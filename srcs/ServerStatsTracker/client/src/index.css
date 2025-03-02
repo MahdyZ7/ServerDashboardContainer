@@ -1,0 +1,21 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --chart-1: #2563eb; /* Blue */
+    --chart-2: #dc2626; /* Red */
+    --chart-3: #16a34a; /* Green */
+    --chart-4: #9333ea; /* Purple */
+    --chart-5: #f59e0b; /* Amber */
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+  }
+}

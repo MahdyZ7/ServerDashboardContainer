@@ -1,0 +1,66 @@
+
+services:
+  postgres:
+    image: postgres
+    container_name: postgres
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=server_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - backend
+    init: true
+    expose:
+      - "5432"
+
+#  echo "your_secure_password_here" | docker secret create postgres_password -
+
+  backend:
+    container_name: backend
+    build: ./srcs/DataCollection
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - ./srcs/DataCollection:/app
+    networks:
+      - backend
+    depends_on:
+      - postgres
+    init: true
+
+  serverstats:
+    container_name: ServerStatsTracker
+    build: ./srcs/ServerStatsTracker
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - ./srcs/ServerStatsTracker:/app
+    networks:
+      - backend
+    depends_on:
+      - postgres
+      - backend
+    init: true
+    ports:
+      - "5000:5000"
+    expose:
+      - "5000"
+
+
+networks:
+  backend:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  
