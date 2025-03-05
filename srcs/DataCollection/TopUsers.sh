@@ -2,7 +2,7 @@
 
 # Function to get disk space usage for a user
 get_disk_usage() {
-	if [ $(id -u) = 0 ] && getent passwd $1 > /dev/null; then
+	if [ $(id -u) = 0 ] && [ -d  /home/$1] ; then
     	du -sb /home/$1 2> /dev/null | awk '{printf("%.2f"), $1/1000000000}'
 	else
 		echo nan
@@ -14,16 +14,14 @@ get_usage_stats() {
 }
 
 # Get all users
-users=$(ls /home/)
-passwd_users=$(getent passwd | awk -F: '{print $1}')
+users=$(getent passwd | grep "/bin/.*sh" | awk -F: '{print $1}')
+# passwd_users=$(getent passwd | awk -F: '{print $1}')
+# ps -eo %cpu,%mem,cmd --sort=-%cpu | awk 'NR==2 {print $3}' | xargs -n1 basename
 
 for user in $users
 do
     # cpu_usage=$(get_cpu_usage $user)
     # memory_usage=$(get_memory_usage $user)
-	if ! getent passwd $user > /dev/null; then
-		continue
-	fi
 	cpu_mem_usage=$(get_usage_stats $user)
     disk_usage=$(get_disk_usage $user)
 

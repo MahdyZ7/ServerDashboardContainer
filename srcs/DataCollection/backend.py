@@ -263,7 +263,9 @@ def readServerList():
 	for i in range(1, 8):
 		server_name = os.getenv(f"SERVER{i}_NAME")
 		if not server_name:
+			logging.info(f"Server {i} not found")
 			continue
+		logging.info(f"Server {i} found")
 		servers.append({
 			   'name': server_name,
 			   'host': os.getenv(f"SERVER{i}_HOST"),
@@ -284,6 +286,7 @@ def main():
 			for server in readServerList():
 
 				if not server_online(server):
+					logging.info(f"Server {server['name']} is offline")
 					continue
 				# Run monitoring script and get output
 				monitoring_output = run_monitoring_script(server)
