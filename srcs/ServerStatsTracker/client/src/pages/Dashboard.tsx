@@ -122,7 +122,7 @@ export default function Dashboard() {
             <SummaryCard 
               title="Active Users"
               value={
-                servers.reduce((sum, server) => sum + server.logged_users, 0)
+                servers.reduce((sum: number, server: ServerMetric) => sum + server.logged_users, 0)
               }
               icon={
                 <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -134,7 +134,7 @@ export default function Dashboard() {
               subValues={[
                 { 
                   label: "", 
-                  value: `${servers.reduce((sum, server) => sum + server.active_ssh_users, 0)} SSH, ${servers.reduce((sum, server) => sum + server.active_vnc_users, 0)} VNC` 
+                  value: `${servers.reduce((sum: number, server: ServerMetric) => sum + server.active_ssh_users, 0)} SSH, ${servers.reduce((sum: number, server: ServerMetric) => sum + server.active_vnc_users, 0)} VNC` 
                 }
               ]}
             />
@@ -175,7 +175,7 @@ export default function Dashboard() {
           </>
         ) : (
           <>
-            {servers.map((server) => (
+            {servers.map((server: ServerMetric) => (
               <ServerCard 
                 key={server.server_name}
                 server={server}

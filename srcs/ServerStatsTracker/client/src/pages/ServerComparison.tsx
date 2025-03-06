@@ -215,8 +215,8 @@ export default function ServerComparison() {
               ))
             ) : (
               serversMetrics
-                .filter(server => selectedServers.includes(server.server_name))
-                .map(server => (
+                .filter((server: ServerMetric) => selectedServers.includes(server.server_name))
+                .map((server: ServerMetrics) => (
                   <tr key={server.server_name} className="hover:bg-slate-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-slate-900">{server.server_name}</div>
