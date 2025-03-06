@@ -2,7 +2,13 @@ Container_list =  $(shell docker ps -aq)
 Image_list = $(shell docker images -aq)
 Volume_list = $(shell docker volume ls -q)
 Network_list = $(shell docker network ls -q)
-  
+
+MAGENTA=\033[0;35m
+CYAN=\033[0;36m  
+BLUE=\033[0;34m
+RED=\033[0;31m
+GREEN=\033[0;32m
+NC=\033[0m # No Color
 
 
 build:
@@ -42,15 +48,19 @@ test:
 		echo "hello"; \
 	fi
 
-logs_db:
+logs-db:
+	@echo "\t${MAGENTA}Postgres${NC}"
 	docker logs postgres
 
-logs_backend:
-	docker logs backend
+logs-DataCollection:
+	@echo "\t${MAGENTA}DataCollection${NC}"
+	docker logs DataCollection
 
-logs:
-	docker logs postgres
-	docker logs backend
+logs-ServerTracker:
+	@echo "\t${MAGENTA}ServerTracker${NC}"
+	docker logs ServerStatsTracker
+
+logs: logs-db logs-DataCollection logs-ServerTracker
 
 
 rebuild: clean build run

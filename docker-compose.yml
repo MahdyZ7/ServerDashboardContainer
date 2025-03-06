@@ -23,7 +23,7 @@ services:
 #  echo "your_secure_password_here" | docker secret create postgres_password -
 
   backend:
-    container_name: backend
+    container_name: DataCollection
     build: ./srcs/DataCollection
     restart: always
     env_file:
