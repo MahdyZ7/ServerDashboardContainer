@@ -59,7 +59,8 @@ def init_db():
 	'''
 	conn = psycopg2.connect(**DB_CONFIG)
 	cursor = conn.cursor()
-		
+
+	logging.info("Initializing database")	
 	cursor.execute(create_table_query)
 	cursor.execute(create_table_query_2)
 	conn.commit()
@@ -100,7 +101,7 @@ def run_monitoring_script(server) -> str:
 							  check=True)
 		return result.stdout.strip()
 	except subprocess.CalledProcessError as e:
-		logging.error(f"Failed to run monitoring script: {e}")
+		logging.error(f"Failed to run monitoring script for {server['host']}: {e}")
 		raise
 
 def get_top_users(server) -> Dict:
@@ -120,7 +121,7 @@ def get_top_users(server) -> Dict:
 							  check=True)
 		return parse_top_users(result.stdout)
 	except subprocess.CalledProcessError as e:
-		logging.error(f"Failed to get top users: {e}")
+		logging.error(f"Failed to get top users for {server['host']}: {e}")
 		raise
 
 def parse_top_users(data: str) -> Dict:
@@ -211,10 +212,10 @@ def store_metrics(metrics: Dict):
 		cursor.execute(insert_query, metrics)
 		conn.commit()
 		
-		logging.info("Successfully stored metrics in database")
+		logging.info(f"Successfully stored metrics in database for {metrics['server_name']}")
 		
 	except  psycopg2.connect.Error as e:
-		logging.error(f"Database error: {e}")
+		logging.error(f"Database error for {metrics['server_name']}: {e}")
 		raise
 	finally:
 		if 'cursor' in locals():
@@ -246,10 +247,10 @@ def store_top_users(server_name: str, top_users: Dict):
 			cursor.execute(insert_query, user)
 		conn.commit()
 		
-		logging.info("Successfully stored top users in database")
+		logging.info("Successfully stored top users in database for {server_name}")
 		
 	except  psycopg2.connect.Error as e:
-		logging.error(f"Database error: {e}")
+		logging.error(f"Database error in {server_name}: {e}")
 		raise
 	finally:
 		if 'cursor' in locals():
@@ -263,9 +264,8 @@ def readServerList():
 	for i in range(1, 8):
 		server_name = os.getenv(f"SERVER{i}_NAME")
 		if not server_name:
-			logging.info(f"Server {i} not found")
 			continue
-		logging.info(f"Server {i} found")
+		logging.info(f"Server {i} found in environment variables")
 		servers.append({
 			   'name': server_name,
 			   'host': os.getenv(f"SERVER{i}_HOST"),
@@ -288,17 +288,21 @@ def main():
 				if not server_online(server):
 					logging.info(f"Server {server['name']} is offline")
 					continue
-				# Run monitoring script and get output
-				monitoring_output = run_monitoring_script(server)
-				top_users = get_top_users(server)
-				# print (top_users)
-				# Parse the monitoring data
-				metrics = parse_monitoring_data(monitoring_output)
-				metrics['server_name'] = server['name']
-				# print(f"{server['name']}:\t{metrics}")
-				# Store in database
-				store_metrics(metrics)
-				store_top_users(server['name'], top_users)
+				try:
+					# Run monitoring script and get output
+					monitoring_output = run_monitoring_script(server)
+					top_users = get_top_users(server)
+					# print (top_users)
+					# Parse the monitoring data
+					metrics = parse_monitoring_data(monitoring_output)
+					metrics['server_name'] = server['name']
+					# print(f"{server['name']}:\t{metrics}")
+					# Store in database
+					store_metrics(metrics)
+					store_top_users(server['name'], top_users)
+				except Exception as e:
+					logging.error(f"Error processing server {server['name']}: {e}")
+					continue
 			# Wait for 5 minutes
 			time.sleep(900)
 		
