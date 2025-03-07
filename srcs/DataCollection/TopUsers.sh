@@ -2,7 +2,7 @@
 
 # Function to get disk space usage for a user
 get_disk_usage() {
-	if [ $(id -u) = 0 ] && [ -d  /home/$1] ; then
+	if [ $(id -u) = 0 ] && [ -d  /home/$1 ] ; then
     	du -sb /home/$1 2> /dev/null | awk '{printf("%.2f"), $1/1000000000}'
 	else
 		echo nan
