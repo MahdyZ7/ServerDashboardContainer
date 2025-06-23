@@ -43,13 +43,13 @@ done
 
 if $line_format; then
 	printf "$ARCH,$OS,$PCPU,$VCPU,$RAM_USED/$RAM_TOTAL,$RAM_PERC,\
-	$DISK_USED/$DISK_TOTAL,$DISK_PERC,$CPU_LOAD,$LAST_BOOT,\
-	$TCP,$USER_LOG,$ACTIVE_VNC,$ACTIVE_SSH\n"
+$DISK_USED/$DISK_TOTAL,$DISK_PERC,$CPU_LOAD,$LAST_BOOT,\
+$TCP,$USER_LOG,$ACTIVE_VNC,$ACTIVE_SSH\n"
 else
 	printf "%-25s: %s\n" "Architecture" "$ARCH"
 	printf "%-25s: %s\n" "OS" "$OS"
-	printf "%-25s: CPUs: %d\n" "Physical" "$PCPU"
-	printf "%-25s: CPUs: %d\n" "Virtual" "$VCPU"
+	printf "%-25s: %d\n" "Physical CPUs" "$PCPU"
+	printf "%-25s: %d\n" "Virtual CPUs" "$VCPU"
 	printf "%-25s: %s/%s (%.0f%%)\n" "RAM" "$RAM_USED" "$RAM_TOTAL" "$RAM_PERC"
 	printf "%-25s: %s/%s (%s)\n" "Disk" "$DISK_USED" "$DISK_TOTAL" "$DISK_PERC"
 	printf "%-25s: %s\n" "CPU Load (1, 5, 15 min)" "$CPU_LOAD"

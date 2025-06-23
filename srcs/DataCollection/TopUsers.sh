@@ -2,7 +2,7 @@
 
 # Function to get disk space usage for a user
 get_disk_usage() {
-	if [ $(id -u) = 0 ] && [ -d  /home/$1 ] ; then
+	if [ -d  /home/$1 ] ; then
 		files=$(find /eda_work/ -user $1 -maxdepth 1 2> /dev/null)
     	if [[ ! $files == *"/eda_work/$1"* ]]; then
 			files="$files /eda_work/$1"
@@ -13,13 +13,12 @@ get_disk_usage() {
 	fi
 }
 
-# Functuon to get all memory and CPU usage stats for all users
+# Function to get all memory and CPU usage stats for all users
 get_all_usage_stats() {
 	ps -eo user:20,%cpu,%mem,comm | awk '{ 
 		user=$1;
 		cpu=$2;
 		mem=$3;
-		magots="$users"
 		if (!users[user]) {
 			users[user]=1;
 			user_cpu[user]=0;

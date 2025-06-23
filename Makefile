@@ -56,11 +56,49 @@ logs-DataCollection:
 	@echo "\t${MAGENTA}DataCollection${NC}"
 	docker logs DataCollection
 
-logs-ServerTracker:
-	@echo "\t${MAGENTA}ServerTracker${NC}"
-	docker logs ServerStatsTracker
+logs-Frontend:
+	@echo "\t${MAGENTA}Frontend${NC}"
+	docker logs Frontend
 
-logs: logs-db logs-DataCollection logs-ServerTracker
+logs: logs-db logs-DataCollection logs-Frontend
 
 
 rebuild: clean build run
+
+# Debugging and utility targets
+
+debug:
+	docker compose up
+
+logs-follow:
+	docker compose logs -f
+
+ps:
+	docker compose ps
+
+status:
+	docker ps -a
+
+restart-service:
+	@if [ -z "$(SERVICE)" ]; then \
+		echo "Please specify SERVICE, e.g., make restart-service SERVICE=Frontend"; \
+		exit 1; \
+	else \
+		docker compose restart $(SERVICE); \
+	fi
+
+rebuild-service:
+	@if [ -z "$(SERVICE)" ]; then \
+		echo "Please specify SERVICE, e.g., make rebuild-service SERVICE=Frontend"; \
+		exit 1; \
+	else \
+		docker compose up --build -d $(SERVICE); \
+	fi
+
+shell:
+	@if [ -z "$(SERVICE)" ]; then \
+		echo "Please specify SERVICE, e.g., make shell SERVICE=Frontend"; \
+		exit 1; \
+	else \
+		docker exec -it $(SERVICE) /bin/bash; \
+	fi

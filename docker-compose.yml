@@ -3,7 +3,7 @@ services:
   postgres:
     image: postgres
     container_name: postgres
-    restart: always
+    restart: unless-stopped
     env_file:
       - .env
     environment:
@@ -25,7 +25,7 @@ services:
   backend:
     container_name: DataCollection
     build: ./srcs/DataCollection
-    restart: always
+    restart: unless-stopped
     env_file:
       - .env
     volumes:
@@ -36,24 +36,23 @@ services:
       - postgres
     init: true
 
-  serverstats:
-    container_name: ServerStatsTracker
-    build: ./srcs/ServerStatsTracker
-    restart: always
+  frontend:
+    container_name: Frontend
+    build: ./srcs/Frontend
+    restart: unless-stopped
     env_file:
       - .env
     volumes:
-      - ./srcs/ServerStatsTracker:/app
+      - ./srcs/Frontend:/app
     networks:
       - backend
     depends_on:
-      - postgres
       - backend
     init: true
     ports:
-      - "5000:5000"
+      - "3000:3000"
     expose:
-      - "5000"
+      - "3000"
 
 
 networks:
