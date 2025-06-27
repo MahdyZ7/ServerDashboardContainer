@@ -7,7 +7,7 @@ from datetime import datetime
 # Import from local modules
 from config import KU_COLORS, DASHBOARD_CONFIG, FONTS
 from components import (create_system_overview, create_alert_panel, create_enhanced_server_cards,
-                       create_enhanced_users_table, create_network_monitor, create_enhanced_historical_graphs)
+                        create_enhanced_users_table, create_network_monitor, create_enhanced_historical_graphs)
 from callbacks import register_callbacks
 
 # Configure logging
@@ -15,8 +15,8 @@ logging.basicConfig(level=logging.INFO)
 
 # Initialize the Dash app
 app = dash.Dash(__name__,
-				suppress_callback_exceptions=True,
-				meta_tags=DASHBOARD_CONFIG['meta_tags'])
+                suppress_callback_exceptions=True,
+                meta_tags=DASHBOARD_CONFIG['meta_tags'])
 
 app.title = DASHBOARD_CONFIG['title']
 
@@ -66,7 +66,7 @@ app.index_string = f'''
                 min-height: 100vh;
                 color: var(--ku-dark);
                 line-height: 1.6;
-                font-weight: 400;
+                fontWeight: 400;
             }}
             
             /* Enhanced Header */
@@ -75,7 +75,7 @@ app.index_string = f'''
                 padding: 20px 40px;
                 color: white;
                 display: flex;
-                align-items: center;
+                alignItems: center;
                 justify-content: space-between;
                 box-shadow: 0 4px 20px rgba(0,87,184,0.25);
                 position: sticky;
@@ -85,18 +85,18 @@ app.index_string = f'''
             
             .header-left {{
                 display: flex;
-                align-items: center;
+                alignItems: center;
             }}
             
             .header img {{
                 height: 60px;
-                margin-right: 24px;
+                marginRight: 24px;
                 filter: brightness(0) invert(1);
             }}
             
             .header h1 {{
                 font-size: 32px;
-                font-weight: 600;
+                fontWeight: 600;
                 letter-spacing: -0.3px;
                 margin: 0;
                 font-family: 'DM Sans', sans-serif;
@@ -104,7 +104,7 @@ app.index_string = f'''
             
             .header-right {{
                 display: flex;
-                align-items: center;
+                alignItems: center;
                 gap: 20px;
             }}
             
@@ -130,7 +130,7 @@ app.index_string = f'''
                 border-radius: 16px;
                 box-shadow: var(--ku-card-shadow);
                 padding: 32px;
-                margin-bottom: 32px;
+                marginBottom: 32px;
                 border: 1px solid var(--ku-border);
                 transition: var(--ku-transition);
                 position: relative;
@@ -154,19 +154,19 @@ app.index_string = f'''
             
             .card-header {{
                 display: flex;
-                align-items: center;
+                alignItems: center;
                 justify-content: space-between;
-                margin-bottom: 24px;
+                marginBottom: 24px;
                 padding-bottom: 16px;
                 border-bottom: 1px solid var(--ku-border);
             }}
             
             .card-title {{
                 font-size: 22px;
-                font-weight: 600;
+                fontWeight: 600;
                 color: var(--ku-dark);
                 display: flex;
-                align-items: center;
+                alignItems: center;
                 gap: 12px;
                 font-family: 'DM Sans', sans-serif;
             }}
@@ -174,7 +174,7 @@ app.index_string = f'''
             .card-subtitle {{
                 font-size: 14px;
                 color: var(--ku-muted);
-                font-weight: 400;
+                fontWeight: 400;
                 line-height: 1.5;
             }}
             
@@ -186,9 +186,9 @@ app.index_string = f'''
             /* System Overview Grid */
             .system-overview {{
                 display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+                gridTemplateColumns: repeat(auto-fit, minmax(300px, 1fr));
                 gap: 24px;
-                margin-bottom: 32px;
+                marginBottom: 32px;
             }}
             
             .overview-stat {{
@@ -202,7 +202,7 @@ app.index_string = f'''
             
             .stat-value {{
                 font-size: 36px;
-                font-weight: 700;
+                fontWeight: 700;
                 color: var(--ku-primary);
                 display: block;
                 line-height: 1.2;
@@ -212,14 +212,14 @@ app.index_string = f'''
             .stat-label {{
                 font-size: 14px;
                 color: var(--ku-muted);
-                font-weight: 500;
+                fontWeight: 500;
                 margin-top: 8px;
             }}
             
             .stat-change {{
                 font-size: 12px;
                 margin-top: 4px;
-                font-weight: 600;
+                fontWeight: 600;
             }}
             
             .stat-change.positive {{
@@ -255,17 +255,17 @@ app.index_string = f'''
             
             .server-header {{
                 display: flex;
-                align-items: center;
+                alignItems: center;
                 justify-content: space-between;
-                margin-bottom: 20px;
+                marginBottom: 20px;
             }}
             
             .server-name {{
                 font-size: 20px;
-                font-weight: 600;
+                fontWeight: 600;
                 color: var(--ku-dark);
                 display: flex;
-                align-items: center;
+                alignItems: center;
                 gap: 12px;
                 font-family: 'DM Sans', sans-serif;
             }}
@@ -274,7 +274,7 @@ app.index_string = f'''
                 padding: 6px 12px;
                 border-radius: 20px;
                 font-size: 12px;
-                font-weight: 600;
+                fontWeight: 600;
                 text-transform: uppercase;
                 letter-spacing: 0.5px;
             }}
@@ -299,7 +299,7 @@ app.index_string = f'''
             
             .server-metrics {{
                 display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+                gridTemplateColumns: repeat(auto-fit, minmax(120px, 1fr));
                 gap: 16px;
                 margin: 20px 0;
             }}
@@ -314,16 +314,16 @@ app.index_string = f'''
             
             .metric-value {{
                 font-size: 24px;
-                font-weight: 600;
+                fontWeight: 600;
                 display: block;
-                margin-bottom: 4px;
+                marginBottom: 4px;
                 font-family: 'DM Sans', sans-serif;
             }}
             
             .metric-label {{
                 font-size: 12px;
                 color: var(--ku-muted);
-                font-weight: 500;
+                fontWeight: 500;
             }}
             
             .server-details {{
@@ -336,7 +336,7 @@ app.index_string = f'''
             .detail-row {{
                 display: flex;
                 justify-content: space-between;
-                align-items: center;
+                alignItems: center;
                 padding: 8px 0;
                 border-bottom: 1px solid var(--ku-border);    
             }}
@@ -346,7 +346,7 @@ app.index_string = f'''
             }}
             
             .detail-label {{
-                font-weight: 500;
+                fontWeight: 500;
                 color: var(--ku-dark);
                 font-size: 14px;
             }}
@@ -362,21 +362,21 @@ app.index_string = f'''
                 border: 1px solid rgba(248, 72, 94, 0.2);
                 border-radius: 12px;
                 padding: 24px;
-                margin-bottom: 28px;
+                marginBottom: 28px;
             }}
             
             .alert-item {{
                 display: flex;
-                align-items: center;
+                alignItems: center;
                 padding: 12px;
                 background: rgba(255, 255, 255, 0.7);
                 border-radius: 8px;
-                margin-bottom: 12px;
+                marginBottom: 12px;
                 border-left: 4px solid var(--ku-primary);
             }}
             
             .alert-icon {{
-                margin-right: 12px;
+                marginRight: 12px;
                 color: var(--ku-danger);
                 font-size: 18px;
             }}
@@ -386,9 +386,9 @@ app.index_string = f'''
             }}
             
             .alert-title {{
-                font-weight: 500;
+                fontWeight: 500;
                 color: var(--ku-dark);
-                margin-bottom: 4px;
+                marginBottom: 4px;
                 font-family: 'DM Sans', sans-serif;
             }}
             
@@ -405,12 +405,12 @@ app.index_string = f'''
             /* Performance Indicators */
             .performance-indicator {{
                 display: flex;
-                align-items: center;
+                alignItems: center;
                 gap: 8px;
                 padding: 8px 12px;
                 border-radius: 20px;
                 font-size: 12px;
-                font-weight: 500;
+                fontWeight: 500;
                 font-family: 'DM Sans', sans-serif;
                 text-transform: uppercase;
                 letter-spacing: 0.5px;
@@ -478,7 +478,7 @@ app.index_string = f'''
             /* Network Activity */
             .network-activity {{
                 display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gridTemplateColumns: repeat(auto-fit, minmax(200px, 1fr));
                 gap: 16px;
                 margin: 20px 0;
             }}
@@ -499,11 +499,11 @@ app.index_string = f'''
                 }}
                 
                 .server-metrics {{
-                    grid-template-columns: repeat(2, 1fr);
+                    gridTemplateColumns: repeat(2, 1fr);
                 }}
                 
                 .system-overview {{
-                    grid-template-columns: 1fr;
+                    gridTemplateColumns: 1fr;
                 }}
                 
                 .header {{
@@ -524,12 +524,12 @@ app.index_string = f'''
                 border-radius: 25px;
                 cursor: pointer;
                 font-size: 14px;
-                font-weight: 600;
+                fontWeight: 600;
                 font-family: 'DM Sans', sans-serif;
                 transition: var(--ku-transition);
                 box-shadow: 0 4px 16px rgba(0,87,184,0.2);
                 display: inline-flex;
-                align-items: center;
+                alignItems: center;
                 gap: 8px;
             }}
             
@@ -709,7 +709,7 @@ app.layout = html.Div([
             "Export Report"
         ], id='export-button', className='btn btn-secondary', style={'marginLeft': '12px'}),
         html.Div(id='last-updated', style={'display': 'inline-block',
-                                          'marginLeft': '24px', 'fontSize': '14px', 'color': KU_COLORS['muted']})
+                                           'marginLeft': '24px', 'fontSize': '14px', 'color': KU_COLORS['muted']})
     ], style={'margin': '32px 0', 'textAlign': 'right', 'padding': '20px', 'borderTop': f'1px solid {KU_COLORS["border"]}', 'backgroundColor': 'white', 'borderRadius': '12px'})
 ])
 
