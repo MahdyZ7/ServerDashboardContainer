@@ -1309,7 +1309,7 @@ def create_network_monitor():
 		# Per-server network details
 		html.Div([
 			html.H4("Server Network Details", style={
-				'margin': '20px 0 16px 0', 'color': KU_COLORS['dark']}),
+				'margin': '20px 0 16px 0', 'color': KU_COLORS['text_primary']}),
 			html.Div([
 				dash_table.DataTable(
 					id='network-table',
@@ -1371,6 +1371,12 @@ def create_network_monitor():
 	])
 
 
+def safe_float(val):
+	try:
+		return float(val)
+	except (ValueError, TypeError):
+		return 0
+
 def create_enhanced_users_table():
 	"""Create enhanced users table with more details"""
 	users_data = get_top_users()
@@ -1381,8 +1387,11 @@ def create_enhanced_users_table():
 	# Group users by server
 	servers = {}
 	total_users = len(users_data)
-	high_usage_users = len([u for u in users_data if u.get(
-		'cpu', 0) > 50 or u.get('mem', 0) > 50])
+
+	high_usage_users = len([
+		u for u in users_data
+		if safe_float(u.get('cpu', 0)) > 50 or safe_float(u.get('mem', 0)) > 50
+	])
 
 	for user in users_data:
 		server_name = user['server_name']
@@ -1424,7 +1433,7 @@ def create_enhanced_users_table():
 			],
 			data=[{
 				**user,
-				'status': 'High Usage' if (user.get('cpu', 0) > 50 or user.get('mem', 0) > 50) else 'Normal'
+				'status': 'High Usage' if safe_float(user.get('cpu', 0)) > 50 or safe_float(user.get('mem', 0)) > 50 else 'Normal'
 			} for user in users],
 			style_table={'overflowX': 'auto'},
 			style_cell={
@@ -1725,6 +1734,10 @@ def update_analytics_chart(server_name, time_range, n_intervals):
 	df = pd.DataFrame(historical_data)
 	if not df.empty:
 		df['timestamp'] = pd.to_datetime(df['timestamp'])
+
+	for col in ['cpu_load_1min', 'cpu_load_5min', 'cpu_load_15min', 'ram_percentage', 'disk_percentage', 'logged_users', 'tcp_connections']:
+		if col in df.columns:
+			df[col] = pd.to_numeric(df[col], errors='coerce')
 
 	# Create the comprehensive chart
 	fig = make_subplots(
