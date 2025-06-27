@@ -114,8 +114,8 @@ def create_alert_panel():
                     html.Div("No alerts at this time",
                              className="alert-description")
                 ], className="alert-content")
-            ], className="alert-item", style={'borderLeftColor': KU_COLORS['success']})
-        ], className="alert-panel", style={'background': 'linear-gradient(135deg, rgba(0, 87, 184, 0.05), rgba(0, 87, 184, 0.1))', 'borderColor': 'rgba(0, 87, 184, 0.2)'})
+            ], className="alert-item", style={'border-left-color': KU_COLORS['success']})
+        ], className="alert-panel", style={'background': 'linear-gradient(135deg, rgba(0, 87, 184, 0.05), rgba(0, 87, 184, 0.1))', 'border-color': 'rgba(0, 87, 184, 0.2)'})
 
     alert_items = []
     for alert in alerts[:TABLE_CONFIG['max_alerts']]:  # Show only top 5 alerts
@@ -290,7 +290,7 @@ def create_enhanced_server_cards():
     # Organize in responsive grid
     return html.Div(server_cards, style={
         'display': 'grid',
-        'gridTemplateColumns': f'repeat(auto-fit, minmax({LAYOUT_CONFIG["server_card_min_width"]}, 1fr))',
+        'grid-template-columns': f'repeat(auto-fit, minmax({LAYOUT_CONFIG["server_card_min_width"]}, 1fr))',
         'gap': LAYOUT_CONFIG['card_gap'],
         'margin': '20px 0'
     })
@@ -542,8 +542,7 @@ def create_enhanced_historical_graphs():
         return html.Div("No server data available", style={'text-align': 'center', 'margin': '20px'})
 
     server_name = metrics[0]['server_name']
-    historical_data = get_historical_metrics(
-        server_name, CHART_CONFIG['default_time_range'])
+    historical_data = get_historical_metrics(server_name, CHART_CONFIG['default_time_range'])
 
     if not historical_data:
         return html.Div(f"No historical data available for {server_name}", style={'text-align': 'center'})
@@ -657,7 +656,7 @@ def create_enhanced_historical_graphs():
         # Server and time range selectors
         html.Div([
             html.Label("Select Server:", style={
-                'marginRight': '10px', 'fontWeight': '600'}),
+                'margin-right': '10px', 'font-weight': '600'}),
             dcc.Dropdown(
                 id='enhanced-server-selector',
                 options=[{'label': m['server_name'],
@@ -666,14 +665,14 @@ def create_enhanced_historical_graphs():
                 style={'width': '300px', 'marginRight': '20px'}
             ),
             html.Label("Time Range:", style={
-                'marginRight': '10px', 'fontWeight': '600'}),
+                'margin-right': '10px', 'font-weight': '600'}),
             dcc.Dropdown(
                 id='enhanced-time-range-selector',
                 options=CHART_CONFIG['time_ranges'],
                 value=CHART_CONFIG['default_time_range'],
                 style={'width': '200px'}
             )
-        ], style={'display': 'flex', 'alignItems': 'center', 'marginBottom': '20px'}),
+        ], style={'display': 'flex', 'align-items': 'center', 'margin-bottom': '20px'}),
 
         # Main analytics chart
         dcc.Graph(id='enhanced-analytics-chart', figure=fig),
