@@ -1,11 +1,9 @@
-# Enhanced Server Monitoring Dashboard - Modular Version
+# Main application file for the Server Monitoring Dashboard
 import dash
 from dash import dcc, html
 import logging
-from datetime import datetime
 
-# Import from local modules
-from config import KU_COLORS, DASHBOARD_CONFIG, FONTS
+from config import (KU_COLORS, DASHBOARD_CONFIG, FONTS)
 from components import (create_system_overview, create_alert_panel, create_enhanced_server_cards,
                        create_enhanced_users_table, create_network_monitor, create_enhanced_historical_graphs)
 from callbacks import register_callbacks
@@ -15,8 +13,8 @@ logging.basicConfig(level=logging.INFO)
 
 # Initialize the Dash app
 app = dash.Dash(__name__,
-				suppress_callback_exceptions=True,
-				meta_tags=DASHBOARD_CONFIG['meta_tags'])
+                suppress_callback_exceptions=True,
+                meta_tags=DASHBOARD_CONFIG['meta_tags'])
 
 app.title = DASHBOARD_CONFIG['title']
 
@@ -100,6 +98,12 @@ app.index_string = f'''
                 letter-spacing: -0.3px;
                 margin: 0;
                 font-family: 'DM Sans', sans-serif;
+            }}
+            
+            .header-subtitle {{
+                font-size: 14px;
+                opacity: 0.9;
+                margin-top: 4px;
             }}
             
             .header-right {{
@@ -440,6 +444,38 @@ app.index_string = f'''
                 border: 1px solid rgba(231, 76, 60, 0.2);
             }}
             
+            /* Enhanced Tables */
+            .enhanced-table {{
+                background: white;
+                border-radius: 12px;
+                overflow: hidden;
+                box-shadow: 0 4px 16px rgba(0,87,184,0.1);
+            }}
+            
+            .table-header {{
+                background: linear-gradient(135deg, var(--ku-primary), #003A7A);
+                color: white;
+                padding: 16px 20px;
+                font-weight: 600;
+            }}
+            
+            /* Network Activity */
+            .network-activity {{
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 16px;
+                margin: 20px 0;
+            }}
+            
+            .network-stat {{
+                background: linear-gradient(135deg, rgba(0, 169, 206, 0.08), rgba(0, 169, 206, 0.12));
+                padding: 24px;
+                border-radius: 12px;
+                text-align: center;
+                border: 1px solid rgba(0, 169, 206, 0.2);
+                backdrop-filter: blur(5px);
+            }}
+            
             /* Resource Usage Bars */
             .resource-bar {{
                 background: var(--ku-light);
@@ -467,31 +503,6 @@ app.index_string = f'''
                 background: linear-gradient(90deg, var(--ku-success), #003A7A);
             }}
             
-            /* Enhanced Tables */
-            .enhanced-table {{
-                background: white;
-                border-radius: 12px;
-                overflow: hidden;
-                box-shadow: 0 4px 16px rgba(0,87,184,0.1);
-            }}
-            
-            /* Network Activity */
-            .network-activity {{
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-                gap: 16px;
-                margin: 20px 0;
-            }}
-            
-            .network-stat {{
-                background: linear-gradient(135deg, rgba(0, 169, 206, 0.08), rgba(0, 169, 206, 0.12));
-                padding: 24px;
-                border-radius: 12px;
-                text-align: center;
-                border: 1px solid rgba(0, 169, 206, 0.2);
-                backdrop-filter: blur(5px);
-            }}
-            
             /* Responsive Design */
             @media (max-width: 768px) {{
                 .dashboard-container {{
@@ -515,7 +526,48 @@ app.index_string = f'''
                 }}
             }}
             
-            /* Button styles */
+            /* Custom Scrollbar */
+            ::-webkit-scrollbar {{
+                width: 8px;
+            }}
+            
+            ::-webkit-scrollbar-track {{
+                background: var(--ku-light);
+            }}
+            
+            ::-webkit-scrollbar-thumb {{
+                background: var(--ku-muted);
+                border-radius: 4px;
+            }}
+            
+            ::-webkit-scrollbar-thumb:hover {{
+                background: var(--ku-primary);
+            }}
+            
+            /* Loading Animation */
+            .loading-spinner {{
+                display: inline-block;
+                width: 20px;
+                height: 20px;
+                border: 3px solid var(--ku-light);
+                border-radius: 50%;
+                border-top-color: var(--ku-primary);
+                animation: spin 1s ease-in-out infinite;
+            }}
+            
+            @keyframes spin {{
+                to {{ transform: rotate(360deg); }}
+            }}
+            
+            /* Tab Enhancements */
+            .tab-selected {{
+                background: linear-gradient(135deg, var(--ku-primary) 0%, #003A7A 100%) !important;
+                color: white !important;
+                border-radius: 12px 12px 0 0 !important;
+                font-weight: 600;
+            }}
+            
+            /* Button Enhancements */
             .btn {{
                 background: linear-gradient(135deg, var(--ku-primary) 0%, #003A7A 100%);
                 color: white;
@@ -536,10 +588,19 @@ app.index_string = f'''
             .btn:hover {{
                 transform: translateY(-2px);
                 box-shadow: 0 8px 24px rgba(0,87,184,0.3);
+                background: linear-gradient(135deg, #003A7A 0%, var(--ku-primary) 100%);
+            }}
+            
+            .btn:active {{
+                transform: translateY(0);
             }}
             
             .btn-secondary {{
                 background: linear-gradient(135deg, var(--ku-muted) 0%, #5A6C7D 100%);
+            }}
+            
+            .btn-danger {{
+                background: linear-gradient(135deg, var(--ku-danger) 0%, #C0392B 100%);
             }}
         </style>
     </head>
@@ -567,6 +628,7 @@ app.index_string = f'''
         {{%scripts%}}
         {{%renderer%}}
         <script>
+            // Update time every second
             function updateTime() {{
                 const now = new Date();
                 document.getElementById('current-time').textContent = now.toLocaleString();
@@ -578,12 +640,12 @@ app.index_string = f'''
 </html>
 '''
 
-# Define the main layout using modular components
+# Define the main layout
 app.layout = html.Div([
     # Auto-refresh component
     dcc.Interval(
         id='interval-component',
-        interval=DASHBOARD_CONFIG['refresh_interval'],
+        interval=DASHBOARD_CONFIG['refresh_interval'],  # Refresh every 30 seconds
         n_intervals=0
     ),
 
