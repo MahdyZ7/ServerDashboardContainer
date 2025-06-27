@@ -56,11 +56,15 @@ logs-DataCollection:
 	@echo "\t${MAGENTA}DataCollection${NC}"
 	docker logs DataCollection
 
+logs-API:
+	@echo "\t${MAGENTA}API${NC}"
+	docker logs API
+
 logs-Frontend:
 	@echo "\t${MAGENTA}Frontend${NC}"
 	docker logs Frontend
 
-logs: logs-db logs-DataCollection logs-Frontend
+logs: logs-db logs-DataCollection logs-API logs-Frontend
 
 
 rebuild: clean build run

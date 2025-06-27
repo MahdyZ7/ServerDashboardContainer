@@ -36,6 +36,24 @@ services:
       - postgres
     init: true
 
+  api:
+    container_name: API
+    build: ./srcs/Backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./srcs/Backend:/app
+    networks:
+      - backend
+    depends_on:
+      - postgres
+    init: true
+    ports:
+      - "5000:5000"
+    expose:
+      - "5000"
+
   frontend:
     container_name: Frontend
     build: ./srcs/Frontend
@@ -48,6 +66,7 @@ services:
       - backend
     depends_on:
       - backend
+      - api
     init: true
     ports:
       - "3000:3000"

@@ -58,8 +58,9 @@ def init_db():
 			disk DECIMAL(5,2) DEFAULT 0,
 			process_count INT DEFAULT 0,
 			top_process VARCHAR(255) DEFAULT NULL,
-			last_login TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-			full_Name VARCHAR(255) DEFAULT NULL
+			last_login TIMESTAMP DEFAULT NULL,
+			full_name VARCHAR(255) DEFAULT NULL,
+			UNIQUE (server_name, username)
 		)
 	'''
 	with psycopg2.connect(**DB_CONFIG) as conn:
@@ -242,6 +243,8 @@ def store_top_users(server_name: str, top_users_dict: Dict):
 			with conn.cursor() as cursor:
 				for user in top_users:
 					user['server_name'] = server_name
+					if user['last_login'] == '--':
+						user['last_login'] = None
 					if user['disk'] == 0:
 						insert_query = """
 							INSERT INTO top_users (server_name, username, cpu, mem, disk, process_count, top_process, last_login, full_name)
@@ -307,12 +310,14 @@ def main():
 		# Initialize the database
 		init_db()
 		logging.info("Database initialized successfully")
+
 		# Set up a counter for disk usage checks
 		server_list = readServerList()
 		if not server_list:
 			logging.error(
 				"No servers found in environment variables. Exiting.")
 			return
+
 		while True:
 			# Loop through the servers
 			for server in server_list:
