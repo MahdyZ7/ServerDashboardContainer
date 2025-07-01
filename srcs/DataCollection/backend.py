@@ -85,12 +85,12 @@ def server_online(server: Dict) -> bool:
 	"""Check if the server is online by pinging it."""
 	try:
 		# Run a simple command to check if the server is online
-		command_string = ['ping', '-c', '1', '-w', '5', server['host']]
+		command_string = ['ping', '-c', '1', '-w', '5', server['ip']]
 		result = subprocess.run(
 			command_string, capture_output=True, text=True, check=True)
 		return True
 	except subprocess.CalledProcessError:
-		logging.error(f"Server {server['host']} is offline")
+		logging.error(f"Server {server['host']}:{server['ip']} is offline")
 		return False
 
 
@@ -100,7 +100,7 @@ def run_monitoring_script(server: Dict) -> str:
 		# Get the directory of the current script
 		current_dir = os.path.dirname(os.path.abspath(__file__))
 		script_path = os.path.join(current_dir, 'BashGetInfo.sh')
-		command_string = [script_path, server['host'], server['username'],
+		command_string = [script_path, server['ip'], server['username'],
 						  server['password'], "mini_monitering.sh", "--line-format"]
 		# Make sure the script is executable
 		os.chmod(script_path, 0o755)
@@ -123,7 +123,7 @@ def get_top_users(server: Dict, get_storage_usage: bool = False) -> Dict:
 		# Get the directory of the current script
 		current_dir = os.path.dirname(os.path.abspath(__file__))
 		script_path = os.path.join(current_dir, 'BashGetInfo.sh')
-		command_string = [script_path, server['host'], server['username'],
+		command_string = [script_path, server['ip'], server['username'],
 						  server['password'], "TopUsers.sh", "--no-headers"]
 		if get_storage_usage:
 			command_string.append("--collect-disk")
@@ -304,6 +304,7 @@ def readServerList() -> List[Dict]:
 		servers.append({
 			'name': server_name,
 			'host': os.getenv(f"SERVER{i}_HOST"),
+			'ip': os.getenv(f"SERVER{i}_IP"),
 			'username': os.getenv(f"SERVER{i}_USERNAME"),
 			'password': os.getenv(f"SERVER{i}_PASSWORD")
 		})
@@ -326,21 +327,21 @@ def main():
 
 		while True:
 			# Loop through the servers
-			for server in server_list:
-				if disk_data_counter == user_disk_data_interval:
-					top_users = get_top_users(server, True)
-					disk_data_counter = 0
-				else:
-					top_users = get_top_users(server)
-				store_top_users(server['name'], top_users)
+			if disk_data_counter == user_disk_data_interval:
+				disk_data_counter = 0
+			else:
 				disk_data_counter += 1
+			for server in server_list:
 				if not server_online(server):
 					logging.info(f"Server {server['name']} is offline")
 					continue
 				try:
 					# Run monitoring script and get output
 					monitoring_output = run_monitoring_script(server)
-					top_users = get_top_users(server)
+					if disk_data_counter == user_disk_data_interval:
+						top_users = get_top_users(server, True)
+					else:
+						top_users = get_top_users(server)
 
 					# Parse the monitoring data
 					metrics = parse_monitoring_data(monitoring_output)
