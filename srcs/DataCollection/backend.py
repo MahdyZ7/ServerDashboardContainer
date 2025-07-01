@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from math import ceil
 import subprocess
 import psycopg2
 import logging
@@ -9,7 +10,9 @@ import time
 
 load_dotenv(".env")
 
-print("ASDASDASDASDASDASD")
+data_collection_interval: int = 15 # in minutes
+user_disk_data_interval: int =  1 * ceil(60 * 24 / data_collection_interval) # 1 time a day
+
 # Database configuration
 DB_CONFIG = {
 	'host': 'postgres',
@@ -122,6 +125,8 @@ def get_top_users(server: Dict, get_storage_usage: bool = False) -> Dict:
 		script_path = os.path.join(current_dir, 'BashGetInfo.sh')
 		command_string = [script_path, server['host'], server['username'],
 						  server['password'], "TopUsers.sh", "--no-headers"]
+		if get_storage_usage:
+			command_string.append("--collect-disk")
 		# Make sure the script is executable
 		os.chmod(script_path, 0o755)
 
@@ -307,7 +312,8 @@ def readServerList() -> List[Dict]:
 
 def main():
 	try:
-		# Initialize the database
+		disk_data_counter: int = 0
+  		# Initialize the database
 		init_db()
 		logging.info("Database initialized successfully")
 
@@ -321,7 +327,13 @@ def main():
 		while True:
 			# Loop through the servers
 			for server in server_list:
-
+				if disk_data_counter == user_disk_data_interval:
+					top_users = get_top_users(server, True)
+					disk_data_counter = 0
+				else:
+					top_users = get_top_users(server)
+				store_top_users(server['name'], top_users)
+				disk_data_counter += 1
 				if not server_online(server):
 					logging.info(f"Server {server['name']} is offline")
 					continue
@@ -342,7 +354,7 @@ def main():
 						f"Error processing server {server['name']}: {e}")
 					continue
 			# Wait for 5 minutes
-			time.sleep(60 * 5)
+			time.sleep(60 * data_collection_interval)
 
 	except Exception as e:
 		logging.error(f"Error in main execution: {e}")

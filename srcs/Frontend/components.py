@@ -430,7 +430,7 @@ def create_enhanced_users_table():
     summary = html.Div([
         html.Div([
             html.Span(f"{total_users}", className="stat-value"),
-            html.Div("Total Active Users", className="stat-label"),
+            html.Div("Total Users", className="stat-label"),
         ], className="overview-stat"),
 
         html.Div([
