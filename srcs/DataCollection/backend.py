@@ -11,7 +11,7 @@ import time
 load_dotenv(".env")
 
 data_collection_interval: int = 15 # in minutes
-user_disk_data_interval: int =  1 * ceil(60 * 24 / data_collection_interval) # 1 time a day
+user_disk_data_interval: int =  1 * int(60 * 24 / data_collection_interval) # 1 time a day
 
 # Database configuration
 DB_CONFIG = {
