@@ -644,7 +644,8 @@ app.layout = html.Div([
                         html.Div(
                             "Active user sessions and resource consumption", className="card-subtitle")
                     ], className="card-header"),
-                    html.Div(id='enhanced-users-table')
+                    html.Div(id='enhanced-users-table'
+                             , children=create_enhanced_users_table())
                 ], className="card")
             ],
             style={'padding': '20px',
@@ -665,7 +666,9 @@ app.layout = html.Div([
                         html.Div(
                             "Historical metrics and trend analysis", className="card-subtitle")
                     ], className="card-header"),
-                    html.Div(id='enhanced-historical-graphs')
+                    html.Div(id='enhanced-historical-graphs'
+                             , children=create_enhanced_historical_graphs()
+                            )
                 ], className="card")
             ],
             style={'padding': '20px',
@@ -686,7 +689,9 @@ app.layout = html.Div([
                         html.Div(
                             "Connection statistics and network health", className="card-subtitle")
                     ], className="card-header"),
-                    html.Div(id='network-monitor')
+                    html.Div(id='network-monitor'
+                             , children=create_network_monitor()
+                            )
                 ], className="card")
             ],
             style={'padding': '20px',

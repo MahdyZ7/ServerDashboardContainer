@@ -409,7 +409,7 @@ def create_enhanced_users_table():
     users_data = get_top_users()
 
     if not users_data:
-        return html.Div("No user data available", style={'text-align': 'center', 'margin': '20px'})
+        return html.Div("No user data available", style={'text-align': 'center', 'margin': '20px', 'padding': '20px', 'background': '#f8f9fa', 'border-radius': '8px'})
 
     # Group users by server
     servers = {}
