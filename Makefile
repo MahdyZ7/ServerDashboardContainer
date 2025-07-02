@@ -48,6 +48,10 @@ test:
 		echo "hello"; \
 	fi
 
+logs-nginx:
+	@echo "\t${MAGENTA}Nginx${NC}"
+	docker logs nginx
+
 logs-db:
 	@echo "\t${MAGENTA}Postgres${NC}"
 	docker logs postgres
