@@ -426,6 +426,10 @@ def create_enhanced_users_table():
             servers[server_name] = []
         servers[server_name].append(user)
 
+        if user['last_login']:
+            dt = datetime.strptime(user['last_login'], '%Y-%m-%dT%H:%M:%S')
+            user['last_login'] = dt.strftime('%b %d, %Y')
+
     # Summary statistics
     summary = html.Div([
         html.Div([
@@ -454,13 +458,20 @@ def create_enhanced_users_table():
                 {'name': 'CPU Usage (%)', 'id': 'cpu', 'type': 'numeric'},
                 {'name': 'Memory Usage (%)', 'id': 'mem', 'type': 'numeric'},
                 {'name': 'Disk Usage (GB)', 'id': 'disk', 'type': 'numeric'},
+                {'name': 'Processes', 'id': 'process_count', 'type': 'numeric'},
+                {'name': 'Top Process', 'id': 'top_process'},
+                {'name': 'Last Login', 'id': 'last_login', 'type': 'datetime'},
+                {'name': 'Full Name', 'id': 'full_name'},
                 {'name': 'Status', 'id': 'status'},
             ],
             data=[{
                 **user,
                 'status': 'High Usage' if is_high_usage_user(user) else 'Normal'
             } for user in users],
-            style_table={'overflowX': 'auto'},
+            style_table={
+                'overflowX': 'auto',
+                'borderRadius': '10px'
+            },
             style_cell={
                 'textAlign': 'left',
                 'padding': '12px',
@@ -476,6 +487,10 @@ def create_enhanced_users_table():
                 'fontFamily': 'DM Sans, sans-serif'
             },
             style_data_conditional=[
+                {
+					'if': {'row_index': 'odd'},
+                    'backgroundColor': '#f7f7fa'
+                },
                 {
                     'if': {'column_id': 'cpu', 'filter_query': '{cpu} > 70'},
                     'backgroundColor': 'rgba(248, 72, 94, 0.1)',
@@ -516,21 +531,22 @@ def create_enhanced_users_table():
             label=f"{server_name} ({len(users)})",
             value=server_name,
             children=[table],
-            style={'padding': '15px', 'fontSize': '14px'},
+            style={'padding': '15px', 'fontSize': '14px', 'borderRadius': '60px'},
             selected_style={
                 'backgroundColor': KU_COLORS['primary'],
                 'color': 'white',
                 'padding': '15px',
                 'fontSize': '14px',
-                'fontWeight': '600'
+                'fontWeight': '600',
+                'borderRadius': '60px',
             }
         )
         tabs.append(tab)
 
     return html.Div([
         summary,
-        dcc.Tabs(id='enhanced-user-tabs', value=list(servers.keys())
-                 [0] if servers else '', children=tabs)
+        dcc.Tabs(id='enhanced-user-tabs', value=list(servers.keys())[0] if servers else '',
+                 children=tabs, style={'margin': '20px 0'})
     ])
 
 
