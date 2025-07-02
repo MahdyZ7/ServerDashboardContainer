@@ -39,7 +39,7 @@ KU_COLORS = {
 }
 
 # API Configuration
-API_BASE_URL = os.getenv('API_BASE_URL', 'http://api:5000/api')
+API_BASE_URL = os.getenv('API_BASE_URL', 'http://API:5000/api')
 
 # Dashboard Configuration
 DASHBOARD_CONFIG = {

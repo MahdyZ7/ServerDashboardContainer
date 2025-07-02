@@ -68,10 +68,10 @@ logs-Frontend:
 	@echo "\t${MAGENTA}Frontend${NC}"
 	docker logs Frontend
 
-logs: logs-db logs-DataCollection logs-API logs-Frontend
+logs: logs-nginx logs-db logs-DataCollection logs-API logs-Frontend
 
 
-rebuild: clean build run
+rebuild: clean build
 
 # Debugging and utility targets
 
@@ -110,3 +110,7 @@ shell:
 	else \
 		docker exec -it $(SERVICE) /bin/bash; \
 	fi
+
+health:
+	@echo "${CYAN}Service Health Status:${NC}"
+	@docker compose ps --format "table {{.Name}}\t{{.Status}}\t{{.Ports}}"
