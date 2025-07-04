@@ -158,13 +158,10 @@ def create_enhanced_server_cards():
         # Status badge styling
         status_class = get_status_badge_class(status)
         status_text = status.upper()
-        
+
         timestamp = metric.get('timestamp', 'Unknown')
         timestamp_dt = datetime.strptime(timestamp, '%Y-%m-%dT%H:%M:%S.%f')
         timestamp_str = timestamp_dt.strftime('%b %d, %Y %H:%M')
-        
-        #dt = datetime.strptime(user['last_login'], '%Y-%m-%dT%H:%M:%S')
-        #user['last_login'] = dt.strftime('%b %d, %Y')
 
         card = html.Div([
             # Server Header
@@ -538,7 +535,8 @@ def create_enhanced_users_table():
             label=f"{server_name} ({len(users)})",
             value=server_name,
             children=[table],
-            style={'padding': '15px', 'fontSize': '14px', 'borderRadius': '60px'},
+            style={'padding': '15px', 'fontSize': '14px',
+                   'borderRadius': '60px'},
             selected_style={
                 'backgroundColor': KU_COLORS['primary'],
                 'color': 'white',
@@ -565,7 +563,8 @@ def create_enhanced_historical_graphs():
         return html.Div("No server data available", style={'text-align': 'center', 'margin': '20px'})
 
     server_name = metrics[0]['server_name']
-    historical_data = get_historical_metrics(server_name, CHART_CONFIG['default_time_range'])
+    historical_data = get_historical_metrics(
+        server_name, CHART_CONFIG['default_time_range'])
 
     if not historical_data:
         return html.Div(f"No historical data available for {server_name}", style={'text-align': 'center'})
@@ -619,9 +618,9 @@ def create_enhanced_historical_graphs():
     )
     # Add critical threshold line
     fig.add_hline(y=90, line_dash="dash", line_color=KU_COLORS['danger'],
-                  annotation_text="Critical", row=1, col=2)
+                  annotation_text="Critical", row="1", col="2")
     fig.add_hline(y=75, line_dash="dot", line_color=KU_COLORS['warning'],
-                  annotation_text="Warning", row=1, col=2)
+                  annotation_text="Warning", row="1", col="2")
 
     # Disk Usage
     fig.add_trace(
