@@ -158,6 +158,13 @@ def create_enhanced_server_cards():
         # Status badge styling
         status_class = get_status_badge_class(status)
         status_text = status.upper()
+        
+        timestamp = metric.get('timestamp', 'Unknown')
+        timestamp_dt = datetime.strptime(timestamp, '%Y-%m-%dT%H:%M:%S.%f')
+        timestamp_str = timestamp_dt.strftime('%b %d, %Y %H:%M')
+        
+        #dt = datetime.strptime(user['last_login'], '%Y-%m-%dT%H:%M:%S')
+        #user['last_login'] = dt.strftime('%b %d, %Y')
 
         card = html.Div([
             # Server Header
@@ -225,7 +232,7 @@ def create_enhanced_server_cards():
                     ], className="resource-bar")
                 ]),
                 html.Div([
-                    html.Div(f"Memory: {ram_percentage}%", style={
+                    html.Div(f"Memory: {metric.get('ram_used', 0):} / {metric.get('ram_total', 0)}", style={
                         'fontSize': '12px', 'marginBottom': '4px', 'fontWeight': '600'}),
                     html.Div([
                         html.Div(className="resource-fill resource-memory",
@@ -233,7 +240,7 @@ def create_enhanced_server_cards():
                     ], className="resource-bar")
                 ]),
                 html.Div([
-                    html.Div(f"Disk: {disk_percentage}%", style={
+                    html.Div(f"Disk: {metric.get('disk_used', 0)} / {metric.get('disk_total', 0)}", style={
                         'fontSize': '12px', 'marginBottom': '4px', 'fontWeight': '600'}),
                     html.Div([
                         html.Div(className="resource-fill resource-disk",
@@ -248,7 +255,7 @@ def create_enhanced_server_cards():
                     html.Span("Operating System",
                               className="detail-label"),
                     html.Span(
-                        f"{metric.get('operating_system', 'Unknown')} ({metric.get('architecture', 'Unknown')})", className="detail-value")
+                        f"{metric.get('operating_system', 'Unknown')}", className="detail-value")
                 ], className="detail-row"),
 
                 html.Div([
@@ -278,7 +285,7 @@ def create_enhanced_server_cards():
 
                 html.Div([
                     html.Span("Last Updated", className="detail-label"),
-                    html.Span(metric.get('timestamp', 'Unknown'),
+                    html.Span(timestamp_str,
                               className="detail-value")
                 ], className="detail-row")
             ], className="server-details")
@@ -488,7 +495,7 @@ def create_enhanced_users_table():
             },
             style_data_conditional=[
                 {
-					'if': {'row_index': 'odd'},
+                    'if': {'row_index': 'odd'},
                     'backgroundColor': '#f7f7fa'
                 },
                 {

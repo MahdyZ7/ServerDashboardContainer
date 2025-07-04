@@ -64,7 +64,19 @@ def get_server_status(server_name):
     except Exception as e:
         logging.error(f"API error fetching server status for {server_name}: {e}")
         return {}
-
+    
+def get_server_health(server_name):
+    """Fetch server health for a specific server"""
+    try:
+        response = requests.get(f"{API_BASE_URL}/health/{server_name}", timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            if data.get('success'):
+                return data.get('data', {})
+        return {}
+    except Exception as e:
+        logging.error(f"API error fetching server health for {server_name}: {e}")
+        return {}
 
 def get_server_list():
     """Fetch list of all available servers"""
