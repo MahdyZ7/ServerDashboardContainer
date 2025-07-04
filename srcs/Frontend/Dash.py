@@ -3,6 +3,7 @@ import dash
 from dash import dcc, html
 import logging
 from datetime import datetime
+import os
 
 # Import from local modules
 from config import KU_COLORS, DASHBOARD_CONFIG, FONTS
@@ -722,4 +723,4 @@ app.layout = html.Div([
 register_callbacks(app)
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=3000)
+    app.run(debug=(os.getenv("DEBUG") == "True"), host='0.0.0.0', port=3000)
