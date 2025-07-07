@@ -603,6 +603,16 @@ def create_enhanced_historical_graphs():
         ),
         row=1, col=1
     )
+    fig.add_trace(
+        go.Scatter(
+            x=df['timestamp'],
+            y=df['cpu_load_15min'],
+            mode='lines',
+            name='15-min Load',
+            line=dict(color=KU_COLORS['primary'], width=2)
+        ),
+        row=1, col=1
+    )
 
     # Memory Usage with threshold lines
     fig.add_trace(
