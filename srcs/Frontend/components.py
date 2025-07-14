@@ -628,9 +628,9 @@ def create_enhanced_historical_graphs():
     )
     # Add critical threshold line
     fig.add_hline(y=90, line_dash="dash", line_color=KU_COLORS['danger'],
-                  annotation_text="Critical", row="1", col="2")
+                  annotation_text="Critical", row=1, col=2)
     fig.add_hline(y=75, line_dash="dot", line_color=KU_COLORS['warning'],
-                  annotation_text="Warning", row="1", col="2")
+                  annotation_text="Warning", row=1, col=2)
 
     # Disk Usage
     fig.add_trace(
