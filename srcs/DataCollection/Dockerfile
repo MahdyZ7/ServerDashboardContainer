@@ -9,6 +9,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 	sshpass \
 	&& rm -rf /var/lib/apt/lists/*
 
+# Disable OpenSSL security level restrictions for legacy compatibility
+ENV OPENSSL_CONF="~/openssl_legacy.conf"
+
 WORKDIR /app
 
 COPY  . .
