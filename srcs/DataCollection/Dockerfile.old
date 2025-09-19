@@ -7,7 +7,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 	iputils-ping \
 	openssh-client \
 	sshpass \
-	cron \
 	&& rm -rf /var/lib/apt/lists/*
 
 # Disable OpenSSL security level restrictions for legacy compatibility
@@ -18,16 +17,7 @@ WORKDIR /app
 COPY  . .
 
 RUN chmod +x BashGetInfo.sh
-RUN chmod +x start-cron.sh
-RUN pip3 install --upgrade pip
-RUN pip3 install -r requirements.txt
+RUN pip install --upgrade pip
+RUN pip install -r requirements.txt
 
-# Create log directory
-RUN mkdir -p /var/log
-
-# Set up crontab
-COPY crontab /etc/cron.d/datacollection-crontab
-RUN chmod 0644 /etc/cron.d/datacollection-crontab
-RUN crontab /etc/cron.d/datacollection-crontab
-
-CMD ["./start-cron.sh"]
+CMD ["python", "./backend.py"]

@@ -1,0 +1,24 @@
+# DataCollection Backend Scheduled Tasks
+# Format: minute hour day month weekday command
+# This file can be used to set up scheduled execution instead of continuous mode
+
+PATH=/usr/local/bin:/usr/bin:/bin
+
+# Collect server metrics every 15 minutes
+*/15 * * * * cd /app && env $(cat /proc/1/environ | tr '\0' '\n' | xargs) EXECUTION_MODE=scheduled COLLECT_DISK_USAGE=false RUN_CLEANUP=false /usr/local/bin/python3 backend.py >> /var/log/datacollection.log 2>&1
+
+# Collect disk usage data once per day at 23:17
+17 23 * * * cd /app && env $(cat /proc/1/environ | tr '\0' '\n' | xargs) EXECUTION_MODE=scheduled COLLECT_DISK_USAGE=true RUN_CLEANUP=false /usr/local/bin/python3 backend.py >> /var/log/datacollection.log 2>&1
+
+# Run data retention cleanup weekly on Sundays at 23:00
+0 23 * * 0 cd /app && env $(cat /proc/1/environ | tr '\0' '\n' | xargs) EXECUTION_MODE=scheduled COLLECT_DISK_USAGE=false RUN_CLEANUP=true /usr/local/bin/python3 backend.py >> /var/log/datacollection.log 2>&1
+
+# Alternative examples (commented out):
+# Every 5 minutes (high frequency):
+# */5 * * * * cd /app && EXECUTION_MODE=scheduled python3 backend.py >> /var/log/datacollection.log 2>&1
+
+# Every hour at minute 0:
+# 0 * * * * cd /app && EXECUTION_MODE=scheduled python3 backend.py >> /var/log/datacollection.log 2>&1
+
+# Every 30 minutes:
+# */30 * * * * cd /app && EXECUTION_MODE=scheduled python3 backend.py >> /var/log/datacollection.log 2>&1

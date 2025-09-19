@@ -14,8 +14,6 @@ services:
       - backend
       - frontend
     init: true
-    environment:
-      - TZ=Asia/Dubai
     logging:
       driver: "json-file"
       options:
@@ -33,7 +31,6 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=server_db
-      - TZ=Asia/Dubai
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -59,8 +56,6 @@ services:
     restart: unless-stopped
     env_file:
       - .env
-    environment:
-      - TZ=Asia/Dubai
     volumes:
       - ./srcs/DataCollection:/app
     networks:
@@ -81,8 +76,6 @@ services:
     restart: unless-stopped
     env_file:
       - .env
-    environment:
-      - TZ=Asia/Dubai
     volumes:
       - ./srcs/Backend:/app
     networks:
@@ -109,8 +102,6 @@ services:
     restart: unless-stopped
     env_file:
       - .env
-    environment:
-      - TZ=Asia/Dubai
     volumes:
       - ./srcs/Frontend:/app
     networks:
@@ -140,3 +131,4 @@ networks:
 volumes:
   postgres_data:
     driver: local
+  
