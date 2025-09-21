@@ -407,6 +407,14 @@ def create_network_monitor():
         ])
     ])
 
+def _try_parse_date(date_str):
+    from datetime import datetime
+    for fmt in ('%b %d, %Y', '%B %d, %Y'):
+        try:
+            return datetime.strptime(date_str, fmt).strftime('%b %d, %Y')
+        except Exception:
+            continue
+    return None
 
 def create_enhanced_users_table():
     """Create enhanced users table with more details"""
@@ -423,6 +431,7 @@ def create_enhanced_users_table():
         u for u in users_data
         if is_high_usage_user(u)
     ])
+
 
     for user in users_data:
         server_name = user['server_name']
@@ -470,6 +479,11 @@ def create_enhanced_users_table():
             ],
             data=[{
                 **user,
+                'cpu': float(user['cpu']),
+                'mem': float(user['mem']),
+                'disk': float(user['disk']),
+                'process_count': int(user['process_count']),
+                'last_login': None if user['last_login'] is None else _try_parse_date(user['last_login']),
                 'status': 'High Usage' if is_high_usage_user(user) else 'Normal'
             } for user in users],
             style_table={

@@ -44,7 +44,7 @@ API_BASE_URL = os.getenv('API_BASE_URL', 'http://API:5000/api')
 # Dashboard Configuration
 DASHBOARD_CONFIG = {
     'title': 'Khalifa University - KSRC Server Monitoring Dashboard',
-    'refresh_interval': 30000,  # 30 seconds in milliseconds
+    'refresh_interval': 900000,  # 15 minutes in milliseconds
     'logo_url': './assets/KU_logo.png',
     'logo_alt': 'Khalifa University Logo',
     'header_title': 'KSRC Server Monitoring',
@@ -81,7 +81,7 @@ CHART_CONFIG = {
 # Table Configuration
 TABLE_CONFIG = {
     'page_size': 15,
-    'users_page_size': 15,
+    'users_page_size': 30,
     'network_page_size': 10,
     'max_alerts': 5
 }

@@ -14,7 +14,7 @@ from utils import safe_float
 
 def register_callbacks(app):
     """Register all dashboard callbacks"""
-    
+        
     @app.callback(
         [Output('system-overview', 'children'),
          Output('alerts-panel', 'children'),
@@ -100,30 +100,43 @@ def register_callbacks(app):
 
         # CPU Load
         fig.add_trace(go.Scatter(x=df['timestamp'], y=df['cpu_load_1min'],
-                                mode='lines', name='1-min Load',
+                                mode='lines', name='1-min Load', line_shape='spline',
                                 line=dict(color=KU_COLORS['primary'], width=2)), row=1, col=1)
         fig.add_trace(go.Scatter(x=df['timestamp'], y=df['cpu_load_5min'],
-                                mode='lines', name='5-min Load',
+                                mode='lines', name='5-min Load', line_shape='spline',
                                 line=dict(color=KU_COLORS['secondary'], width=2)), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df['timestamp'], y=df['cpu_load_15min'],
+                                mode='lines', name='15-min Load', line_shape='spline',
+                                line=dict(color=KU_COLORS['accent'], width=2)), row=1, col=1)
+        fig.update_yaxes(title_text="CPU Load %", range=[0,100], row=1, col=1)
+        fig.update_xaxes(title_text="Time", row=1, col=1, tickformat="%H:%M\n%b %d")
 
         # Memory Usage
         fig.add_trace(go.Scatter(x=df['timestamp'], y=df['ram_percentage'],
                                 mode='lines+markers', name='RAM %',
                                 line=dict(color=KU_COLORS['warning'], width=3)), row=1, col=2)
+        fig.update_yaxes(title_text="Memory Usage %", range=[0,100], row=1, col=2)
+        fig.update_xaxes(title_text="Time", row=1, col=2, tickformat="%H:%M\n%b %d")
 
         # Disk Usage
         fig.add_trace(go.Scatter(x=df['timestamp'], y=df['disk_percentage'],
                                 mode='lines+markers', name='Disk %',
                                 line=dict(color=KU_COLORS['primary'], width=3)), row=2, col=1)
-
+        fig.update_yaxes(title_text="Disk Usage %", range=[0,100], row=2, col=1)
+        fig.update_xaxes(title_text="Time", row=2, col=1, tickformat="%H:%M\n%b %d")
+  
         # Network Activity
         fig.add_trace(go.Scatter(x=df['timestamp'], y=df['logged_users'],
-                                mode='lines+markers', name='Users',
+                                mode='lines+markers', name='Users', line_shape='hv',
                                 line=dict(color=KU_COLORS['info'], width=2)), row=2, col=2)
         fig.add_trace(go.Scatter(x=df['timestamp'], y=df['tcp_connections'],
-                                mode='lines+markers', name='Connections',
+                                mode='lines+markers', name='TCP Connections',
                                 line=dict(color=KU_COLORS['accent'], width=2)), row=2, col=2, secondary_y=True)
-
+        fig.update_yaxes(title_text="No. of Users", range=[0, df['logged_users'].max()*1.2 if not df['logged_users'].empty else 10], row=2, col=2,
+                         secondary_y=False)
+        fig.update_yaxes(title_text="TCP Connections", range=[0, df['tcp_connections'].max()*1.2 if not df['tcp_connections'].empty else 10], row=2, col=2,
+                         secondary_y=True)
+        fig.update_xaxes(title_text="Time", row=2, col=2, tickformat="%H:%M\n%b %d")
         fig.update_layout(height=CHART_CONFIG['default_height'], showlegend=True,
                           title_text=f"Performance Analytics - {server_name}")
 
