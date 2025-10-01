@@ -41,15 +41,11 @@ def create_system_overview():
             html.Div([
                 html.Span(f"{total_servers}", className="stat-value"),
                 html.Div("Total Servers", className="stat-label"),
-                html.Div("↑ 2 new this month",
-                         className="stat-change positive")
             ], className="overview-stat"),
 
             html.Div([
                 html.Span(f"{online_servers}", className="stat-value"),
                 html.Div("Online Servers", className="stat-label"),
-                html.Div(f"{(online_servers/total_servers*100):.1f}% uptime" if total_servers > 0 else "0% uptime",
-                         className="stat-change positive")
             ], className="overview-stat"),
 
             html.Div([
@@ -58,7 +54,7 @@ def create_system_overview():
                 html.Div("Servers with Warnings",
                          className="stat-label"),
                 html.Div(
-                    "Requires attention", className="stat-change negative" if warning_servers > 0 else "stat-change positive")
+                    "Requires attention" if warning_servers > 0 else "No action needed", className="stat-change negative" if warning_servers > 0 else "stat-change positive")
             ], className="overview-stat"),
 
             html.Div([
@@ -66,7 +62,7 @@ def create_system_overview():
                           className="stat-value"),
                 html.Div("Offline Servers", className="stat-label"),
                 html.Div(
-                    "Check connectivity", className="stat-change negative" if offline_servers > 0 else "stat-change positive")
+                    "Check connectivity" if offline_servers > 0 else "No action needed", className="stat-change negative" if offline_servers > 0 else "stat-change positive")
             ], className="overview-stat"),
 
             html.Div([
@@ -77,13 +73,13 @@ def create_system_overview():
 
             html.Div([
                 html.Span(f"{avg_ram:.1f}%", className="stat-value"),
-                html.Div("Avg Memory Usage", className="stat-label"),
+                html.Div("Avg RAM Usage", className="stat-label"),
                 html.Div("Across all servers", className="stat-change")
             ], className="overview-stat"),
 
             html.Div([
                 html.Span(f"{total_users}", className="stat-value"),
-                html.Div("Active Users", className="stat-label"),
+                html.Div("Users", className="stat-label"),
                 html.Div("Currently logged in",
                          className="stat-change")
             ], className="overview-stat"),
@@ -133,6 +129,72 @@ def create_alert_panel():
 
     return html.Div(alert_items, className="alert-panel")
 
+def create_compact_server_grid():
+    """Create grid of compact server cards with maximum data density"""
+    metrics = get_latest_server_metrics()
+
+    if not metrics:
+        return html.Div([
+            html.Div("No server data available",
+                    style={'textAlign': 'center', 'padding': '40px', 'color': '#6C757D'})
+        ], className="server-grid")
+
+    server_cards = []
+
+    for metric in metrics:
+        server_name = metric.get('server_name', 'Unknown')
+        status = determine_server_status(metric)
+
+        # Extract key metrics
+        cpu_load = safe_float(metric.get('cpu_load_5min', 0))
+        ram_percent = metric.get('ram_percentage', 0)
+        disk_percent = metric.get('disk_percentage', 0)
+        users = metric.get('logged_users', 0)
+
+        # Determine metric value classes for color coding
+        cpu_class = 'critical' if cpu_load > 80 else 'warning' if cpu_load > 50 else ''
+        ram_class = 'critical' if ram_percent > 95 else 'warning' if ram_percent > 85 else ''
+        disk_class = 'critical' if disk_percent > 95 else 'warning' if disk_percent > 85 else ''
+
+        server_card = html.Div([
+            # Server Header
+            html.Div([
+                html.Div(server_name, className="server-name"),
+                html.Div([
+                    html.Div(className="status-indicator"),
+                    html.Span(status.upper())
+                ], className=f"server-status {status}")
+            ], className="server-header"),
+
+            # Inline Metrics Row
+            html.Div([
+                html.Div([
+                    html.Div("CPU", className="metric-inline-label"),
+                    html.Div(f"{cpu_load:.1f}", className=f"metric-inline-value {cpu_class}")
+                ], className="metric-inline"),
+
+                html.Div([
+                    html.Div("RAM", className="metric-inline-label"),
+                    html.Div(f"{ram_percent:.0f}%", className=f"metric-inline-value {ram_class}")
+                ], className="metric-inline"),
+
+                html.Div([
+                    html.Div("DISK", className="metric-inline-label"),
+                    html.Div(f"{disk_percent:.0f}%", className=f"metric-inline-value {disk_class}")
+                ], className="metric-inline"),
+
+                html.Div([
+                    html.Div("USERS", className="metric-inline-label"),
+                    html.Div(f"{users}", className="metric-inline-value")
+                ], className="metric-inline")
+            ], className="metrics-row"),
+
+        ], className="server-card", **{'data-server': sanitize_server_name(server_name)})
+
+        server_cards.append(server_card)
+
+    return html.Div(server_cards, className="server-grid")
+
 
 def create_enhanced_server_cards():
     """Create enhanced server cards with detailed information"""
@@ -145,6 +207,7 @@ def create_enhanced_server_cards():
 
     for metric in metrics:
         server_name = metric.get('server_name', 'Unknown')
+        historical_data = get_historical_metrics(server_name, CHART_CONFIG['default_time_range'])
         status = determine_server_status(metric)
 
         # Get performance rating
@@ -159,9 +222,108 @@ def create_enhanced_server_cards():
         status_class = get_status_badge_class(status)
         status_text = status.upper()
 
+        # Format timestamp
         timestamp = metric.get('timestamp', 'Unknown')
         timestamp_dt = datetime.strptime(timestamp, '%Y-%m-%dT%H:%M:%S.%f')
         timestamp_str = timestamp_dt.strftime('%b %d, %Y %H:%M')
+
+        # Historical dataframe with error handling
+        fig = make_subplots(rows=1, cols=1,
+                            subplot_titles=(f"Load History - {server_name}",))
+
+        if historical_data and len(historical_data) > 0:
+            try:
+                df = pd.DataFrame(historical_data)
+                # Ensure timestamp is properly parsed
+                if 'timestamp' in df.columns and not df.empty:
+                    df['timestamp'] = pd.to_datetime(df['timestamp'])
+
+                    # Convert CPU load strings to float
+                    if 'cpu_load_15min' in df.columns:
+                        df['cpu_load_15min'] = pd.to_numeric(df['cpu_load_15min'], errors='coerce')
+
+                    # Ensure percentage columns are numeric
+                    if 'ram_percentage' in df.columns:
+                        df['ram_percentage'] = pd.to_numeric(df['ram_percentage'], errors='coerce')
+
+                    if 'disk_percentage' in df.columns:
+                        df['disk_percentage'] = pd.to_numeric(df['disk_percentage'], errors='coerce')
+
+                    # Add traces only if data exists
+                    if 'cpu_load_15min' in df.columns:
+                        fig.add_trace(
+                            go.Scatter(
+                                x=df['timestamp'],
+                                y=df['cpu_load_15min'],
+                                mode='lines+text',
+                                name='CPU Load',
+                                line=dict(color=KU_COLORS['primary'], width=2),
+                                text=['CPU Load' if i == len(df)-1 else '' for i in range(len(df))],
+                                textposition='middle right',
+                                textfont=dict(size=12, color=KU_COLORS['primary']),
+                                showlegend=False
+                            ),
+                            row=1, col=1
+                        )
+
+                    if 'ram_percentage' in df.columns:
+                        fig.add_trace(
+                            go.Scatter(
+                                x=df['timestamp'],
+                                y=df['ram_percentage'],
+                                mode='lines+text',
+                                name='RAM Usage',
+                                line=dict(color=KU_COLORS['secondary'], width=2),
+                                text=['RAM Usage' if i == len(df)-1 else '' for i in range(len(df))],
+                                textposition='middle right',
+                                textfont=dict(size=12, color=KU_COLORS['secondary']),
+                                showlegend=False
+                            ),
+                            row=1, col=1
+                        )
+
+                    if 'disk_percentage' in df.columns:
+                        fig.add_trace(
+                            go.Scatter(
+                                x=df['timestamp'],
+                                y=df['disk_percentage'],
+                                mode='lines+text',
+                                name='Disk Usage',
+                                line=dict(color=KU_COLORS['accent'], width=2),
+                                text=['Disk Usage' if i == len(df)-1 else '' for i in range(len(df))],
+                                textposition='middle right',
+                                textfont=dict(size=12, color=KU_COLORS['accent']),
+                                showlegend=False
+                            ),
+                            row=1, col=1
+                        )
+            except (ValueError, KeyError, pd.errors.ParserError) as e:
+                # If timestamp parsing fails, create empty graph with message
+                fig.add_annotation(
+                    text="Historical data unavailable",
+                    xref="paper", yref="paper",
+                    x=0.5, y=0.5, showarrow=False,
+                    font=dict(size=16, color="gray")
+                )
+        else:
+            # No historical data available
+            fig.add_annotation(
+                text="No historical data available",
+                xref="paper", yref="paper",
+                x=0.5, y=0.5, showarrow=False,
+                font=dict(size=16, color="gray")
+            )
+
+        fig.update_layout(
+            showlegend=False,
+            # height=10,
+            margin=dict(l=40, r=40, t=40, b=40),
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)'
+        )
+        # Fix y-axis range to be consistent across all server cards
+        fig.update_yaxes(range=[0, 110], row=1, col=1)
+        
 
         card = html.Div([
             # Server Header
@@ -179,6 +341,11 @@ def create_enhanced_server_cards():
                 ])
             ], className="server-header"),
 
+            # Historical Data Graph
+            html.Div([
+				dcc.Graph(figure=fig, style={'height': '400px'})
+			], style={'margin': '16px 0'}),
+
             # Key Metrics Grid
             html.Div([
                 html.Div([
@@ -190,32 +357,20 @@ def create_enhanced_server_cards():
                 html.Div([
                     html.Span(f"{ram_percentage}%", className="metric-value", style={
                         'color': KU_COLORS['danger'] if ram_percentage > 85 else KU_COLORS['warning'] if ram_percentage > 70 else KU_COLORS['primary']}),
-                    html.Span("Memory", className="metric-label")
+                    html.Span("RAM Usage", className="metric-label")
                 ], className="metric-item"),
 
                 html.Div([
                     html.Span(f"{disk_percentage}%", className="metric-value", style={
                         'color': KU_COLORS['danger'] if disk_percentage > 85 else KU_COLORS['warning'] if disk_percentage > 70 else KU_COLORS['primary']}),
-                    html.Span("Disk", className="metric-label")
+                    html.Span("Disk Usage", className="metric-label")
                 ], className="metric-item"),
 
                 html.Div([
                     html.Span(f"{metric.get('logged_users', 0)}",
                               className="metric-value"),
-                    html.Span("Users", className="metric-label")
+                    html.Span("Connected Users", className="metric-label")
                 ], className="metric-item"),
-
-                html.Div([
-                    html.Span(f"{metric.get('tcp_connections', 0)}",
-                              className="metric-value"),
-                    html.Span("Connections", className="metric-label")
-                ], className="metric-item"),
-
-                html.Div([
-                    html.Span(f"{metric.get('physical_cpus', 0)}",
-                              className="metric-value"),
-                    html.Span("CPUs", className="metric-label")
-                ], className="metric-item")
             ], className="server-metrics"),
 
             # Resource Usage Bars

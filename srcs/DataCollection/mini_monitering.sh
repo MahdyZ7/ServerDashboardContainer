@@ -22,7 +22,7 @@ CPU_LOAD=$(cat /proc/loadavg | awk '{print $1 "," $2 "," $3}')
 #CPU_LOAD=$(uptime | awk '{print $(NF-2) $(NF-1) $NF}')
 LAST_BOOT=$(who -b | awk '{print($3 " " $4)}')
 TCP=$(awk '/TCP:/ {print $3}' /proc/net/sockstat)
-USER_LOG=$(who | wc -l)
+USER_LOG=$(who | awk '{print $1}' | sort -u | wc -l)
 
 Active_CONNECTIONS=$(lsof -n -iTCP -sTCP:ESTABLISHED | grep -E 'sshd|Xvnc')
 ACTIVE_VNC=$(echo "$Active_CONNECTIONS" | grep '^Xvnc' | wc -l)

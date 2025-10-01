@@ -1,15 +1,18 @@
 # Callback functions for the Server Monitoring Dashboard
-from dash import Input, Output, callback
+from dash import Input, Output, callback, dcc
 import plotly.graph_objs as go
 from plotly.subplots import make_subplots
 import pandas as pd
 from datetime import datetime
+import logging
 
 from config import KU_COLORS, CHART_CONFIG
 from components import (create_system_overview, create_alert_panel, create_enhanced_server_cards,
                        create_enhanced_users_table, create_network_monitor, create_enhanced_historical_graphs)
 from api_client import get_historical_metrics
 from utils import safe_float
+from export_utils import generate_export_report, export_to_excel
+from refresh_utils import trigger_dashboard_refresh, get_refresh_status_message
 
 
 def register_callbacks(app):
@@ -163,3 +166,46 @@ def register_callbacks(app):
         ], style={'display': 'flex', 'gap': '20px', 'margin': '20px 0'})
 
         return fig, summary
+
+    @app.callback(
+        Output('download-report', 'data'),
+        Input('export-button', 'n_clicks'),
+        prevent_initial_call=True
+    )
+    def export_report(n_clicks):
+        """Handle export button click and generate downloadable report"""
+        if n_clicks:
+            try:
+                # Generate export data
+                export_data = generate_export_report()
+
+                if export_data:
+                    # Export to Excel
+                    filepath = export_to_excel(export_data)
+
+                    if filepath:
+                        logging.info(f"Report exported successfully: {filepath}")
+                        return dcc.send_file(filepath)
+                    else:
+                        logging.error("Failed to create Excel file")
+                        return None
+                else:
+                    logging.error("Failed to generate export data")
+                    return None
+
+            except Exception as e:
+                logging.error(f"Error in export callback: {e}")
+                return None
+
+        return None
+
+    @app.callback(
+        Output('server-grid', 'children'),
+        Input('refresh-button', 'n_clicks'),
+        Input('interval-component', 'n_intervals'),
+        prevent_initial_call=False
+    )
+    def refresh_server_grid(n_clicks, n_intervals):
+        """Refresh server grid when refresh button is clicked or interval triggers"""
+        from components import create_compact_server_grid
+        return create_compact_server_grid()
