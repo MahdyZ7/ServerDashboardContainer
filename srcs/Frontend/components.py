@@ -7,12 +7,18 @@ from plotly.subplots import make_subplots
 import pandas as pd
 import numpy as np
 from datetime import datetime
+import logging
 
 from config import KU_COLORS, TABLE_CONFIG, CHART_CONFIG, LAYOUT_CONFIG
 from api_client import get_latest_server_metrics, get_top_users, get_historical_metrics
 from utils import (determine_server_status, get_performance_rating, generate_alerts,
                    safe_float, get_status_badge_class, get_performance_badge_class,
                    is_high_usage_user, sanitize_server_name)
+from validation import validate_timestamp, safe_get
+from data_processing import (safe_create_dataframe, parse_dataframe_timestamps,
+                            convert_numeric_columns, prepare_historical_dataframe)
+
+logger = logging.getLogger(__name__)
 
 
 def create_system_overview():
@@ -189,7 +195,7 @@ def create_compact_server_grid():
                 ], className="metric-inline")
             ], className="metrics-row"),
 
-        ], className="server-card", **{'data-server': sanitize_server_name(server_name)})
+        ], className="server-card", style={'padding': '0px', 'border-radius': '10px'}, **{'data-server': sanitize_server_name(server_name)})
 
         server_cards.append(server_card)
 
@@ -222,33 +228,34 @@ def create_enhanced_server_cards():
         status_class = get_status_badge_class(status)
         status_text = status.upper()
 
-        # Format timestamp
-        timestamp = metric.get('timestamp', 'Unknown')
-        timestamp_dt = datetime.strptime(timestamp, '%Y-%m-%dT%H:%M:%S.%f')
-        timestamp_str = timestamp_dt.strftime('%b %d, %Y %H:%M')
+        # Format timestamp with error handling
+        timestamp_raw = metric.get('timestamp', 'Unknown')
+        try:
+            timestamp_dt = validate_timestamp(timestamp_raw)
+            timestamp_str = timestamp_dt.strftime('%b %d, %Y %H:%M')
+        except Exception as e:
+            logger.warning(f"Failed to parse timestamp {timestamp_raw}: {e}")
+            timestamp_str = str(timestamp_raw) if timestamp_raw != 'Unknown' else 'Unknown'
 
-        # Historical dataframe with error handling
-        fig = make_subplots(rows=1, cols=1,
-                            subplot_titles=(f"Load History - {server_name}",))
+        # Historical dataframe with improved error handling
+        # fig = make_subplots(rows=1, cols=1,
+                            # subplot_titles=(f"Load History - {server_name}",))
+        fig = go.Figure()
+        fig.layout.title = f"24H Load History"
+        fig.layout.xaxis.title = "Time"
+        fig.layout.yaxis.title = "Load (%)"
+        fig.update_layout(title_x=0.5)
+        fig.update_yaxes(range=[-5, 110])
 
         if historical_data and len(historical_data) > 0:
             try:
-                df = pd.DataFrame(historical_data)
-                # Ensure timestamp is properly parsed
-                if 'timestamp' in df.columns and not df.empty:
-                    df['timestamp'] = pd.to_datetime(df['timestamp'])
+                # Use the new data processing utility
+                df = prepare_historical_dataframe(historical_data, server_name)
+                df['cpu_load_15min'] = df['cpu_load_15min'].replace(['', None, 'N/A'], np.nan)
+                df['ram_percentage'] = df['ram_percentage'].replace(['', None, 'N/A'], np.nan)
+                df['disk_percentage'] = df['disk_percentage'].replace(['', None, 'N/A'], np.nan)
 
-                    # Convert CPU load strings to float
-                    if 'cpu_load_15min' in df.columns:
-                        df['cpu_load_15min'] = pd.to_numeric(df['cpu_load_15min'], errors='coerce')
-
-                    # Ensure percentage columns are numeric
-                    if 'ram_percentage' in df.columns:
-                        df['ram_percentage'] = pd.to_numeric(df['ram_percentage'], errors='coerce')
-
-                    if 'disk_percentage' in df.columns:
-                        df['disk_percentage'] = pd.to_numeric(df['disk_percentage'], errors='coerce')
-
+                if not df.empty and 'timestamp' in df.columns:
                     # Add traces only if data exists
                     if 'cpu_load_15min' in df.columns:
                         fig.add_trace(
@@ -259,11 +266,10 @@ def create_enhanced_server_cards():
                                 name='CPU Load',
                                 line=dict(color=KU_COLORS['primary'], width=2),
                                 text=['CPU Load' if i == len(df)-1 else '' for i in range(len(df))],
-                                textposition='middle right',
+                                textposition='top left',
                                 textfont=dict(size=12, color=KU_COLORS['primary']),
                                 showlegend=False
                             ),
-                            row=1, col=1
                         )
 
                     if 'ram_percentage' in df.columns:
@@ -275,11 +281,10 @@ def create_enhanced_server_cards():
                                 name='RAM Usage',
                                 line=dict(color=KU_COLORS['secondary'], width=2),
                                 text=['RAM Usage' if i == len(df)-1 else '' for i in range(len(df))],
-                                textposition='middle right',
+                                textposition='top left',
                                 textfont=dict(size=12, color=KU_COLORS['secondary']),
                                 showlegend=False
                             ),
-                            row=1, col=1
                         )
 
                     if 'disk_percentage' in df.columns:
@@ -291,14 +296,22 @@ def create_enhanced_server_cards():
                                 name='Disk Usage',
                                 line=dict(color=KU_COLORS['accent'], width=2),
                                 text=['Disk Usage' if i == len(df)-1 else '' for i in range(len(df))],
-                                textposition='middle right',
+                                textposition='top left',
                                 textfont=dict(size=12, color=KU_COLORS['accent']),
                                 showlegend=False
                             ),
-                            row=1, col=1
                         )
-            except (ValueError, KeyError, pd.errors.ParserError) as e:
-                # If timestamp parsing fails, create empty graph with message
+                else:
+                    # Data preparation failed
+                    fig.add_annotation(
+                        text="Historical data processing failed",
+                        xref="paper", yref="paper",
+                        x=0.5, y=0.5, showarrow=False,
+                        font=dict(size=16, color="gray")
+                    )
+            except Exception as e:
+                logger.error(f"Error creating historical graph for {server_name}: {e}")
+                # If anything fails, create empty graph with message
                 fig.add_annotation(
                     text="Historical data unavailable",
                     xref="paper", yref="paper",
@@ -320,9 +333,10 @@ def create_enhanced_server_cards():
             margin=dict(l=40, r=40, t=40, b=40),
             plot_bgcolor='rgba(0,0,0,0)',
             paper_bgcolor='rgba(0,0,0,0)'
+            
         )
         # Fix y-axis range to be consistent across all server cards
-        fig.update_yaxes(range=[0, 110], row=1, col=1)
+        # fig.update_yaxes(range=[0, 110])
         
 
         card = html.Div([
@@ -343,8 +357,8 @@ def create_enhanced_server_cards():
 
             # Historical Data Graph
             html.Div([
-				dcc.Graph(figure=fig, style={'height': '400px'})
-			], style={'margin': '16px 0'}),
+                dcc.Graph(figure=fig, style={'height': '400px'})
+            ], style={'margin': '16px 0'}),
 
             # Key Metrics Grid
             html.Div([
@@ -562,15 +576,6 @@ def create_network_monitor():
         ])
     ])
 
-def _try_parse_date(date_str):
-    from datetime import datetime
-    for fmt in ('%b %d, %Y', '%B %d, %Y'):
-        try:
-            return datetime.strptime(date_str, fmt).strftime('%b %d, %Y')
-        except Exception:
-            continue
-    return None
-
 def create_enhanced_users_table():
     """Create enhanced users table with more details"""
     users_data = get_top_users()
@@ -594,9 +599,13 @@ def create_enhanced_users_table():
             servers[server_name] = []
         servers[server_name].append(user)
 
+        # Format last_login for display while keeping it sortable
         if user['last_login']:
-            dt = datetime.strptime(user['last_login'], '%Y-%m-%dT%H:%M:%S')
-            user['last_login'] = dt.strftime('%b %d, %Y')
+            try:
+                dt = datetime.strptime(user['last_login'], '%Y-%m-%dT%H:%M:%S')
+                user['last_login'] = dt.strftime('%Y-%m-%d')
+            except Exception:
+                pass  # Keep original format if parsing fails
 
     # Summary statistics
     summary = html.Div([
@@ -638,7 +647,7 @@ def create_enhanced_users_table():
                 'mem': float(user['mem']),
                 'disk': float(user['disk']),
                 'process_count': int(user['process_count']),
-                'last_login': None if user['last_login'] is None else _try_parse_date(user['last_login']),
+                'last_login': user['last_login'],
                 'status': 'High Usage' if is_high_usage_user(user) else 'Normal'
             } for user in users],
             style_table={

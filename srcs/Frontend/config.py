@@ -53,8 +53,8 @@ DASHBOARD_CONFIG = {
 
 # Performance Thresholds
 PERFORMANCE_THRESHOLDS = {
-    'cpu_warning': 5.0,
-    'cpu_critical': 8.0,
+    'cpu_warning': 50.0,
+    'cpu_critical': 80.0,
     'memory_warning': 85,
     'memory_critical': 95,
     'disk_warning': 85,

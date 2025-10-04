@@ -1,50 +1,75 @@
 # Utility functions for the Server Monitoring Dashboard
 from datetime import datetime, timedelta
+from typing import Any, Optional, Tuple
+import logging
 from config import PERFORMANCE_THRESHOLDS, STATUS_CONFIG, KU_COLORS
+from validation import validate_timestamp, safe_get
 
-def safe_float(val):
-    """Safely convert value to float, return 0 if conversion fails"""
+logger = logging.getLogger(__name__)
+
+
+def safe_float(val: Any, default: float = 0.0) -> float:
+    """
+    Safely convert value to float, return default if conversion fails
+
+    Args:
+        val: Value to convert
+        default: Default value to return on failure
+
+    Returns:
+        Float value or default
+    """
     try:
         return float(val)
-    except (ValueError, TypeError):
-        return 0
+    except (ValueError, TypeError, AttributeError):
+        if val is not None:
+            logger.debug(f"Failed to convert {val} to float, using default {default}")
+        return default
 
 
-def determine_server_status(metrics):
-    """Determine server status based on metrics"""
-    if not metrics:
+def determine_server_status(metrics: dict) -> str:
+    """
+    Determine server status based on metrics
+
+    Args:
+        metrics: Server metrics dictionary
+
+    Returns:
+        Status string: 'online', 'warning', or 'offline'
+    """
+    if not metrics or not isinstance(metrics, dict):
+        logger.warning("Invalid or empty metrics provided")
         return "offline"
 
-    ram_percentage = metrics.get('ram_percentage', 0)
-    disk_percentage = metrics.get('disk_percentage', 0)
-    cpu_load = safe_float(metrics.get('cpu_load_5min', 0))
+    try:
+        ram_percentage = safe_float(metrics.get('ram_percentage', 0))
+        disk_percentage = safe_float(metrics.get('disk_percentage', 0))
+        cpu_load = safe_float(metrics.get('cpu_load_5min', 0))
 
-    # Check for warning conditions
-    if (ram_percentage > PERFORMANCE_THRESHOLDS['memory_warning'] or 
-        disk_percentage > PERFORMANCE_THRESHOLDS['disk_warning'] or 
-        cpu_load > PERFORMANCE_THRESHOLDS['cpu_warning']):
-        return "warning"
+        # Check for warning conditions
+        if (ram_percentage > PERFORMANCE_THRESHOLDS['memory_warning'] or
+            disk_percentage > PERFORMANCE_THRESHOLDS['disk_warning'] or
+            cpu_load > PERFORMANCE_THRESHOLDS['cpu_warning']):
+            return "warning"
 
-    # Check if server is offline based on timestamp
-    timestamp = metrics.get('timestamp')
-    if timestamp:
-        if isinstance(timestamp, str):
+        # Check if server is offline based on timestamp
+        timestamp_raw = metrics.get('timestamp')
+        if timestamp_raw:
             try:
-                timestamp = datetime.fromisoformat(
-                    timestamp.replace('Z', '+00:00'))
-            except:
-                try:
-                    timestamp = datetime.strptime(
-                        timestamp, '%Y-%m-%d %H:%M:%S.%f')
-                except:
-                    timestamp = datetime.strptime(
-                        timestamp, '%Y-%m-%dT%H:%M:%S.%f')
-        
-        offline_threshold = timedelta(minutes=STATUS_CONFIG['offline_timeout_minutes'])
-        if datetime.now() - timestamp.replace(tzinfo=None) > offline_threshold:
-            return "offline"
+                timestamp = validate_timestamp(timestamp_raw)
+                offline_threshold = timedelta(minutes=STATUS_CONFIG['offline_timeout_minutes'])
+                if datetime.now() - timestamp.replace(tzinfo=None) > offline_threshold:
+                    return "offline"
+            except Exception as e:
+                logger.warning(f"Failed to parse timestamp for status check: {e}")
+                # If we can't parse timestamp, assume online if we got metrics
+                return "online"
 
-    return "online"
+        return "online"
+
+    except Exception as e:
+        logger.error(f"Error determining server status: {e}")
+        return "offline"
 
 
 def get_performance_rating(cpu_load, ram_percentage, disk_percentage):
@@ -132,29 +157,41 @@ def generate_alerts(metrics_list):
     return alerts
 
 
-def format_uptime(boot_time):
-    """Format server uptime based on boot time"""
+def format_uptime(boot_time: Any) -> str:
+    """
+    Format server uptime based on boot time
+
+    Args:
+        boot_time: Boot time as string or datetime
+
+    Returns:
+        Formatted uptime string
+    """
     if not boot_time:
         return "Unknown"
-    
+
     try:
         if isinstance(boot_time, str):
-            boot_datetime = datetime.strptime(boot_time, '%Y-%m-%d %H:%M:%S')
-        else:
+            boot_datetime = validate_timestamp(boot_time)
+        elif isinstance(boot_time, datetime):
             boot_datetime = boot_time
-            
-        uptime = datetime.now() - boot_datetime
+        else:
+            logger.warning(f"Invalid boot_time type: {type(boot_time)}")
+            return "Unknown"
+
+        uptime = datetime.now() - boot_datetime.replace(tzinfo=None)
         days = uptime.days
         hours = uptime.seconds // 3600
         minutes = (uptime.seconds % 3600) // 60
-        
+
         if days > 0:
             return f"{days}d {hours}h {minutes}m"
         elif hours > 0:
             return f"{hours}h {minutes}m"
         else:
             return f"{minutes}m"
-    except:
+    except Exception as e:
+        logger.warning(f"Failed to format uptime: {e}")
         return "Unknown"
 
 
