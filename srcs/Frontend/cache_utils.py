@@ -50,8 +50,8 @@ class SimpleCache:
         logging.debug(f"Cache miss for key: {key}")
         return None
 
-    def set(self, key: str, value: Any, ttl_seconds: int = 900):
-        """Set value in cache with TTL (default 15 minutes)"""
+    def set(self, key: str, value: Any, ttl_seconds: int = 300):
+        """Set value in cache with TTL (default 5 minutes)"""
         self._cache[key] = CacheEntry(value, ttl_seconds)
         logging.debug(f"Cache set for key: {key} (TTL: {ttl_seconds}s)")
 
@@ -99,12 +99,12 @@ def get_cache() -> SimpleCache:
     return _cache
 
 
-def cached(ttl_seconds: int = 900, key_prefix: str = ""):
+def cached(ttl_seconds: int = 300, key_prefix: str = ""):
     """
     Decorator to cache function results
 
     Args:
-        ttl_seconds: Time to live in seconds (default 15 minutes)
+        ttl_seconds: Time to live in seconds (default 5 minutes)
         key_prefix: Optional prefix for cache key
     """
     def decorator(func: Callable) -> Callable:
