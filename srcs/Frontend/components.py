@@ -332,8 +332,8 @@ def create_enhanced_server_cards():
             # height=10,
             margin=dict(l=40, r=40, t=40, b=40),
             plot_bgcolor='rgba(0,0,0,0)',
-            paper_bgcolor='rgba(0,0,0,0)'
-            
+            paper_bgcolor='rgba(0,0,0,0)',
+            xaxis=dict(autorange=True)
         )
         # Fix y-axis range to be consistent across all server cards
         # fig.update_yaxes(range=[0, 110])

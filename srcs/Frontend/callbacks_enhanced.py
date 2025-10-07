@@ -268,6 +268,7 @@ def register_callbacks(app):
     def refresh_server_grid(n_clicks, n_intervals):
         """Refresh server grid when refresh button is clicked or interval triggers"""
         try:
+            # invalidate_all_caches()
             return create_compact_server_grid()
         except Exception as e:
             logger.error(f"Error refreshing server grid: {e}", exc_info=True)

@@ -10,7 +10,7 @@ from config import KU_COLORS, DASHBOARD_CONFIG, FONTS
 from components import (create_system_overview, create_alert_panel, create_enhanced_server_cards,
                        create_enhanced_users_table, create_network_monitor, create_enhanced_historical_graphs,
                        create_compact_server_grid,)
-from callbacks import register_callbacks
+from callbacks_enhanced import register_callbacks
 from export_utils import generate_export_report, export_to_excel
 from refresh_utils import trigger_dashboard_refresh
 from toast_utils import create_toast_container
