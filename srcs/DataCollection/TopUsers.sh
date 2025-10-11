@@ -1,13 +1,13 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Function to get disk space usage for a user
 get_disk_usage() {
 	if [ -d  /home/$1 ] ; then
-		files=$(find /eda_work/ -user $1 -maxdepth 1 2> /dev/null)
+		files=$(find /eda_work/ -user "$1" -maxdepth 1 2> /dev/null)
     	if [[ ! $files == *"/eda_work/$1"* ]]; then
 			files="$files /eda_work/$1"
 		fi
-		du -scb /home/$1 $(find /eda_work/ -user $1 -maxdepth 1 2> /dev/null) 2> /dev/null | tail -1 | awk '{printf("%.2f"), $1/1024/1024/1024}'
+		du -scb /home/$1 $(find /eda_work/ -user "$1" -maxdepth 1 2> /dev/null) 2> /dev/null | tail -1 | awk '{printf("%.2f"), $1/1024/1024/1024}'
 	else
 		echo nan
 	fi

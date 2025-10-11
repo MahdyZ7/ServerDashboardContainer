@@ -1,12 +1,12 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-ARCH=$(uname -srvmo)
-OS_NAME=$(lsb_release -i | awk '{print $3}')
-OS_VER=$(lsb_release -r | awk '{print $2}')
+ARCH=$(uname -srvmo) || "Unknown"
+OS_NAME=$(lsb_release -i | awk '{print $3}') || "Unknown OS"
+OS_VER=$(lsb_release -r | awk '{print $2}') || "Unknown Version"
 OS="$OS_NAME $OS_VER"
 
-PCPU=$(cat /proc/cpuinfo | grep 'physical id' | sort -u | wc -l)
-VCPU=$(cat /proc/cpuinfo | grep processor | sort -u | wc -l)
+PCPU=$(grep 'physical id' /proc/cpuinfo | sort -u | wc -l)
+VCPU=$(grep 'processor' /proc/cpuinfo | sort -u | wc -l)
 
 RAM_DATA=$(free -m | grep Mem)
 RAM_TOTAL=$(echo "$RAM_DATA" | awk '{printf("%.2fG"), $2/1024.0}')
@@ -42,22 +42,22 @@ while [ $# -ne 0 ]; do
 done
 
 if $line_format; then
-	printf "$ARCH,$OS,$PCPU,$VCPU,$RAM_USED/$RAM_TOTAL,$RAM_PERC,\
-$DISK_USED/$DISK_TOTAL,$DISK_PERC,$CPU_LOAD,$LAST_BOOT,\
-$TCP,$USER_LOG,$ACTIVE_VNC,$ACTIVE_SSH\n"
+	printf "${ARCH},${OS},${PCPU},${VCPU},${RAM_USED}/${RAM_TOTAL},${RAM_PERC},\
+${DISK_USED}/${DISK_TOTAL},${DISK_PERC},${CPU_LOAD},${LAST_BOOT},\
+${TCP},${USER_LOG},${ACTIVE_VNC},${ACTIVE_SSH}\n"
 else
-	printf "%-25s: %s\n" "Architecture" "$ARCH"
-	printf "%-25s: %s\n" "OS" "$OS"
-	printf "%-25s: %d\n" "Physical CPUs" "$PCPU"
-	printf "%-25s: %d\n" "Virtual CPUs" "$VCPU"
-	printf "%-25s: %s/%s (%.0f%%)\n" "RAM" "$RAM_USED" "$RAM_TOTAL" "$RAM_PERC"
-	printf "%-25s: %s/%s (%s)\n" "Disk" "$DISK_USED" "$DISK_TOTAL" "$DISK_PERC"
-	printf "%-25s: %s\n" "CPU Load (1, 5, 15 min)" "$CPU_LOAD"
-	printf "%-25s: %s\n" "Last Boot" "$LAST_BOOT"
-	printf "%-25s: %d\n" "TCP Connections" "$TCP"
-	printf "%-25s: %d\n" "User Logins" "$USER_LOG"
-	printf "%-25s: %d\n" "Active VNC Sessions" "$ACTIVE_VNC"
-	printf "%-25s: %d\n" "Active SSH Sessions" "$ACTIVE_SSH"
+	printf "%-25s: %s\n" "Architecture" "${ARCH}"
+	printf "%-25s: %s\n" "OS" "${OS}"
+	printf "%-25s: %d\n" "Physical CPUs" "${PCPU}"
+	printf "%-25s: %d\n" "Virtual CPUs" "${VCPU}"
+	printf "%-25s: %s/%s (%.0f%%)\n" "RAM" "${RAM_USED}" "${RAM_TOTAL}" "${RAM_PERC}"
+	printf "%-25s: %s/%s (%s)\n" "Disk" "${DISK_USED}" "${DISK_TOTAL}" "${DISK_PERC}"
+	printf "%-25s: %s\n" "CPU Load (1, 5, 15 min)" "${CPU_LOAD}"
+	printf "%-25s: %s\n" "Last Boot" "${LAST_BOOT}"
+	printf "%-25s: %d\n" "TCP Connections" "${TCP}"
+	printf "%-25s: %d\n" "User Logins" "${USER_LOG}"
+	printf "%-25s: %d\n" "Active VNC Sessions" "${ACTIVE_VNC}"
+	printf "%-25s: %d\n" "Active SSH Sessions" "${ACTIVE_SSH}"
 fi
 
 
