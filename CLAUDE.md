@@ -36,7 +36,6 @@ The Frontend has been significantly refactored with a modular architecture and c
 
 ### Core Modules
 - **`exceptions.py`** - Custom exception hierarchy for typed error handling
-- **`cache_utils.py`** - In-memory caching with TTL (15-min default), reduces API calls by ~90%
 - **`validation.py`** - Input validation utilities with type checking
 - **`data_processing.py`** - Safe DataFrame operations with automatic error handling
 - **`toast_utils.py`** - Toast notification system for user feedback
@@ -46,20 +45,6 @@ The Frontend has been significantly refactored with a modular architecture and c
 - **`utils.py`** - Utility functions with validation and error handling
 
 ### Frontend Development Patterns
-
-**Using the Cache System:**
-```python
-from cache_utils import cached, get_cache, invalidate_all_caches
-
-# Automatic caching via decorator (already applied to all API functions)
-@cached(ttl_seconds=900)
-def expensive_function():
-    return data
-
-# Manual cache operations
-invalidate_all_caches()  # Clear all caches
-stats = get_cache().get_stats()  # Get cache hit/miss metrics
-```
 
 **Input Validation:**
 ```python
@@ -173,8 +158,8 @@ pytest -x
 ```
 
 **Test Infrastructure:**
-- 103 unit tests across `test_validation.py`, `test_cache_utils.py`, `test_utils.py`
-- Fixtures in `tests/conftest.py` (auto-reset cache, sample data)
+- 103 unit tests across `test_validation.py`, `test_utils.py`
+- Fixtures in `tests/conftest.py` (sample data)
 - Target: >80% coverage on core modules (currently >85%)
 
 ### Database Access
@@ -236,21 +221,7 @@ The API backend (`srcs/Backend/api.py`) provides the following REST endpoints:
 2. Add database query function
 3. Format response as `{'success': bool, 'data': ..., 'message': str}`
 4. Add corresponding function in `srcs/Frontend/api_client.py`
-5. Decorate with `@cached()` decorator
-6. Add validation for inputs
-
-### Modifying Cache Behavior
-- Cache TTL configured in `api_client.py` as `CACHE_TTL`
-- Cache automatically invalidated on manual refresh button
-- Cache stats available via `get_cache_stats()`
-- Pattern-based invalidation: `invalidate_cache_pattern("prefix_")`
-
-### Debugging Performance Issues
-```python
-# Check cache performance
-from api_client import get_cache_stats
-stats = get_cache_stats()
-print(f"Hit rate: {stats['hit_rate']:.1f}%")  # Should be >80%
+5. Add validation for inputs
 
 # Check API response times in logs
 # Look for: "API request successful" with timing info
@@ -294,9 +265,6 @@ print(f"Hit rate: {stats['hit_rate']:.1f}%")  # Should be >80%
 - Run `pytest` before committing
 
 ### Performance
-- Use `@cached` decorator for expensive operations
-- Cache TTL: 15 minutes for API calls
-- Monitor cache hit rate (target >80%)
 - Use `safe_create_dataframe()` to avoid memory leaks
 
 ## Troubleshooting
@@ -311,22 +279,6 @@ make logs-Frontend
 
 # Restart service
 make restart-service SERVICE=Frontend
-```
-
-### Cache issues
-```python
-# Clear cache programmatically
-from cache_utils import get_cache
-get_cache().clear()
-```
-
-### Test failures
-```bash
-# Clear pytest cache
-pytest --cache-clear
-
-# Run from correct directory
-cd srcs/Frontend && pytest
 ```
 
 ### Import errors in tests

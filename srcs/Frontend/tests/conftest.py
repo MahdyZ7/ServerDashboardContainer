@@ -145,16 +145,6 @@ def offline_server_metrics(sample_server_metrics):
     return metrics
 
 
-@pytest.fixture(autouse=True)
-def reset_cache():
-    """Automatically reset cache before each test"""
-    from cache_utils import get_cache
-    cache = get_cache()
-    cache.clear()
-    yield
-    cache.clear()
-
-
 @pytest.fixture
 def mock_api_response_success():
     """Fixture for successful API response structure"""

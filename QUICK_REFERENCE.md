@@ -9,7 +9,6 @@
 ### Core Utilities
 ```
 exceptions.py         → Custom error types
-cache_utils.py        → Caching system
 validation.py         → Input validation
 data_processing.py    → DataFrame utilities
 toast_utils.py        → User notifications
@@ -49,20 +48,6 @@ pytest -v                 # Verbose output
 pytest --cov=.            # With coverage
 ```
 
-### Check Cache Performance
-```python
-from api_client import get_cache_stats
-print(get_cache_stats())
-# Expected: hit_rate > 80%
-```
-
-### Manual Cache Invalidation
-```python
-from api_client import invalidate_all_caches
-invalidate_all_caches()
-# Done automatically on refresh button
-```
-
 ### Validate User Input
 ```python
 from validation import validate_percentage, validate_server_name
@@ -96,8 +81,6 @@ server = validate_server_name(server_input)
 
 ### 2. Performance
 - 90% reduction in API calls
-- 83% faster page loads (when cached)
-- Smart caching with 15-minute TTL
 
 ### 3. Code Quality
 - 103 unit tests (>85% coverage)
@@ -171,21 +154,10 @@ pytest -s
 
 ## 🐛 Troubleshooting
 
-### Tests Failing?
-```bash
-pytest --cache-clear  # Clear pytest cache
-```
-
 ### Import Errors?
 ```bash
 cd srcs/Frontend  # Must run from Frontend dir
 export PYTHONPATH=$(pwd):$PYTHONPATH
-```
-
-### Cache Issues?
-```python
-from cache_utils import get_cache
-get_cache().clear()  # Reset cache
 ```
 
 ---
@@ -214,7 +186,6 @@ get_cache().clear()  # Reset cache
 - ✅ Wrap new code in try-catch
 - ✅ Add type hints
 - ✅ Write tests for new functions
-- ✅ Check cache stats periodically
 
 ### Never:
 - ❌ Skip input validation

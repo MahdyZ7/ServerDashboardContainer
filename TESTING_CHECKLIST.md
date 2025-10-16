@@ -48,15 +48,8 @@ python -m py_compile *.py
 #### 2.3 Refresh Functionality
 - [ ] Auto-refresh works (every 15 minutes)
 - [ ] Manual refresh button works
-- [ ] Cache invalidated on manual refresh
 - [ ] Last updated timestamp updates
 - [ ] Data refreshes across all tabs
-
-#### 2.4 Caching Behavior
-- [ ] First load fetches from API (check logs)
-- [ ] Second load uses cache (check logs)
-- [ ] Cache expires after 15 minutes
-- [ ] Cache stats available (check logs)
 
 ---
 
@@ -116,21 +109,7 @@ Test with slow network:
 
 ### 4. Performance Testing
 
-#### 4.1 Cache Performance
-Monitor logs for cache statistics:
-
-- [ ] Cache hit rate > 80% after warmup
-- [ ] API call reduction visible in logs
-- [ ] Page load time < 1 second (cached)
-- [ ] Memory usage reasonable (<100MB overhead)
-
-Check cache stats in Python console:
-```python
-from api_client import get_cache_stats
-print(get_cache_stats())
-```
-
-#### 4.2 Load Testing
+#### 4.1 Load Testing
 - [ ] Dashboard responsive with multiple tabs open
 - [ ] No memory leaks after extended use
 - [ ] Browser doesn't freeze during refresh
@@ -197,13 +176,7 @@ for val in test_values:
 - [ ] User tables update
 - [ ] Status badges reflect actual status
 
-#### 6.2 Cache Invalidation
-- [ ] Manual refresh clears cache
-- [ ] New data fetched after invalidation
-- [ ] All components get fresh data
-- [ ] Cache rebuilt on next request
-
-#### 6.3 Error Propagation
+#### 6.2 Error Propagation
 - [ ] API errors logged but don't crash UI
 - [ ] Data processing errors shown as "No data"
 - [ ] Component errors contained (don't break whole page)

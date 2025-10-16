@@ -13,7 +13,6 @@ from api_client import get_historical_metrics
 from utils import safe_float
 from export_utils import generate_export_report, export_to_excel
 from refresh_utils import trigger_dashboard_refresh, get_refresh_status_message
-from api_client import invalidate_all_caches
 
 
 def register_callbacks(app):
@@ -30,8 +29,6 @@ def register_callbacks(app):
     )
     def update_main_dashboard(n_intervals, refresh_clicks, alert_refresh):
         """Update main dashboard components"""
-        # Invalidate caches to ensure fresh data
-        invalidate_all_caches()
 
         return (
             create_system_overview(),
@@ -211,7 +208,5 @@ def register_callbacks(app):
     )
     def refresh_server_grid(n_clicks, n_intervals):
         """Refresh server grid when refresh button is clicked or interval triggers"""
-        from api_client import invalidate_all_caches
         from components import create_compact_server_grid
-        invalidate_all_caches()
         return create_compact_server_grid()

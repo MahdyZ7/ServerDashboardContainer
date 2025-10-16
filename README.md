@@ -78,7 +78,6 @@
 
 ### Performance & Reliability
 
-- **Caching Layer** - 90% reduction in API calls with 15-minute TTL cache
 - **Error Handling** - Comprehensive error handling with automatic retry logic (3 attempts with exponential backoff)
 - **Input Validation** - All inputs validated and sanitized
 - **Health Checks** - Docker health checks for all services
@@ -170,7 +169,6 @@ The system consists of 5 Docker containers orchestrated via Docker Compose:
 2. **Query Phase** (on-demand)
    - Frontend sends requests to API
    - API queries PostgreSQL database
-   - Results are cached (15-minute TTL)
    - Data returned as JSON
 
 3. **Display Phase** (real-time)
@@ -362,17 +360,6 @@ RUN echo "*/15 * * * * /usr/local/bin/python /app/backend.py >> /var/log/datacol
 RUN echo "*/5 * * * * /usr/local/bin/python /app/backend.py >> /var/log/datacollection.log 2>&1" > /etc/cron.d/datacollection
 ```
 
-#### Cache TTL
-Edit `srcs/Frontend/cache_utils.py`:
-
-```python
-# Default: 15 minutes (900 seconds)
-DEFAULT_TTL = 900
-
-# Change to 5 minutes:
-DEFAULT_TTL = 300
-```
-
 #### Dashboard Refresh Rate
 Edit `srcs/Frontend/Dash.py`:
 
@@ -492,7 +479,7 @@ pytest --cov=. --cov-report=html
 #### Main Dashboard Tab
 - **Server Status Cards**: Show current status (green=healthy, yellow=warning, red=critical, gray=offline)
 - **Gauge Charts**: Visual indicators for CPU, RAM, and disk usage
-- **Refresh Button**: Manually refresh data and clear cache
+- **Refresh Button**: Manually refresh data
 
 #### Overview Tab
 - **System Statistics**: Total servers, online/offline count, average CPU/RAM/disk
@@ -549,7 +536,6 @@ ServerDashboardContainer/
 │       ├── utils.py               # Utility functions
 │       ├── callbacks.py           # Dash callbacks
 │       ├── exceptions.py          # Custom exceptions
-│       ├── cache_utils.py         # Caching system
 │       ├── validation.py          # Input validation
 │       ├── data_processing.py     # DataFrame utilities
 │       ├── toast_utils.py         # Toast notifications
@@ -558,7 +544,6 @@ ServerDashboardContainer/
 │       └── tests/
 │           ├── conftest.py        # pytest fixtures
 │           ├── test_validation.py # Validation tests
-│           ├── test_cache_utils.py# Cache tests
 │           └── test_utils.py      # Utility tests
 │
 └── Documentation/
@@ -701,11 +686,6 @@ pytest -s
   - Percentage, timestamp, server name validation
   - Edge cases and error handling
 
-- **test_cache_utils.py** (25 tests)
-  - Tests for caching system
-  - TTL expiration, cache hits/misses
-  - Cache invalidation
-
 - **test_utils.py** (40+ tests)
   - Tests for utility functions
   - Status determination, uptime formatting
@@ -719,7 +699,6 @@ Available fixtures (defined in `conftest.py`):
 - `multiple_servers_metrics` - Multiple servers
 - `warning_server_metrics` - Triggers warnings
 - `critical_server_metrics` - Triggers critical alerts
-- `reset_cache` - Automatically clears cache
 
 ### Integration Testing
 
@@ -1200,9 +1179,6 @@ curl http://localhost:5000/api/servers/metrics/latest
 ```bash
 # Check memory usage
 docker stats
-
-# Reduce cache TTL in srcs/Frontend/cache_utils.py
-# Change DEFAULT_TTL from 900 to 300
 
 # Limit PostgreSQL memory in docker-compose.yml:
 services:

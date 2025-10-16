@@ -8,7 +8,6 @@ from exceptions import (
     APIConnectionError, APITimeoutError, APIResponseError,
     APIDataError
 )
-from cache_utils import cached, get_cache
 
 # Configure logging with more detail
 logging.basicConfig(
@@ -21,7 +20,6 @@ logger = logging.getLogger(__name__)
 DEFAULT_TIMEOUT = 10
 MAX_RETRIES = 3
 RETRY_BACKOFF_FACTOR = 2
-CACHE_TTL = 900  # 15 minutes
 
 
 class APIResult:
@@ -190,7 +188,6 @@ def _make_api_request(
 
 
 @retry_on_failure()
-@cached(ttl_seconds=CACHE_TTL, key_prefix="server_metrics_")
 def get_latest_server_metrics() -> List[Dict]:
     """
     Fetch latest server metrics from API
@@ -209,7 +206,6 @@ def get_latest_server_metrics() -> List[Dict]:
 
 
 @retry_on_failure()
-@cached(ttl_seconds=CACHE_TTL, key_prefix="top_users_")
 def get_top_users() -> List[Dict]:
     """
     Fetch top users data from API
@@ -228,7 +224,6 @@ def get_top_users() -> List[Dict]:
 
 
 @retry_on_failure()
-@cached(ttl_seconds=CACHE_TTL, key_prefix="historical_")
 def get_historical_metrics(server_name: str, hours: int = 24) -> List[Dict]:
     """
     Fetch historical metrics for a specific server
@@ -261,7 +256,6 @@ def get_historical_metrics(server_name: str, hours: int = 24) -> List[Dict]:
 
 
 @retry_on_failure()
-@cached(ttl_seconds=CACHE_TTL, key_prefix="server_status_")
 def get_server_status(server_name: str) -> Dict:
     """
     Fetch status for a specific server
@@ -287,7 +281,6 @@ def get_server_status(server_name: str) -> Dict:
 
 
 @retry_on_failure()
-@cached(ttl_seconds=CACHE_TTL, key_prefix="server_health_")
 def get_server_health(server_name: str) -> Dict:
     """
     Fetch server health for a specific server
@@ -313,7 +306,6 @@ def get_server_health(server_name: str) -> Dict:
 
 
 @retry_on_failure()
-@cached(ttl_seconds=CACHE_TTL, key_prefix="server_list_")
 def get_server_list() -> List[str]:
     """
     Fetch list of all available servers
@@ -332,7 +324,6 @@ def get_server_list() -> List[str]:
 
 
 @retry_on_failure()
-@cached(ttl_seconds=CACHE_TTL, key_prefix="top_users_server_")
 def get_top_users_by_server(server_name: str) -> List[Dict]:
     """
     Fetch top users for a specific server
@@ -358,7 +349,6 @@ def get_top_users_by_server(server_name: str) -> List[Dict]:
 
 
 @retry_on_failure()
-@cached(ttl_seconds=CACHE_TTL, key_prefix="system_overview_")
 def get_system_overview() -> Dict:
     """
     Fetch system overview data
@@ -397,16 +387,3 @@ def check_api_health() -> bool:
     except Exception as e:
         logger.error(f"API health check failed: {e}")
         return False
-
-
-def invalidate_all_caches():
-    """Invalidate all API caches (called on manual refresh)"""
-    cache = get_cache()
-    cache.clear()
-    logger.info("All API caches invalidated")
-
-
-def get_cache_stats() -> Dict:
-    """Get statistics about API cache performance"""
-    cache = get_cache()
-    return cache.get_stats()

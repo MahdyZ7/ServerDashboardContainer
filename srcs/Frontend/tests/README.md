@@ -43,7 +43,6 @@ tests/
 ├── __init__.py                 # Package init
 ├── conftest.py                 # Pytest configuration and fixtures
 ├── test_validation.py          # Validation module tests
-├── test_cache_utils.py         # Cache utilities tests
 ├── test_utils.py              # Utils module tests
 └── README.md                   # This file
 ```
@@ -53,7 +52,6 @@ tests/
 Current test coverage by module:
 
 - `validation.py`: ~95% (all core functions)
-- `cache_utils.py`: ~90% (cache operations)
 - `utils.py`: ~85% (utility functions)
 
 Target: >80% overall coverage
@@ -110,7 +108,6 @@ def test_with_server_metrics(sample_server_metrics):
 - `empty_metrics` - Empty metrics dict
 - `mock_api_response_success` - Successful API response
 - `mock_api_response_error` - Error API response
-- `reset_cache` - Automatically resets cache before each test
 
 ## Test Markers
 
@@ -178,23 +175,11 @@ export PYTHONPATH=/home/ayassin/Developer/ServerDashboardContainer/srcs/Frontend
 pytest
 ```
 
-### Cache Issues
-
-If tests are failing due to cache pollution, the `reset_cache` fixture should handle it automatically. If issues persist:
-
-```python
-# Add to your test
-def test_my_function(reset_cache):
-    # Cache is cleared before this test runs
-    pass
-```
-
 ## Test Coverage Goals
 
 | Module | Current | Target |
 |--------|---------|--------|
 | validation.py | 95% | 95% |
-| cache_utils.py | 90% | 90% |
 | utils.py | 85% | 90% |
 | api_client.py | 0% | 70% |
 | data_processing.py | 0% | 80% |
@@ -204,7 +189,6 @@ def test_my_function(reset_cache):
 
 1. **API Client Tests** (`test_api_client.py`)
    - Test retry logic
-   - Test cache integration
    - Mock HTTP requests
 
 2. **Data Processing Tests** (`test_data_processing.py`)
@@ -219,7 +203,6 @@ def test_my_function(reset_cache):
 4. **Integration Tests**
    - End-to-end API flows
    - Dashboard rendering
-   - Cache behavior under load
 
 ## Best Practices
 
@@ -236,9 +219,6 @@ def test_my_function(reset_cache):
 ```bash
 # Run only validation tests
 pytest tests/test_validation.py -v
-
-# Run only cache tests
-pytest tests/test_cache_utils.py -v
 
 # Run only utils tests
 pytest tests/test_utils.py -v

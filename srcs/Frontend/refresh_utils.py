@@ -2,7 +2,7 @@
 from datetime import datetime
 import logging
 from typing import Dict
-from api_client import check_api_health, invalidate_all_caches, get_cache_stats
+from api_client import check_api_health
 
 logger = logging.getLogger(__name__)
 
@@ -11,15 +11,12 @@ def trigger_dashboard_refresh() -> Dict:
     """
     Trigger a manual refresh of all dashboard data
 
-    This function invalidates all caches and checks API health.
+    This function checks API health.
 
     Returns:
         Dictionary with refresh status and timestamp
     """
     try:
-        # Invalidate all caches first
-        invalidate_all_caches()
-        logger.info("Invalidated all caches for manual refresh")
 
         # Check API health before refreshing
         api_healthy = check_api_health()
@@ -32,8 +29,6 @@ def trigger_dashboard_refresh() -> Dict:
                 'message': 'API is not responding. Please check the backend service.'
             }
 
-        # Get cache statistics
-        cache_stats = get_cache_stats()
 
         # Return success with timestamp
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -43,7 +38,6 @@ def trigger_dashboard_refresh() -> Dict:
             'success': True,
             'timestamp': timestamp,
             'message': f'Dashboard refreshed successfully at {timestamp}',
-            'cache_stats': cache_stats
         }
 
     except Exception as e:

@@ -10,7 +10,7 @@ from config import KU_COLORS, CHART_CONFIG
 from components import (create_system_overview, create_alert_panel, create_enhanced_server_cards,
                        create_enhanced_users_table, create_network_monitor, create_enhanced_historical_graphs,
                        create_compact_server_grid)
-from api_client import get_historical_metrics, invalidate_all_caches, get_cache_stats
+from api_client import get_historical_metrics
 from utils import safe_float
 from export_utils import generate_export_report, export_to_excel
 from refresh_utils import trigger_dashboard_refresh, get_refresh_status_message
@@ -40,7 +40,6 @@ def register_callbacks(app):
             # Trigger refresh if manual button clicked
             if refresh_clicks and refresh_clicks > 0:
                 logger.info("Manual refresh triggered")
-                invalidate_all_caches()
                 toasts.append(create_info_toast("Refreshing data..."))
 
             # Update components
@@ -50,9 +49,8 @@ def register_callbacks(app):
 
             # Add success toast on manual refresh
             if refresh_clicks and refresh_clicks > 0:
-                cache_stats = get_cache_stats()
                 toasts = [create_success_toast(
-                    f"Dashboard refreshed successfully! Cache hit rate: {cache_stats.get('hit_rate', 0):.1f}%"
+                    f"Dashboard refreshed successfully! {get_refresh_status_message()}"
                 )]
 
             return (
@@ -268,7 +266,6 @@ def register_callbacks(app):
     def refresh_server_grid(n_clicks, n_intervals):
         """Refresh server grid when refresh button is clicked or interval triggers"""
         try:
-            # invalidate_all_caches()
             return create_compact_server_grid()
         except Exception as e:
             logger.error(f"Error refreshing server grid: {e}", exc_info=True)

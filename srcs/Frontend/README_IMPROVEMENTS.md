@@ -31,49 +31,6 @@ raise ValidationError("Invalid server name", details={'name': name})
 
 ---
 
-### 2. `cache_utils.py` - Caching System
-
-**Using the cache decorator:**
-
-```python
-from cache_utils import cached
-
-@cached(ttl_seconds=900, key_prefix="mydata_")
-def get_expensive_data(param1, param2):
-    # This function's result will be cached for 15 minutes
-    return fetch_data_from_api(param1, param2)
-```
-
-**Manual cache management:**
-
-```python
-from cache_utils import get_cache, invalidate_cache_pattern
-
-# Get cache instance
-cache = get_cache()
-
-# Manually set cache
-cache.set("my_key", {"data": "value"}, ttl_seconds=600)
-
-# Get from cache
-data = cache.get("my_key")
-
-# Invalidate specific key
-cache.invalidate("my_key")
-
-# Invalidate by pattern
-invalidate_cache_pattern("server_")  # Invalidates all keys containing "server_"
-
-# Clear all cache
-cache.clear()
-
-# Get statistics
-stats = cache.get_stats()
-print(f"Hit rate: {stats['hit_rate']:.1f}%")
-```
-
----
-
 ### 3. `validation.py` - Input Validation
 
 **Validating inputs:**
@@ -175,22 +132,9 @@ anomaly_count = anomalies.sum()
 
 **All API functions now:**
 - Automatically retry on failure (3 attempts with exponential backoff)
-- Cache results for 15 minutes
 - Validate inputs
 - Return empty list/dict on error (never None)
 - Log detailed error information
-
-**Manual cache control:**
-
-```python
-from api_client import invalidate_all_caches, get_cache_stats
-
-# Invalidate all API caches (on manual refresh)
-invalidate_all_caches()
-
-# Get cache performance stats
-stats = get_cache_stats()
-```
 
 ---
 
@@ -349,33 +293,9 @@ df = parse_dataframe_timestamps(df, 'timestamp')
 df = convert_numeric_columns(df, ['cpu', 'memory'], fillna=0.0)
 ```
 
-### 5. Cache Expensive Operations
-
-```python
-# ❌ Bad - No caching
-def get_heavy_computation(param):
-    # Expensive operation
-    return result
-
-# ✅ Good - With caching
-from cache_utils import cached
-
-@cached(ttl_seconds=600)
-def get_heavy_computation(param):
-    # Expensive operation
-    return result
-```
-
 ---
 
 ## Configuration
-
-### Cache Settings
-
-Edit `api_client.py`:
-```python
-CACHE_TTL = 900  # 15 minutes
-```
 
 ### Retry Settings
 
@@ -403,35 +323,6 @@ import logging
 
 # Set to DEBUG level
 logging.basicConfig(level=logging.DEBUG)
-```
-
-### View Cache Statistics
-
-```python
-from api_client import get_cache_stats
-
-stats = get_cache_stats()
-print(f"""
-Cache Statistics:
-- Hits: {stats['hits']}
-- Misses: {stats['misses']}
-- Hit Rate: {stats['hit_rate']:.1f}%
-- Cached Items: {stats['cached_items']}
-""")
-```
-
-### Manual Cache Inspection
-
-```python
-from cache_utils import get_cache
-
-cache = get_cache()
-print(f"Cached items: {len(cache._cache)}")
-
-# List all keys
-for key in cache._cache.keys():
-    entry = cache._cache[key]
-    print(f"Key: {key}, Age: {entry.get_age():.1f}s, Expired: {entry.is_expired()}")
 ```
 
 ---
@@ -476,9 +367,6 @@ df = parse_dataframe_timestamps(df, 'timestamp')
 ---
 
 ## Common Issues
-
-### Issue: Cache not invalidating
-**Solution:** Call `invalidate_all_caches()` on manual refresh
 
 ### Issue: Timestamp parsing fails
 **Solution:** Use `validate_timestamp()` which supports multiple formats
