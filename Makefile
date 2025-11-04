@@ -12,6 +12,10 @@ GREEN=\033[0;32m
 NC=\033[0m # No Color
 
 
+#clear_port:
+#	sudo netstat -tulpn | grep :80
+#	kill -9 $(sudo lsof -t -i:80) || echo "No process is using port 80"
+
 build:
 	docker compose up --build -d
 
