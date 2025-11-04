@@ -169,7 +169,7 @@ This project uses **UV** (https://docs.astral.sh/uv/), a fast Python package man
 **Managing Dependencies:**
 ```bash
 # Install dependencies (creates virtual environment)
-cd srcs/Backend  # or Frontend or DataCollection
+cd srcs/Backend  # or Frontend or DataCollection or schema
 uv sync
 
 # Add a new dependency
@@ -183,6 +183,7 @@ uv lock --upgrade
 
 # Run Python scripts with UV
 uv run api.py
+uv run python generate_all.py  # In schema/generators
 ```
 
 **Project Structure:**
@@ -198,6 +199,15 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen
 ```
 
+**Schema Generators:**
+The schema generators also use UV (see `schema/pyproject.toml`):
+```bash
+cd schema
+uv sync                    # Install dependencies (PyYAML)
+cd generators
+uv run python generate_all.py  # Generate code from schema
+```
+
 **Test Infrastructure:**
 - 103 unit tests across `test_validation.py`, `test_utils.py`
 - Fixtures in `tests/conftest.py` (sample data)
@@ -208,6 +218,29 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # Connect to PostgreSQL directly
 psql -h localhost -U postgres -d server_db
 ```
+
+## Documentation
+
+All project documentation has been organized into the `Docs/` folder:
+
+- **[Docs/INDEX.md](Docs/INDEX.md)** - Master documentation index (START HERE)
+- **Docs/Schema-System/** - Schema-driven architecture (NEW!)
+  - Daily usage guide, technical specs, migration guide
+- **Docs/Monitoring-Analysis/** - System analysis & monitoring improvements
+- **Docs/Frontend-Improvements/** - Frontend refactoring documentation
+- **Docs/Project-Overview/** - Project setup, testing, references
+- **Docs/generated/** - Auto-generated documentation from schema
+
+### Key Documents for Different Tasks
+
+**Adding a new metric:**
+→ Read: [Docs/Schema-System/SCHEMA_HOWTO.md](Docs/Schema-System/SCHEMA_HOWTO.md)
+
+**Understanding the system:**
+→ Read: [Docs/Monitoring-Analysis/ARCHITECTURE_VISUAL.md](Docs/Monitoring-Analysis/ARCHITECTURE_VISUAL.md)
+
+**Quick reference:**
+→ Read: [Docs/Project-Overview/QUICK_REFERENCE.md](Docs/Project-Overview/QUICK_REFERENCE.md)
 
 ## Configuration
 

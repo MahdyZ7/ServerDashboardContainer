@@ -1,0 +1,526 @@
+# Server Metrics Schema Definition
+# This is the SINGLE SOURCE OF TRUTH for all data structures
+# Edit this file to add/modify/remove metrics, then run: python generators/generate_all.py
+
+version: "1.0.0"
+generated_at: "auto"
+
+# Metric Groups for UI organization
+metric_groups:
+  - id: system_info
+    name: System Information
+    order: 1
+
+  - id: resources
+    name: Resource Usage
+    order: 2
+
+  - id: storage
+    name: Storage
+    order: 3
+
+  - id: network
+    name: Network & Security
+    order: 4
+
+  - id: users
+    name: User Activity
+    order: 5
+
+# Server Metrics Table Definition
+server_metrics:
+  table_name: server_metrics
+  primary_key: id
+  description: "System monitoring metrics collected from remote servers"
+
+  fields:
+    # System Information
+    - name: id
+      type: serial
+      primary_key: true
+      nullable: false
+      bash_output: false
+      description: "Primary key"
+
+    - name: server_name
+      type: varchar(255)
+      nullable: false
+      bash_output: false
+      group: system_info
+      description: "Server identifier"
+      frontend_display: "Server"
+
+    - name: timestamp
+      type: timestamp
+      nullable: false
+      default: CURRENT_TIMESTAMP
+      bash_output: false
+      group: system_info
+      description: "Collection timestamp"
+      frontend_display: "Timestamp"
+
+    - name: architecture
+      type: varchar(255)
+      nullable: true
+      bash_output: true
+      bash_index: 0
+      bash_format: raw
+      group: system_info
+      description: "System architecture (kernel, release, machine)"
+      frontend_display: "Architecture"
+      validation:
+        type: string
+        max_length: 255
+
+    - name: os
+      type: varchar(100)
+      nullable: true
+      bash_output: true
+      bash_index: 1
+      bash_format: raw
+      group: system_info
+      description: "Operating system name and version"
+      frontend_display: "OS"
+      validation:
+        type: string
+        max_length: 100
+
+    # CPU Information
+    - name: physical_cpus
+      type: integer
+      nullable: true
+      bash_output: true
+      bash_index: 2
+      bash_format: raw
+      group: resources
+      description: "Number of physical CPU sockets"
+      frontend_display: "Physical CPUs"
+      validation:
+        type: integer
+        min: 0
+        max: 256
+
+    - name: virtual_cpus
+      type: integer
+      nullable: true
+      bash_output: true
+      bash_index: 3
+      bash_format: raw
+      group: resources
+      description: "Number of virtual CPU cores (threads)"
+      frontend_display: "Virtual CPUs"
+      validation:
+        type: integer
+        min: 0
+        max: 1024
+
+    # Memory
+    - name: ram_used
+      type: varchar(20)
+      nullable: true
+      bash_output: true
+      bash_index: 4
+      bash_format: part_before_slash
+      group: resources
+      description: "RAM currently in use"
+      frontend_display: "RAM Used"
+      validation:
+        type: string
+
+    - name: ram_total
+      type: varchar(20)
+      nullable: true
+      bash_output: true
+      bash_index: 4
+      bash_format: part_after_slash
+      group: resources
+      description: "Total RAM available"
+      frontend_display: "RAM Total"
+      validation:
+        type: string
+
+    - name: ram_percentage
+      type: integer
+      nullable: true
+      bash_output: true
+      bash_index: 5
+      bash_format: raw
+      group: resources
+      description: "RAM usage percentage"
+      frontend_display: "RAM %"
+      visualization:
+        type: progress_bar
+        thresholds:
+          warning: 70
+          critical: 85
+      validation:
+        type: percentage
+        min: 0
+        max: 100
+
+    # Disk Storage
+    - name: disk_used
+      type: varchar(20)
+      nullable: true
+      bash_output: true
+      bash_index: 6
+      bash_format: part_before_slash
+      group: storage
+      description: "Disk space used"
+      frontend_display: "Disk Used"
+      validation:
+        type: string
+
+    - name: disk_total
+      type: varchar(20)
+      nullable: true
+      bash_output: true
+      bash_index: 6
+      bash_format: part_after_slash
+      group: storage
+      description: "Total disk space"
+      frontend_display: "Disk Total"
+      validation:
+        type: string
+
+    - name: disk_percentage
+      type: varchar(10)
+      nullable: true
+      bash_output: true
+      bash_index: 7
+      bash_format: strip_percent
+      group: storage
+      description: "Disk usage percentage"
+      frontend_display: "Disk %"
+      visualization:
+        type: progress_bar
+        thresholds:
+          warning: 80
+          critical: 90
+      validation:
+        type: string
+
+    # CPU Load
+    - name: cpu_load_1min
+      type: varchar(10)
+      nullable: true
+      bash_output: true
+      bash_index: 8
+      bash_format: csv_split_0
+      group: resources
+      description: "CPU load average (1 minute)"
+      frontend_display: "Load (1m)"
+      validation:
+        type: string
+
+    - name: cpu_load_5min
+      type: varchar(10)
+      nullable: true
+      bash_output: true
+      bash_index: 8
+      bash_format: csv_split_1
+      group: resources
+      description: "CPU load average (5 minutes)"
+      frontend_display: "Load (5m)"
+      validation:
+        type: string
+
+    - name: cpu_load_15min
+      type: varchar(10)
+      nullable: true
+      bash_output: true
+      bash_index: 8
+      bash_format: csv_split_2
+      group: resources
+      description: "CPU load average (15 minutes)"
+      frontend_display: "Load (15m)"
+      validation:
+        type: string
+
+    # System Status
+    - name: last_boot
+      type: varchar(50)
+      nullable: true
+      bash_output: true
+      bash_index: 9
+      bash_format: raw
+      group: system_info
+      description: "Last system boot time"
+      frontend_display: "Last Boot"
+      validation:
+        type: string
+
+    - name: tcp_connections
+      type: integer
+      nullable: true
+      bash_output: true
+      bash_index: 10
+      bash_format: raw
+      group: network
+      description: "Number of TCP connections"
+      frontend_display: "TCP Connections"
+      validation:
+        type: integer
+        min: 0
+
+    - name: logged_users
+      type: integer
+      nullable: true
+      bash_output: true
+      bash_index: 11
+      bash_format: raw
+      group: users
+      description: "Number of logged-in users"
+      frontend_display: "Logged Users"
+      validation:
+        type: integer
+        min: 0
+
+    - name: active_vnc
+      type: integer
+      nullable: true
+      bash_output: true
+      bash_index: 12
+      bash_format: raw
+      group: network
+      description: "Active VNC sessions"
+      frontend_display: "VNC Sessions"
+      validation:
+        type: integer
+        min: 0
+
+    - name: active_ssh
+      type: integer
+      nullable: true
+      bash_output: true
+      bash_index: 13
+      bash_format: raw
+      group: network
+      description: "Active SSH sessions"
+      frontend_display: "SSH Sessions"
+      validation:
+        type: integer
+        min: 0
+
+# Top Users Table Definition
+top_users:
+  table_name: top_users
+  primary_key: id
+  description: "Per-user resource usage metrics"
+
+  fields:
+    - name: id
+      type: serial
+      primary_key: true
+      nullable: false
+      bash_output: false
+      description: "Primary key"
+
+    - name: server_name
+      type: varchar(255)
+      nullable: false
+      bash_output: false
+      description: "Server identifier"
+      frontend_display: "Server"
+
+    - name: timestamp
+      type: timestamp
+      nullable: false
+      default: CURRENT_TIMESTAMP
+      bash_output: false
+      description: "Collection timestamp"
+      frontend_display: "Timestamp"
+
+    - name: username
+      type: varchar(50)
+      nullable: false
+      bash_output: true
+      bash_index: 0
+      bash_format: raw
+      description: "Username"
+      frontend_display: "User"
+      validation:
+        type: string
+        max_length: 50
+
+    - name: cpu_percentage
+      type: decimal(5,2)
+      nullable: true
+      bash_output: true
+      bash_index: 1
+      bash_format: raw
+      description: "CPU usage percentage"
+      frontend_display: "CPU %"
+      validation:
+        type: float
+        min: 0
+        max: 1000
+
+    - name: memory_percentage
+      type: decimal(5,2)
+      nullable: true
+      bash_output: true
+      bash_index: 2
+      bash_format: raw
+      description: "Memory usage percentage"
+      frontend_display: "Memory %"
+      validation:
+        type: float
+        min: 0
+        max: 100
+
+    - name: disk_usage_gb
+      type: decimal(10,2)
+      nullable: true
+      bash_output: true
+      bash_index: 3
+      bash_format: raw
+      description: "Disk usage in GB"
+      frontend_display: "Disk (GB)"
+      validation:
+        type: float
+        min: 0
+
+    - name: process_count
+      type: integer
+      nullable: true
+      bash_output: true
+      bash_index: 4
+      bash_format: raw
+      description: "Number of processes"
+      frontend_display: "Processes"
+      validation:
+        type: integer
+        min: 0
+
+    - name: top_process
+      type: varchar(255)
+      nullable: true
+      bash_output: true
+      bash_index: 5
+      bash_format: raw
+      description: "Top CPU-consuming process"
+      frontend_display: "Top Process"
+      validation:
+        type: string
+        max_length: 255
+
+    - name: last_login
+      type: varchar(50)
+      nullable: true
+      bash_output: true
+      bash_index: 6
+      bash_format: raw
+      description: "Last login timestamp"
+      frontend_display: "Last Login"
+      validation:
+        type: string
+
+    - name: full_name
+      type: varchar(255)
+      nullable: true
+      bash_output: true
+      bash_index: 7
+      bash_format: raw
+      description: "User's full name"
+      frontend_display: "Full Name"
+      validation:
+        type: string
+        max_length: 255
+
+# API Endpoints Configuration
+api_endpoints:
+  - path: /api/servers/metrics/latest
+    method: GET
+    description: "Get latest metrics for all servers"
+    returns: server_metrics
+    fields: all
+
+  - path: /api/servers/<server_name>/metrics/historical/<hours>
+    method: GET
+    description: "Get historical metrics for specific server"
+    returns: server_metrics
+    fields: all
+    parameters:
+      - name: server_name
+        type: string
+        required: true
+      - name: hours
+        type: integer
+        required: true
+        validation:
+          min: 1
+          max: 720
+
+  - path: /api/servers/<server_name>/status
+    method: GET
+    description: "Get current status of specific server"
+    returns: server_metrics
+    fields: all
+    parameters:
+      - name: server_name
+        type: string
+        required: true
+
+  - path: /api/servers/list
+    method: GET
+    description: "List all available servers"
+    returns: server_metrics
+    fields: [server_name]
+
+  - path: /api/users/top
+    method: GET
+    description: "Get top users across all servers"
+    returns: top_users
+    fields: all
+
+  - path: /api/users/top/<server_name>
+    method: GET
+    description: "Get top users for specific server"
+    returns: top_users
+    fields: all
+    parameters:
+      - name: server_name
+        type: string
+        required: true
+
+  - path: /api/system/overview
+    method: GET
+    description: "Real-time system statistics and trends"
+    returns: server_metrics
+    fields: all
+
+  - path: /api/health
+    method: GET
+    description: "API health check"
+    returns: custom
+    fields: []
+
+# Frontend Display Configuration
+frontend_config:
+  server_metrics:
+    overview_cards:
+      - field: ram_percentage
+        title: "Memory Usage"
+        color_scheme: "blue"
+      - field: disk_percentage
+        title: "Disk Usage"
+        color_scheme: "green"
+      - field: cpu_load_1min
+        title: "CPU Load"
+        color_scheme: "orange"
+
+    graphs:
+      - name: "Resource Usage Over Time"
+        fields: [ram_percentage, disk_percentage]
+        type: line
+
+      - name: "CPU Load Average"
+        fields: [cpu_load_1min, cpu_load_5min, cpu_load_15min]
+        type: line
+
+  top_users:
+    table_columns: [username, cpu_percentage, memory_percentage, disk_usage_gb, process_count, top_process]
+    sortable: true
+    default_sort: cpu_percentage
+    default_order: desc
