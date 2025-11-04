@@ -17,35 +17,33 @@ def trigger_dashboard_refresh() -> Dict:
         Dictionary with refresh status and timestamp
     """
     try:
-
         # Check API health before refreshing
         api_healthy = check_api_health()
 
         if not api_healthy:
             logger.warning("API health check failed during refresh")
             return {
-                'success': False,
-                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                'message': 'API is not responding. Please check the backend service.'
+                "success": False,
+                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "message": "API is not responding. Please check the backend service.",
             }
 
-
         # Return success with timestamp
-        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         logger.info(f"Dashboard refresh triggered at {timestamp}")
 
         return {
-            'success': True,
-            'timestamp': timestamp,
-            'message': f'Dashboard refreshed successfully at {timestamp}',
+            "success": True,
+            "timestamp": timestamp,
+            "message": f"Dashboard refreshed successfully at {timestamp}",
         }
 
     except Exception as e:
         logger.error(f"Error during dashboard refresh: {e}", exc_info=True)
         return {
-            'success': False,
-            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            'message': f'Refresh failed: {str(e)}'
+            "success": False,
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "message": f"Refresh failed: {str(e)}",
         }
 
 
@@ -59,7 +57,7 @@ def get_refresh_status_message(refresh_result):
     Returns:
         String message for display
     """
-    if refresh_result.get('success'):
+    if refresh_result.get("success"):
         return f"✓ Last updated: {refresh_result.get('timestamp')}"
     else:
         return f"⚠ Update failed: {refresh_result.get('message', 'Unknown error')}"

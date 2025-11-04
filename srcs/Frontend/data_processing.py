@@ -1,11 +1,7 @@
 # Data processing utilities for the Server Monitoring Dashboard
 import pandas as pd
-import numpy as np
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Optional
 import logging
-from datetime import datetime
-from validation import validate_timestamp, validate_server_metrics
-from exceptions import DataProcessingError
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +34,9 @@ def safe_create_dataframe(data: List[Dict], name: str = "data") -> pd.DataFrame:
         return pd.DataFrame()
 
 
-def parse_dataframe_timestamps(df: pd.DataFrame, column: str = 'timestamp') -> pd.DataFrame:
+def parse_dataframe_timestamps(
+    df: pd.DataFrame, column: str = "timestamp"
+) -> pd.DataFrame:
     """
     Safely parse timestamps in a DataFrame column
 
@@ -57,12 +55,14 @@ def parse_dataframe_timestamps(df: pd.DataFrame, column: str = 'timestamp') -> p
         return df
 
     try:
-        df[column] = pd.to_datetime(df[column], errors='coerce')
+        df[column] = pd.to_datetime(df[column], errors="coerce")
 
         # Count and log failed conversions
         failed_count = df[column].isna().sum()
         if failed_count > 0:
-            logger.warning(f"Failed to parse {failed_count} timestamps in column '{column}'")
+            logger.warning(
+                f"Failed to parse {failed_count} timestamps in column '{column}'"
+            )
 
         return df
     except Exception as e:
@@ -71,9 +71,7 @@ def parse_dataframe_timestamps(df: pd.DataFrame, column: str = 'timestamp') -> p
 
 
 def convert_numeric_columns(
-    df: pd.DataFrame,
-    columns: List[str],
-    fillna: float = 0.0
+    df: pd.DataFrame, columns: List[str], fillna: float = 0.0
 ) -> pd.DataFrame:
     """
     Safely convert specified columns to numeric types
@@ -92,7 +90,7 @@ def convert_numeric_columns(
     for col in columns:
         if col in df.columns:
             try:
-                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(fillna)
+                df[col] = pd.to_numeric(df[col], errors="coerce").fillna(fillna)
                 logger.debug(f"Converted column '{col}' to numeric")
             except Exception as e:
                 logger.error(f"Failed to convert column '{col}' to numeric: {e}")
@@ -101,11 +99,7 @@ def convert_numeric_columns(
 
 
 def validate_dataframe_range(
-    df: pd.DataFrame,
-    column: str,
-    min_val: float,
-    max_val: float,
-    clip: bool = False
+    df: pd.DataFrame, column: str, min_val: float, max_val: float, clip: bool = False
 ) -> pd.DataFrame:
     """
     Validate that values in a DataFrame column are within range
@@ -134,7 +128,9 @@ def validate_dataframe_range(
 
         if clip:
             df[column] = df[column].clip(lower=min_val, upper=max_val)
-            logger.info(f"Clipped values in column '{column}' to range {min_val}-{max_val}")
+            logger.info(
+                f"Clipped values in column '{column}' to range {min_val}-{max_val}"
+            )
 
         return df
     except Exception as e:
@@ -143,8 +139,7 @@ def validate_dataframe_range(
 
 
 def prepare_historical_dataframe(
-    historical_data: List[Dict],
-    server_name: str
+    historical_data: List[Dict], server_name: str
 ) -> pd.DataFrame:
     """
     Prepare historical data DataFrame with proper types and validation
@@ -162,32 +157,36 @@ def prepare_historical_dataframe(
         return df
 
     # Parse timestamps
-    df = parse_dataframe_timestamps(df, 'timestamp')
+    df = parse_dataframe_timestamps(df, "timestamp")
 
     # Convert numeric columns
     numeric_columns = [
-        'cpu_load_1min', 'cpu_load_5min', 'cpu_load_15min',
-        'ram_percentage', 'disk_percentage',
-        'logged_users', 'tcp_connections'
+        "cpu_load_1min",
+        "cpu_load_5min",
+        "cpu_load_15min",
+        "ram_percentage",
+        "disk_percentage",
+        "logged_users",
+        "tcp_connections",
     ]
     df = convert_numeric_columns(df, numeric_columns, fillna=0.0)
 
     # Validate ranges for percentage columns
-    percentage_columns = ['ram_percentage', 'disk_percentage']
+    percentage_columns = ["ram_percentage", "disk_percentage"]
     for col in percentage_columns:
         if col in df.columns:
             df = validate_dataframe_range(df, col, 0, 100, clip=True)
 
     # Validate CPU load (typically 0-100 but can go higher)
-    cpu_columns = ['cpu_load_1min', 'cpu_load_5min', 'cpu_load_15min']
+    cpu_columns = ["cpu_load_1min", "cpu_load_5min", "cpu_load_15min"]
     for col in cpu_columns:
         if col in df.columns:
             df = validate_dataframe_range(df, col, 0, 1000, clip=False)
 
     # Sort by timestamp
-    if 'timestamp' in df.columns:
+    if "timestamp" in df.columns:
         try:
-            df = df.sort_values('timestamp')
+            df = df.sort_values("timestamp")
         except Exception as e:
             logger.warning(f"Failed to sort by timestamp: {e}")
 
@@ -195,7 +194,9 @@ def prepare_historical_dataframe(
     return df
 
 
-def aggregate_metrics(metrics_list: List[Dict], operation: str = 'mean') -> Dict[str, float]:
+def aggregate_metrics(
+    metrics_list: List[Dict], operation: str = "mean"
+) -> Dict[str, float]:
     """
     Aggregate metrics across multiple servers
 
@@ -216,26 +217,32 @@ def aggregate_metrics(metrics_list: List[Dict], operation: str = 'mean') -> Dict
 
         # Convert numeric columns
         numeric_columns = [
-            'cpu_load_1min', 'cpu_load_5min', 'cpu_load_15min',
-            'ram_percentage', 'disk_percentage',
-            'logged_users', 'tcp_connections'
+            "cpu_load_1min",
+            "cpu_load_5min",
+            "cpu_load_15min",
+            "ram_percentage",
+            "disk_percentage",
+            "logged_users",
+            "tcp_connections",
         ]
         df = convert_numeric_columns(df, numeric_columns)
 
         # Perform aggregation
-        if operation == 'mean':
+        if operation == "mean":
             result = df[numeric_columns].mean().to_dict()
-        elif operation == 'sum':
+        elif operation == "sum":
             result = df[numeric_columns].sum().to_dict()
-        elif operation == 'max':
+        elif operation == "max":
             result = df[numeric_columns].max().to_dict()
-        elif operation == 'min':
+        elif operation == "min":
             result = df[numeric_columns].min().to_dict()
         else:
             logger.error(f"Unknown aggregation operation: {operation}")
             return {}
 
-        logger.info(f"Aggregated metrics using {operation} across {len(metrics_list)} servers")
+        logger.info(
+            f"Aggregated metrics using {operation} across {len(metrics_list)} servers"
+        )
         return result
 
     except Exception as e:
@@ -244,9 +251,7 @@ def aggregate_metrics(metrics_list: List[Dict], operation: str = 'mean') -> Dict
 
 
 def filter_recent_data(
-    df: pd.DataFrame,
-    timestamp_column: str = 'timestamp',
-    hours: int = 24
+    df: pd.DataFrame, timestamp_column: str = "timestamp", hours: int = 24
 ) -> pd.DataFrame:
     """
     Filter DataFrame to include only recent data
@@ -274,8 +279,7 @@ def filter_recent_data(
         filtered_df = df[df[timestamp_column] >= cutoff_time]
 
         logger.info(
-            f"Filtered data to last {hours} hours: "
-            f"{len(df)} -> {len(filtered_df)} rows"
+            f"Filtered data to last {hours} hours: {len(df)} -> {len(filtered_df)} rows"
         )
 
         return filtered_df
@@ -285,11 +289,7 @@ def filter_recent_data(
         return df
 
 
-def calculate_trends(
-    df: pd.DataFrame,
-    column: str,
-    window: int = 5
-) -> Optional[str]:
+def calculate_trends(df: pd.DataFrame, column: str, window: int = 5) -> Optional[str]:
     """
     Calculate trend direction for a metric
 
@@ -315,14 +315,16 @@ def calculate_trends(
         first_val = ma.dropna().iloc[0]
         last_val = ma.dropna().iloc[-1]
 
-        change_percent = ((last_val - first_val) / first_val * 100) if first_val != 0 else 0
+        change_percent = (
+            ((last_val - first_val) / first_val * 100) if first_val != 0 else 0
+        )
 
         if change_percent > 5:
-            return 'increasing'
+            return "increasing"
         elif change_percent < -5:
-            return 'decreasing'
+            return "decreasing"
         else:
-            return 'stable'
+            return "stable"
 
     except Exception as e:
         logger.error(f"Failed to calculate trends for column '{column}': {e}")
@@ -330,9 +332,7 @@ def calculate_trends(
 
 
 def detect_anomalies(
-    df: pd.DataFrame,
-    column: str,
-    threshold_std: float = 3.0
+    df: pd.DataFrame, column: str, threshold_std: float = 3.0
 ) -> pd.Series:
     """
     Detect anomalies in a metric using standard deviation

@@ -2,13 +2,18 @@
 import pandas as pd
 from datetime import datetime
 import logging
-from api_client import (get_latest_server_metrics, get_top_users,
-                       get_system_overview, get_server_list, get_historical_metrics)
+from api_client import (
+    get_latest_server_metrics,
+    get_top_users,
+    get_system_overview,
+    get_server_list,
+    get_historical_metrics,
+)
 
 logging.basicConfig(level=logging.INFO)
 
 
-def generate_export_report(format='csv'):
+def generate_export_report(format="csv"):
     """
     Generate a comprehensive report of all dashboard data
 
@@ -19,7 +24,7 @@ def generate_export_report(format='csv'):
         Dictionary with export data or None if failed
     """
     try:
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
         # Fetch all data
         server_metrics = get_latest_server_metrics()
@@ -34,25 +39,32 @@ def generate_export_report(format='csv'):
         # Create system overview DataFrame
         overview_data = []
         if system_overview:
-            overview_data = [{
-                'metric': 'Total Servers',
-                'value': system_overview.get('total_servers', 0)
-            }, {
-                'metric': 'Active Servers',
-                'value': system_overview.get('active_servers', 0)
-            }, {
-                'metric': 'Total Users',
-                'value': system_overview.get('total_users', 0)
-            }, {
-                'metric': 'Average CPU Load',
-                'value': f"{system_overview.get('avg_cpu_load', 0):.2f}"
-            }, {
-                'metric': 'Average Memory Usage',
-                'value': f"{system_overview.get('avg_memory_usage', 0):.2f}%"
-            }, {
-                'metric': 'Average Disk Usage',
-                'value': f"{system_overview.get('avg_disk_usage', 0):.2f}%"
-            }]
+            overview_data = [
+                {
+                    "metric": "Total Servers",
+                    "value": system_overview.get("total_servers", 0),
+                },
+                {
+                    "metric": "Active Servers",
+                    "value": system_overview.get("active_servers", 0),
+                },
+                {
+                    "metric": "Total Users",
+                    "value": system_overview.get("total_users", 0),
+                },
+                {
+                    "metric": "Average CPU Load",
+                    "value": f"{system_overview.get('avg_cpu_load', 0):.2f}",
+                },
+                {
+                    "metric": "Average Memory Usage",
+                    "value": f"{system_overview.get('avg_memory_usage', 0):.2f}%",
+                },
+                {
+                    "metric": "Average Disk Usage",
+                    "value": f"{system_overview.get('avg_disk_usage', 0):.2f}%",
+                },
+            ]
         df_overview = pd.DataFrame(overview_data)
 
         # Fetch historical data for all servers (last 24 hours)
@@ -63,14 +75,16 @@ def generate_export_report(format='csv'):
                 hist = get_historical_metrics(server_name, hours=24)
                 if hist:
                     historical_data.extend(hist)
-        df_historical = pd.DataFrame(historical_data) if historical_data else pd.DataFrame()
+        df_historical = (
+            pd.DataFrame(historical_data) if historical_data else pd.DataFrame()
+        )
 
         export_data = {
-            'timestamp': timestamp,
-            'server_metrics': df_servers,
-            'top_users': df_users,
-            'system_overview': df_overview,
-            'historical_metrics': df_historical
+            "timestamp": timestamp,
+            "server_metrics": df_servers,
+            "top_users": df_users,
+            "system_overview": df_overview,
+            "historical_metrics": df_historical,
         }
 
         logging.info(f"Export report generated successfully at {timestamp}")
@@ -92,34 +106,36 @@ def export_to_csv(export_data):
         List of file paths created
     """
     try:
-        timestamp = export_data.get('timestamp', datetime.now().strftime('%Y%m%d_%H%M%S'))
+        timestamp = export_data.get(
+            "timestamp", datetime.now().strftime("%Y%m%d_%H%M%S")
+        )
         file_paths = []
 
         # Export server metrics
-        if not export_data['server_metrics'].empty:
+        if not export_data["server_metrics"].empty:
             filepath = f"/tmp/server_metrics_{timestamp}.csv"
-            export_data['server_metrics'].to_csv(filepath, index=False)
+            export_data["server_metrics"].to_csv(filepath, index=False)
             file_paths.append(filepath)
             logging.info(f"Exported server metrics to {filepath}")
 
         # Export top users
-        if not export_data['top_users'].empty:
+        if not export_data["top_users"].empty:
             filepath = f"/tmp/top_users_{timestamp}.csv"
-            export_data['top_users'].to_csv(filepath, index=False)
+            export_data["top_users"].to_csv(filepath, index=False)
             file_paths.append(filepath)
             logging.info(f"Exported top users to {filepath}")
 
         # Export system overview
-        if not export_data['system_overview'].empty:
+        if not export_data["system_overview"].empty:
             filepath = f"/tmp/system_overview_{timestamp}.csv"
-            export_data['system_overview'].to_csv(filepath, index=False)
+            export_data["system_overview"].to_csv(filepath, index=False)
             file_paths.append(filepath)
             logging.info(f"Exported system overview to {filepath}")
 
         # Export historical metrics
-        if not export_data['historical_metrics'].empty:
+        if not export_data["historical_metrics"].empty:
             filepath = f"/tmp/historical_metrics_{timestamp}.csv"
-            export_data['historical_metrics'].to_csv(filepath, index=False)
+            export_data["historical_metrics"].to_csv(filepath, index=False)
             file_paths.append(filepath)
             logging.info(f"Exported historical metrics to {filepath}")
 
@@ -141,21 +157,31 @@ def export_to_excel(export_data):
         File path of created Excel file or None if failed
     """
     try:
-        timestamp = export_data.get('timestamp', datetime.now().strftime('%Y%m%d_%H%M%S'))
+        timestamp = export_data.get(
+            "timestamp", datetime.now().strftime("%Y%m%d_%H%M%S")
+        )
         filepath = f"/tmp/dashboard_report_{timestamp}.xlsx"
 
-        with pd.ExcelWriter(filepath, engine='openpyxl') as writer:
-            if not export_data['server_metrics'].empty:
-                export_data['server_metrics'].to_excel(writer, sheet_name='Server Metrics', index=False)
+        with pd.ExcelWriter(filepath, engine="openpyxl") as writer:
+            if not export_data["server_metrics"].empty:
+                export_data["server_metrics"].to_excel(
+                    writer, sheet_name="Server Metrics", index=False
+                )
 
-            if not export_data['top_users'].empty:
-                export_data['top_users'].to_excel(writer, sheet_name='Top Users', index=False)
+            if not export_data["top_users"].empty:
+                export_data["top_users"].to_excel(
+                    writer, sheet_name="Top Users", index=False
+                )
 
-            if not export_data['system_overview'].empty:
-                export_data['system_overview'].to_excel(writer, sheet_name='System Overview', index=False)
+            if not export_data["system_overview"].empty:
+                export_data["system_overview"].to_excel(
+                    writer, sheet_name="System Overview", index=False
+                )
 
-            if not export_data['historical_metrics'].empty:
-                export_data['historical_metrics'].to_excel(writer, sheet_name='Historical Data', index=False)
+            if not export_data["historical_metrics"].empty:
+                export_data["historical_metrics"].to_excel(
+                    writer, sheet_name="Historical Data", index=False
+                )
 
         logging.info(f"Exported data to Excel file: {filepath}")
         return filepath
@@ -176,34 +202,38 @@ def export_to_json(export_data):
         List of file paths created
     """
     try:
-        timestamp = export_data.get('timestamp', datetime.now().strftime('%Y%m%d_%H%M%S'))
+        timestamp = export_data.get(
+            "timestamp", datetime.now().strftime("%Y%m%d_%H%M%S")
+        )
         file_paths = []
 
         # Export server metrics
-        if not export_data['server_metrics'].empty:
+        if not export_data["server_metrics"].empty:
             filepath = f"/tmp/server_metrics_{timestamp}.json"
-            export_data['server_metrics'].to_json(filepath, orient='records', indent=2)
+            export_data["server_metrics"].to_json(filepath, orient="records", indent=2)
             file_paths.append(filepath)
             logging.info(f"Exported server metrics to {filepath}")
 
         # Export top users
-        if not export_data['top_users'].empty:
+        if not export_data["top_users"].empty:
             filepath = f"/tmp/top_users_{timestamp}.json"
-            export_data['top_users'].to_json(filepath, orient='records', indent=2)
+            export_data["top_users"].to_json(filepath, orient="records", indent=2)
             file_paths.append(filepath)
             logging.info(f"Exported top users to {filepath}")
 
         # Export system overview
-        if not export_data['system_overview'].empty:
+        if not export_data["system_overview"].empty:
             filepath = f"/tmp/system_overview_{timestamp}.json"
-            export_data['system_overview'].to_json(filepath, orient='records', indent=2)
+            export_data["system_overview"].to_json(filepath, orient="records", indent=2)
             file_paths.append(filepath)
             logging.info(f"Exported system overview to {filepath}")
 
         # Export historical metrics
-        if not export_data['historical_metrics'].empty:
+        if not export_data["historical_metrics"].empty:
             filepath = f"/tmp/historical_metrics_{timestamp}.json"
-            export_data['historical_metrics'].to_json(filepath, orient='records', indent=2)
+            export_data["historical_metrics"].to_json(
+                filepath, orient="records", indent=2
+            )
             file_paths.append(filepath)
             logging.info(f"Exported historical metrics to {filepath}")
 
@@ -226,10 +256,16 @@ def create_export_summary(export_data):
     """
     try:
         summary = {
-            'timestamp': export_data.get('timestamp'),
-            'server_count': len(export_data['server_metrics']) if not export_data['server_metrics'].empty else 0,
-            'user_count': len(export_data['top_users']) if not export_data['top_users'].empty else 0,
-            'historical_records': len(export_data['historical_metrics']) if not export_data['historical_metrics'].empty else 0
+            "timestamp": export_data.get("timestamp"),
+            "server_count": len(export_data["server_metrics"])
+            if not export_data["server_metrics"].empty
+            else 0,
+            "user_count": len(export_data["top_users"])
+            if not export_data["top_users"].empty
+            else 0,
+            "historical_records": len(export_data["historical_metrics"])
+            if not export_data["historical_metrics"].empty
+            else 0,
         }
         return summary
     except Exception as e:

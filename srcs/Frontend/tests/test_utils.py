@@ -8,11 +8,17 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from utils import (
-    safe_float, determine_server_status, get_performance_rating,
-    generate_alerts, format_uptime, calculate_resource_utilization,
-    get_status_badge_class, get_performance_badge_class,
-    is_high_usage_user, get_trend_indicator, format_bytes,
-    sanitize_server_name
+    safe_float,
+    determine_server_status,
+    get_performance_rating,
+    generate_alerts,
+    format_uptime,
+    get_status_badge_class,
+    get_performance_badge_class,
+    is_high_usage_user,
+    get_trend_indicator,
+    format_bytes,
+    sanitize_server_name,
 )
 from config import PERFORMANCE_THRESHOLDS
 
@@ -53,57 +59,57 @@ class TestDetermineServerStatus:
 
     def test_high_ram_returns_warning(self):
         metrics = {
-            'ram_percentage': 90,
-            'disk_percentage': 50,
-            'cpu_load_5min': 2.0,
-            'timestamp': datetime.now().isoformat()
+            "ram_percentage": 90,
+            "disk_percentage": 50,
+            "cpu_load_5min": 2.0,
+            "timestamp": datetime.now().isoformat(),
         }
         assert determine_server_status(metrics) == "warning"
 
     def test_high_disk_returns_warning(self):
         metrics = {
-            'ram_percentage': 50,
-            'disk_percentage': 90,
-            'cpu_load_5min': 2.0,
-            'timestamp': datetime.now().isoformat()
+            "ram_percentage": 50,
+            "disk_percentage": 90,
+            "cpu_load_5min": 2.0,
+            "timestamp": datetime.now().isoformat(),
         }
         assert determine_server_status(metrics) == "warning"
 
     def test_high_cpu_returns_warning(self):
         metrics = {
-            'ram_percentage': 50,
-            'disk_percentage': 50,
-            'cpu_load_5min': 6.0,
-            'timestamp': datetime.now().isoformat()
+            "ram_percentage": 50,
+            "disk_percentage": 50,
+            "cpu_load_5min": 6.0,
+            "timestamp": datetime.now().isoformat(),
         }
         assert determine_server_status(metrics) == "warning"
 
     def test_old_timestamp_returns_offline(self):
         old_time = datetime.now() - timedelta(hours=1)
         metrics = {
-            'ram_percentage': 50,
-            'disk_percentage': 50,
-            'cpu_load_5min': 2.0,
-            'timestamp': old_time.isoformat()
+            "ram_percentage": 50,
+            "disk_percentage": 50,
+            "cpu_load_5min": 2.0,
+            "timestamp": old_time.isoformat(),
         }
         assert determine_server_status(metrics) == "offline"
 
     def test_recent_timestamp_normal_metrics_returns_online(self):
         metrics = {
-            'ram_percentage': 50,
-            'disk_percentage': 50,
-            'cpu_load_5min': 2.0,
-            'timestamp': datetime.now().isoformat()
+            "ram_percentage": 50,
+            "disk_percentage": 50,
+            "cpu_load_5min": 2.0,
+            "timestamp": datetime.now().isoformat(),
         }
         assert determine_server_status(metrics) == "online"
 
     def test_invalid_timestamp_format_returns_online(self):
         """If timestamp can't be parsed, assume online if we got metrics"""
         metrics = {
-            'ram_percentage': 50,
-            'disk_percentage': 50,
-            'cpu_load_5min': 2.0,
-            'timestamp': "invalid"
+            "ram_percentage": 50,
+            "disk_percentage": 50,
+            "cpu_load_5min": 2.0,
+            "timestamp": "invalid",
         }
         status = determine_server_status(metrics)
         assert status in ["online", "warning"]  # Depends on metrics
@@ -131,81 +137,93 @@ class TestGetPerformanceRating:
     def test_returns_color(self):
         rating, color = get_performance_rating(1.0, 10.0, 20.0)
         assert isinstance(color, str)
-        assert color.startswith('#') or color.startswith('rgb')
+        assert color.startswith("#") or color.startswith("rgb")
 
 
 class TestGenerateAlerts:
     """Tests for generate_alerts function"""
 
     def test_no_alerts_for_normal_metrics(self):
-        metrics = [{
-            'server_name': 'Server1',
-            'cpu_load_5min': 2.0,
-            'ram_percentage': 50,
-            'disk_percentage': 50
-        }]
+        metrics = [
+            {
+                "server_name": "Server1",
+                "cpu_load_5min": 2.0,
+                "ram_percentage": 50,
+                "disk_percentage": 50,
+            }
+        ]
         alerts = generate_alerts(metrics)
         assert len(alerts) == 0
 
     def test_cpu_warning_alert(self):
-        metrics = [{
-            'server_name': 'Server1',
-            'cpu_load_5min': PERFORMANCE_THRESHOLDS['cpu_warning'] + 0.1,
-            'ram_percentage': 50,
-            'disk_percentage': 50
-        }]
+        metrics = [
+            {
+                "server_name": "Server1",
+                "cpu_load_5min": PERFORMANCE_THRESHOLDS["cpu_warning"] + 0.1,
+                "ram_percentage": 50,
+                "disk_percentage": 50,
+            }
+        ]
         alerts = generate_alerts(metrics)
         assert len(alerts) > 0
-        assert any('CPU' in alert['title'] for alert in alerts)
+        assert any("CPU" in alert["title"] for alert in alerts)
 
     def test_cpu_critical_alert(self):
-        metrics = [{
-            'server_name': 'Server1',
-            'cpu_load_5min': PERFORMANCE_THRESHOLDS['cpu_critical'] + 0.1,
-            'ram_percentage': 50,
-            'disk_percentage': 50
-        }]
+        metrics = [
+            {
+                "server_name": "Server1",
+                "cpu_load_5min": PERFORMANCE_THRESHOLDS["cpu_critical"] + 0.1,
+                "ram_percentage": 50,
+                "disk_percentage": 50,
+            }
+        ]
         alerts = generate_alerts(metrics)
         assert len(alerts) > 0
-        critical_alerts = [a for a in alerts if a['type'] == 'critical']
+        critical_alerts = [a for a in alerts if a["type"] == "critical"]
         assert len(critical_alerts) > 0
 
     def test_memory_alert(self):
-        metrics = [{
-            'server_name': 'Server1',
-            'cpu_load_5min': 2.0,
-            'ram_percentage': PERFORMANCE_THRESHOLDS['memory_warning'] + 1,
-            'disk_percentage': 50
-        }]
+        metrics = [
+            {
+                "server_name": "Server1",
+                "cpu_load_5min": 2.0,
+                "ram_percentage": PERFORMANCE_THRESHOLDS["memory_warning"] + 1,
+                "disk_percentage": 50,
+            }
+        ]
         alerts = generate_alerts(metrics)
         assert len(alerts) > 0
-        assert any('Memory' in alert['title'] or 'RAM' in alert['title'] for alert in alerts)
+        assert any(
+            "Memory" in alert["title"] or "RAM" in alert["title"] for alert in alerts
+        )
 
     def test_disk_alert(self):
-        metrics = [{
-            'server_name': 'Server1',
-            'cpu_load_5min': 2.0,
-            'ram_percentage': 50,
-            'disk_percentage': PERFORMANCE_THRESHOLDS['disk_warning'] + 1
-        }]
+        metrics = [
+            {
+                "server_name": "Server1",
+                "cpu_load_5min": 2.0,
+                "ram_percentage": 50,
+                "disk_percentage": PERFORMANCE_THRESHOLDS["disk_warning"] + 1,
+            }
+        ]
         alerts = generate_alerts(metrics)
         assert len(alerts) > 0
-        assert any('Disk' in alert['title'] for alert in alerts)
+        assert any("Disk" in alert["title"] for alert in alerts)
 
     def test_multiple_servers_multiple_alerts(self):
         metrics = [
             {
-                'server_name': 'Server1',
-                'cpu_load_5min': PERFORMANCE_THRESHOLDS['cpu_critical'] + 1,
-                'ram_percentage': 50,
-                'disk_percentage': 50
+                "server_name": "Server1",
+                "cpu_load_5min": PERFORMANCE_THRESHOLDS["cpu_critical"] + 1,
+                "ram_percentage": 50,
+                "disk_percentage": 50,
             },
             {
-                'server_name': 'Server2',
-                'cpu_load_5min': 2.0,
-                'ram_percentage': PERFORMANCE_THRESHOLDS['memory_critical'] + 1,
-                'disk_percentage': 50
-            }
+                "server_name": "Server2",
+                "cpu_load_5min": 2.0,
+                "ram_percentage": PERFORMANCE_THRESHOLDS["memory_critical"] + 1,
+                "disk_percentage": 50,
+            },
         ]
         alerts = generate_alerts(metrics)
         assert len(alerts) >= 2
@@ -245,30 +263,21 @@ class TestIsHighUsageUser:
     """Tests for is_high_usage_user function"""
 
     def test_high_cpu_usage(self):
-        user_data = {
-            'cpu': PERFORMANCE_THRESHOLDS['high_cpu_usage'] + 1,
-            'mem': 20
-        }
+        user_data = {"cpu": PERFORMANCE_THRESHOLDS["high_cpu_usage"] + 1, "mem": 20}
         assert is_high_usage_user(user_data) is True
 
     def test_high_memory_usage(self):
-        user_data = {
-            'cpu': 20,
-            'mem': PERFORMANCE_THRESHOLDS['high_memory_usage'] + 1
-        }
+        user_data = {"cpu": 20, "mem": PERFORMANCE_THRESHOLDS["high_memory_usage"] + 1}
         assert is_high_usage_user(user_data) is True
 
     def test_normal_usage(self):
-        user_data = {
-            'cpu': 20,
-            'mem': 30
-        }
+        user_data = {"cpu": 20, "mem": 30}
         assert is_high_usage_user(user_data) is False
 
     def test_string_values(self):
         user_data = {
-            'cpu': str(PERFORMANCE_THRESHOLDS['high_cpu_usage'] + 1),
-            'mem': '20'
+            "cpu": str(PERFORMANCE_THRESHOLDS["high_cpu_usage"] + 1),
+            "mem": "20",
         }
         assert is_high_usage_user(user_data) is True
 
@@ -387,5 +396,5 @@ class TestGetPerformanceBadgeClass:
         assert get_performance_badge_class("unknown") == "perf-poor"
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

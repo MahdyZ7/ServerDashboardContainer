@@ -5,14 +5,15 @@ import time
 from typing import Optional, Dict, List, Any, Tuple
 from config import API_BASE_URL
 from exceptions import (
-    APIConnectionError, APITimeoutError, APIResponseError,
-    APIDataError
+    APIConnectionError,
+    APITimeoutError,
+    APIResponseError,
+    APIDataError,
 )
 
 # Configure logging with more detail
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -25,7 +26,9 @@ RETRY_BACKOFF_FACTOR = 2
 class APIResult:
     """Wrapper for API results with success/error information"""
 
-    def __init__(self, success: bool, data: Any = None, error: Optional[Exception] = None):
+    def __init__(
+        self, success: bool, data: Any = None, error: Optional[Exception] = None
+    ):
         self.success = success
         self.data = data
         self.error = error
@@ -38,7 +41,9 @@ class APIResult:
         return self.success
 
 
-def retry_on_failure(max_retries: int = MAX_RETRIES, backoff_factor: float = RETRY_BACKOFF_FACTOR):
+def retry_on_failure(
+    max_retries: int = MAX_RETRIES, backoff_factor: float = RETRY_BACKOFF_FACTOR
+):
     """
     Decorator to retry API calls on failure with exponential backoff
 
@@ -46,6 +51,7 @@ def retry_on_failure(max_retries: int = MAX_RETRIES, backoff_factor: float = RET
         max_retries: Maximum number of retry attempts
         backoff_factor: Multiplier for exponential backoff
     """
+
     def decorator(func):
         def wrapper(*args, **kwargs):
             last_exception = None
@@ -56,7 +62,7 @@ def retry_on_failure(max_retries: int = MAX_RETRIES, backoff_factor: float = RET
                 except (APIConnectionError, APITimeoutError) as e:
                     last_exception = e
                     if attempt < max_retries - 1:
-                        wait_time = backoff_factor ** attempt
+                        wait_time = backoff_factor**attempt
                         logger.warning(
                             f"API call failed (attempt {attempt + 1}/{max_retries}): {e}. "
                             f"Retrying in {wait_time}s..."
@@ -76,13 +82,12 @@ def retry_on_failure(max_retries: int = MAX_RETRIES, backoff_factor: float = RET
                 raise last_exception
 
         return wrapper
+
     return decorator
 
 
 def _make_api_request(
-    endpoint: str,
-    timeout: int = DEFAULT_TIMEOUT,
-    params: Optional[Dict] = None
+    endpoint: str, timeout: int = DEFAULT_TIMEOUT, params: Optional[Dict] = None
 ) -> Tuple[bool, Any, Optional[Exception]]:
     """
     Make an API request with proper error handling
@@ -110,20 +115,20 @@ def _make_api_request(
                 if not isinstance(data, dict):
                     error = APIDataError(
                         "API response is not a dictionary",
-                        details={'response': str(data)[:200]}
+                        details={"response": str(data)[:200]},
                     )
                     logger.error(f"Invalid response structure from {url}: {error}")
                     return False, None, error
 
                 # Check if API indicates success
-                if data.get('success'):
+                if data.get("success"):
                     logger.debug(f"API request successful: {url}")
-                    return True, data.get('data'), None
+                    return True, data.get("data"), None
                 else:
                     error = APIResponseError(
                         f"API returned success=false: {data.get('message', 'Unknown error')}",
                         status_code=200,
-                        details={'response': data}
+                        details={"response": data},
                     )
                     logger.warning(f"API returned error: {error}")
                     return False, None, error
@@ -131,15 +136,14 @@ def _make_api_request(
             except ValueError as e:
                 error = APIDataError(
                     "Failed to parse JSON response",
-                    details={'error': str(e), 'response': response.text[:200]}
+                    details={"error": str(e), "response": response.text[:200]},
                 )
                 logger.error(f"JSON parse error from {url}: {error}")
                 return False, None, error
 
         elif response.status_code == 404:
             error = APIResponseError(
-                f"API endpoint not found: {endpoint}",
-                status_code=404
+                f"API endpoint not found: {endpoint}", status_code=404
             )
             logger.error(f"404 error from {url}: {error}")
             return False, None, error
@@ -148,7 +152,7 @@ def _make_api_request(
             error = APIResponseError(
                 f"Server error: {response.status_code}",
                 status_code=response.status_code,
-                details={'response': response.text[:200]}
+                details={"response": response.text[:200]},
             )
             logger.error(f"Server error from {url}: {error}")
             return False, None, error
@@ -157,23 +161,22 @@ def _make_api_request(
             error = APIResponseError(
                 f"HTTP error: {response.status_code}",
                 status_code=response.status_code,
-                details={'response': response.text[:200]}
+                details={"response": response.text[:200]},
             )
             logger.error(f"HTTP error from {url}: {error}")
             return False, None, error
 
-    except requests.exceptions.Timeout as e:
+    except requests.exceptions.Timeout:
         error = APITimeoutError(
             f"Request timed out after {timeout}s",
-            details={'endpoint': endpoint, 'timeout': timeout}
+            details={"endpoint": endpoint, "timeout": timeout},
         )
         logger.error(f"Timeout error for {url}: {error}")
         return False, None, error
 
     except requests.exceptions.ConnectionError as e:
         error = APIConnectionError(
-            "Failed to connect to API",
-            details={'endpoint': endpoint, 'error': str(e)}
+            "Failed to connect to API", details={"endpoint": endpoint, "error": str(e)}
         )
         logger.error(f"Connection error for {url}: {error}")
         return False, None, error
@@ -181,7 +184,7 @@ def _make_api_request(
     except Exception as e:
         error = APIConnectionError(
             f"Unexpected error: {str(e)}",
-            details={'endpoint': endpoint, 'error_type': type(e).__name__}
+            details={"endpoint": endpoint, "error_type": type(e).__name__},
         )
         logger.error(f"Unexpected error for {url}: {error}", exc_info=True)
         return False, None, error
@@ -378,11 +381,13 @@ def check_api_health() -> bool:
         response = requests.get(f"{API_BASE_URL}/health", timeout=5)
         if response.status_code == 200:
             data = response.json()
-            is_healthy = data.get('status') == 'healthy'
+            is_healthy = data.get("status") == "healthy"
             logger.info(f"API health check: {'healthy' if is_healthy else 'unhealthy'}")
             return is_healthy
         else:
-            logger.warning(f"API health check failed with status: {response.status_code}")
+            logger.warning(
+                f"API health check failed with status: {response.status_code}"
+            )
             return False
     except Exception as e:
         logger.error(f"API health check failed: {e}")

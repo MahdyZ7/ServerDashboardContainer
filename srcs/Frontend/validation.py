@@ -1,5 +1,5 @@
 # Input validation utilities for the Server Monitoring Dashboard
-from typing import Any, Optional, Dict, List
+from typing import Any, Optional, Dict
 from datetime import datetime
 import logging
 from exceptions import ValidationError
@@ -26,13 +26,13 @@ def validate_percentage(value: Any, field_name: str = "percentage") -> float:
         if not 0 <= float_value <= 100:
             raise ValidationError(
                 f"{field_name} must be between 0 and 100, got {float_value}",
-                details={'field': field_name, 'value': value}
+                details={"field": field_name, "value": value},
             )
         return float_value
     except (TypeError, ValueError) as e:
         raise ValidationError(
             f"Invalid {field_name} value: {value}",
-            details={'field': field_name, 'value': value, 'error': str(e)}
+            details={"field": field_name, "value": value, "error": str(e)},
         )
 
 
@@ -55,13 +55,13 @@ def validate_positive_number(value: Any, field_name: str = "number") -> float:
         if float_value < 0:
             raise ValidationError(
                 f"{field_name} must be positive, got {float_value}",
-                details={'field': field_name, 'value': value}
+                details={"field": field_name, "value": value},
             )
         return float_value
     except (TypeError, ValueError) as e:
         raise ValidationError(
             f"Invalid {field_name} value: {value}",
-            details={'field': field_name, 'value': value, 'error': str(e)}
+            details={"field": field_name, "value": value, "error": str(e)},
         )
 
 
@@ -80,14 +80,13 @@ def validate_server_name(server_name: Any) -> str:
     """
     if not server_name:
         raise ValidationError(
-            "Server name cannot be empty",
-            details={'value': server_name}
+            "Server name cannot be empty", details={"value": server_name}
         )
 
     if not isinstance(server_name, str):
         raise ValidationError(
             f"Server name must be a string, got {type(server_name).__name__}",
-            details={'value': server_name, 'type': type(server_name).__name__}
+            details={"value": server_name, "type": type(server_name).__name__},
         )
 
     # Sanitize: remove leading/trailing whitespace
@@ -96,14 +95,14 @@ def validate_server_name(server_name: Any) -> str:
     if not sanitized:
         raise ValidationError(
             "Server name cannot be empty after sanitization",
-            details={'original': server_name}
+            details={"original": server_name},
         )
 
     # Check length
     if len(sanitized) > 255:
         raise ValidationError(
             f"Server name too long: {len(sanitized)} characters (max 255)",
-            details={'length': len(sanitized)}
+            details={"length": len(sanitized)},
         )
 
     return sanitized
@@ -127,18 +126,18 @@ def validate_time_range(hours: Any) -> int:
         if int_hours <= 0:
             raise ValidationError(
                 f"Time range must be positive, got {int_hours}",
-                details={'value': hours}
+                details={"value": hours},
             )
         if int_hours > 8760:  # 1 year
             raise ValidationError(
                 f"Time range too large: {int_hours} hours (max 8760)",
-                details={'value': hours}
+                details={"value": hours},
             )
         return int_hours
     except (TypeError, ValueError) as e:
         raise ValidationError(
             f"Invalid time range value: {hours}",
-            details={'value': hours, 'error': str(e)}
+            details={"value": hours, "error": str(e)},
         )
 
 
@@ -158,27 +157,27 @@ def validate_server_metrics(metrics: Dict) -> Dict:
     if not isinstance(metrics, dict):
         raise ValidationError(
             f"Metrics must be a dictionary, got {type(metrics).__name__}",
-            details={'type': type(metrics).__name__}
+            details={"type": type(metrics).__name__},
         )
 
-    required_fields = ['server_name']
+    required_fields = ["server_name"]
     missing_fields = [f for f in required_fields if f not in metrics]
 
     if missing_fields:
         raise ValidationError(
             f"Missing required fields: {', '.join(missing_fields)}",
-            details={'missing_fields': missing_fields}
+            details={"missing_fields": missing_fields},
         )
 
     # Validate numeric fields if present
     numeric_fields = {
-        'cpu_load_1min': (0, 100),
-        'cpu_load_5min': (0, 100),
-        'cpu_load_15min': (0, 100),
-        'ram_percentage': (0, 100),
-        'disk_percentage': (0, 100),
-        'logged_users': (0, 10000),
-        'tcp_connections': (0, 100000)
+        "cpu_load_1min": (0, 100),
+        "cpu_load_5min": (0, 100),
+        "cpu_load_15min": (0, 100),
+        "ram_percentage": (0, 100),
+        "disk_percentage": (0, 100),
+        "logged_users": (0, 10000),
+        "tcp_connections": (0, 100000),
     }
 
     validated = metrics.copy()
@@ -219,21 +218,21 @@ def validate_timestamp(timestamp: Any) -> datetime:
     if not isinstance(timestamp, str):
         raise ValidationError(
             f"Timestamp must be string or datetime, got {type(timestamp).__name__}",
-            details={'type': type(timestamp).__name__}
+            details={"type": type(timestamp).__name__},
         )
 
     # Try multiple timestamp formats
     formats = [
-        '%Y-%m-%dT%H:%M:%S.%f',
-        '%Y-%m-%dT%H:%M:%S',
-        '%Y-%m-%d %H:%M:%S.%f',
-        '%Y-%m-%d %H:%M:%S',
-        '%Y-%m-%d',
+        "%Y-%m-%dT%H:%M:%S.%f",
+        "%Y-%m-%dT%H:%M:%S",
+        "%Y-%m-%d %H:%M:%S.%f",
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%d",
     ]
 
     # Try ISO format with timezone
     try:
-        return datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+        return datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
     except (ValueError, AttributeError):
         pass
 
@@ -246,7 +245,7 @@ def validate_timestamp(timestamp: Any) -> datetime:
 
     raise ValidationError(
         f"Unable to parse timestamp: {timestamp}",
-        details={'value': timestamp, 'tried_formats': formats}
+        details={"value": timestamp, "tried_formats": formats},
     )
 
 
@@ -266,22 +265,22 @@ def validate_user_data(user: Dict) -> Dict:
     if not isinstance(user, dict):
         raise ValidationError(
             f"User data must be a dictionary, got {type(user).__name__}",
-            details={'type': type(user).__name__}
+            details={"type": type(user).__name__},
         )
 
-    required_fields = ['username']
+    required_fields = ["username"]
     missing_fields = [f for f in required_fields if f not in user]
 
     if missing_fields:
         raise ValidationError(
             f"Missing required fields: {', '.join(missing_fields)}",
-            details={'missing_fields': missing_fields}
+            details={"missing_fields": missing_fields},
         )
 
     validated = user.copy()
 
     # Validate numeric fields
-    numeric_fields = ['cpu', 'mem', 'disk']
+    numeric_fields = ["cpu", "mem", "disk"]
     for field in numeric_fields:
         if field in validated:
             try:
@@ -293,7 +292,12 @@ def validate_user_data(user: Dict) -> Dict:
     return validated
 
 
-def safe_get(dictionary: Dict, key: str, default: Any = None, validator: Optional[callable] = None) -> Any:
+def safe_get(
+    dictionary: Dict,
+    key: str,
+    default: Any = None,
+    validator: Optional[callable] = None,
+) -> Any:
     """
     Safely get value from dictionary with optional validation
 
