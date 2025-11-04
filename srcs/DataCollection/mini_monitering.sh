@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
-ARCH=$(uname -srvmo) || "Unknown"
-OS_NAME=$(lsb_release -i | awk '{print $3}') || "Unknown OS"
-OS_VER=$(lsb_release -r | awk '{print $2}') || "Unknown Version"
+ARCH=$(uname -srvmo 2>/dev/null || echo "Unknown")
+OS_NAME=$(lsb_release -i 2>/dev/null | awk '{print $3}' || echo "Unknown OS")
+OS_VER=$(lsb_release -r 2>/dev/null | awk '{print $2}' || echo "Unknown Version")
 OS="$OS_NAME $OS_VER"
 
 PCPU=$(grep 'physical id' /proc/cpuinfo | sort -u | wc -l)
