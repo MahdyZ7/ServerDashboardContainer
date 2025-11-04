@@ -1,2 +1,13 @@
-psycopg2==2.9.10
-python-dotenv==1.1.0
+# DEPRECATED: This file is no longer used
+#
+# This project has migrated to UV package manager.
+# Dependencies are now managed in pyproject.toml
+#
+# To install dependencies:
+#   uv sync
+#
+# To add a dependency:
+#   uv add <package>
+#
+# For more information, see:
+#   https://docs.astral.sh/uv/

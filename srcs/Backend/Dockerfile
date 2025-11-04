@@ -1,15 +1,27 @@
-FROM python:3.11-slim
+FROM python:3.13-slim
+
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 # Set working directory
 WORKDIR /app
 
-# Copy requirements and install dependencies
-COPY requirements.txt .
-RUN apt-get update && apt-get install -y gcc libpq-dev curl
-RUN pip install --upgrade pip && pip install -r requirements.txt
+# Install only essential runtime dependencies with cache mount
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy the rest of the application code
-COPY . .
+# Copy dependency files
+COPY pyproject.toml uv.lock ./
+
+# Install Python dependencies with cache mount
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen
+
+# Copy application code
+COPY *.py ./
 
 # Expose the port the API runs on
 EXPOSE 5000
@@ -18,4 +30,4 @@ EXPOSE 5000
 ENV FLASK_APP=api.py
 
 # Run the API
-CMD ["python", "api.py"]
+CMD ["uv", "run", "api.py"]

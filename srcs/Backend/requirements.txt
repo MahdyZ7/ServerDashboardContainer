@@ -1,5 +1,13 @@
-Flask==3.1.1
-flask_cors==6.0.1
-psycopg2_binary==2.9.10
-python-dotenv==1.1.1
-Requests==2.32.4
+# DEPRECATED: This file is no longer used
+#
+# This project has migrated to UV package manager.
+# Dependencies are now managed in pyproject.toml
+#
+# To install dependencies:
+#   uv sync
+#
+# To add a dependency:
+#   uv add <package>
+#
+# For more information, see:
+#   https://docs.astral.sh/uv/

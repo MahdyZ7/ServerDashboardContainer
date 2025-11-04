@@ -157,6 +157,47 @@ pytest -m unit
 pytest -x
 ```
 
+### Dependency Management (UV Package Manager)
+
+This project uses **UV** (https://docs.astral.sh/uv/), a fast Python package manager, instead of pip.
+
+**Key Benefits:**
+- 10-100x faster than pip
+- Reproducible builds with uv.lock files
+- Better caching and dependency resolution
+
+**Managing Dependencies:**
+```bash
+# Install dependencies (creates virtual environment)
+cd srcs/Backend  # or Frontend or DataCollection
+uv sync
+
+# Add a new dependency
+uv add requests
+
+# Remove a dependency
+uv remove requests
+
+# Update dependencies
+uv lock --upgrade
+
+# Run Python scripts with UV
+uv run api.py
+```
+
+**Project Structure:**
+- `pyproject.toml` - Dependency specifications
+- `uv.lock` - Locked versions for reproducible builds
+- `requirements.txt` - DEPRECATED (kept for reference only)
+
+**Docker Integration:**
+All Dockerfiles use UV for dependency installation:
+```dockerfile
+COPY pyproject.toml uv.lock ./
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen
+```
+
 **Test Infrastructure:**
 - 103 unit tests across `test_validation.py`, `test_utils.py`
 - Fixtures in `tests/conftest.py` (sample data)

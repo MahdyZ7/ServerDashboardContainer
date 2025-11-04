@@ -1,33 +1,39 @@
-FROM python:3-slim
-RUN apt-get update && apt-get install -y --no-install-recommends \
-	build-essential \
-	python3-dev \
-	libpq-dev \
-	bash \
-	iputils-ping \
-	openssh-client \
-	sshpass \
-	cron \
-	&& rm -rf /var/lib/apt/lists/*
+FROM python:3.13-slim
+
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+# Install runtime packages with cache mount
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
+    openssh-client \
+    sshpass \
+    cron \
+    && rm -rf /var/lib/apt/lists/*
 
 # Disable OpenSSL security level restrictions for legacy compatibility
 ENV OPENSSL_CONF="~/openssl_legacy.conf"
 
 WORKDIR /app
 
-COPY  . .
+# Copy dependency files
+COPY pyproject.toml uv.lock ./
 
-RUN chmod +x BashGetInfo.sh
-RUN chmod +x start-cron.sh
-RUN pip3 install --upgrade pip
-RUN pip3 install -r requirements.txt
+# Install Python dependencies with cache mount
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen
 
-# Create log directory
-RUN mkdir -p /var/log
-
-# Set up crontab
+# Copy application files
+COPY BashGetInfo.sh TopUsers.sh start-cron.sh ./
+COPY *.py ./
 COPY crontab /etc/cron.d/datacollection-crontab
-RUN chmod 0644 /etc/cron.d/datacollection-crontab
-RUN crontab /etc/cron.d/datacollection-crontab
+
+# Set permissions and configure cron in one layer
+RUN chmod +x BashGetInfo.sh TopUsers.sh start-cron.sh && \
+    mkdir -p /var/log && \
+    chmod 0644 /etc/cron.d/datacollection-crontab && \
+    crontab /etc/cron.d/datacollection-crontab
 
 CMD ["./start-cron.sh"]
