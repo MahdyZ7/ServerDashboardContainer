@@ -357,7 +357,7 @@ def store_top_users(server_name: str, top_users_dict: Dict):
 def readServerList() -> List[Dict]:
     """Read server configurations from environment variables."""
     servers = []
-    for i in range(1, 8):
+    for i in range(1, 10):
         server_name = os.getenv(f"SERVER{i}_NAME")
         if not server_name:
             continue
