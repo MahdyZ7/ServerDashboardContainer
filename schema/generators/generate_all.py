@@ -24,6 +24,7 @@ from generate_validators import generate_validators
 from generate_parsers import generate_parsers
 from generate_docs import generate_documentation
 
+
 class SchemaGenerator:
     def __init__(self, schema_path: str):
         self.schema_path = Path(schema_path)
@@ -33,11 +34,11 @@ class SchemaGenerator:
     def load_schema(self) -> Dict[str, Any]:
         """Load and validate schema YAML file."""
         try:
-            with open(self.schema_path, 'r') as f:
+            with open(self.schema_path, "r") as f:
                 schema = yaml.safe_load(f)
 
             # Add generation timestamp
-            schema['generated_at'] = datetime.now().isoformat()
+            schema["generated_at"] = datetime.now().isoformat()
 
             return schema
         except Exception as e:
@@ -51,39 +52,41 @@ class SchemaGenerator:
         errors = []
 
         # Check required top-level keys
-        required_keys = ['version', 'server_metrics', 'top_users']
+        required_keys = ["version", "server_metrics", "top_users"]
         for key in required_keys:
             if key not in self.schema:
                 errors.append(f"Missing required key: {key}")
 
         # Validate server_metrics fields
-        if 'server_metrics' in self.schema:
-            fields = self.schema['server_metrics'].get('fields', [])
+        if "server_metrics" in self.schema:
+            fields = self.schema["server_metrics"].get("fields", [])
             bash_indices = []
 
             for field in fields:
                 # Check required field properties
-                if 'name' not in field:
+                if "name" not in field:
                     errors.append(f"Field missing 'name' property: {field}")
                     continue
 
-                if 'type' not in field:
+                if "type" not in field:
                     errors.append(f"Field '{field['name']}' missing 'type' property")
 
                 # Check for duplicate bash_index (allow if different bash_format)
-                if field.get('bash_output') and 'bash_index' in field:
-                    idx = field['bash_index']
-                    fmt = field.get('bash_format', 'raw')
+                if field.get("bash_output") and "bash_index" in field:
+                    idx = field["bash_index"]
+                    fmt = field.get("bash_format", "raw")
                     key = (idx, fmt)
                     if key in bash_indices:
-                        errors.append(f"Duplicate bash_index {idx} with format '{fmt}' for field '{field['name']}'")
+                        errors.append(
+                            f"Duplicate bash_index {idx} with format '{fmt}' for field '{field['name']}'"
+                        )
                     bash_indices.append(key)
 
         # Validate top_users fields
-        if 'top_users' in self.schema:
-            fields = self.schema['top_users'].get('fields', [])
+        if "top_users" in self.schema:
+            fields = self.schema["top_users"].get("fields", [])
             for field in fields:
-                if 'name' not in field or 'type' not in field:
+                if "name" not in field or "type" not in field:
                     errors.append(f"Invalid field in top_users: {field}")
 
         if errors:
@@ -98,13 +101,15 @@ class SchemaGenerator:
     def generate_all(self, targets: List[str] = None) -> bool:
         """Generate all code from schema."""
         if targets is None:
-            targets = ['sql', 'python', 'typescript', 'validators', 'parsers', 'docs']
+            targets = ["sql", "python", "typescript", "validators", "parsers", "docs"]
 
         success = True
 
-        print(f"\n🚀 Generating code from schema (version {self.schema['version']})...\n")
+        print(
+            f"\n🚀 Generating code from schema (version {self.schema['version']})...\n"
+        )
 
-        if 'sql' in targets:
+        if "sql" in targets:
             print("📊 Generating SQL migration...")
             try:
                 sql_file = generate_sql_migration(self.schema)
@@ -113,10 +118,11 @@ class SchemaGenerator:
             except Exception as e:
                 print(f"   ❌ Failed: {e}")
                 import traceback
+
                 traceback.print_exc()
                 success = False
 
-        if 'python' in targets:
+        if "python" in targets:
             print("🐍 Generating Python models...")
             try:
                 py_files = generate_python_models(self.schema)
@@ -125,10 +131,11 @@ class SchemaGenerator:
             except Exception as e:
                 print(f"   ❌ Failed: {e}")
                 import traceback
+
                 traceback.print_exc()
                 success = False
 
-        if 'typescript' in targets:
+        if "typescript" in targets:
             print("📘 Generating TypeScript types...")
             try:
                 ts_files = generate_typescript_types(self.schema)
@@ -137,10 +144,11 @@ class SchemaGenerator:
             except Exception as e:
                 print(f"   ❌ Failed: {e}")
                 import traceback
+
                 traceback.print_exc()
                 success = False
 
-        if 'validators' in targets:
+        if "validators" in targets:
             print("✔️  Generating validators...")
             try:
                 validator_files = generate_validators(self.schema)
@@ -149,10 +157,11 @@ class SchemaGenerator:
             except Exception as e:
                 print(f"   ❌ Failed: {e}")
                 import traceback
+
                 traceback.print_exc()
                 success = False
 
-        if 'parsers' in targets:
+        if "parsers" in targets:
             print("🔧 Generating parsers...")
             try:
                 parser_files = generate_parsers(self.schema)
@@ -161,10 +170,11 @@ class SchemaGenerator:
             except Exception as e:
                 print(f"   ❌ Failed: {e}")
                 import traceback
+
                 traceback.print_exc()
                 success = False
 
-        if 'docs' in targets:
+        if "docs" in targets:
             print("📚 Generating documentation...")
             try:
                 doc_files = generate_documentation(self.schema)
@@ -173,6 +183,7 @@ class SchemaGenerator:
             except Exception as e:
                 print(f"   ❌ Failed: {e}")
                 import traceback
+
                 traceback.print_exc()
                 success = False
 
@@ -189,32 +200,41 @@ class SchemaGenerator:
         print("=" * 60)
         print(f"Version: {self.schema['version']}")
 
-        if 'server_metrics' in self.schema:
-            fields = self.schema['server_metrics'].get('fields', [])
-            bash_fields = [f for f in fields if f.get('bash_output')]
-            print(f"Server Metrics: {len(fields)} fields ({len(bash_fields)} from bash)")
+        if "server_metrics" in self.schema:
+            fields = self.schema["server_metrics"].get("fields", [])
+            bash_fields = [f for f in fields if f.get("bash_output")]
+            print(
+                f"Server Metrics: {len(fields)} fields ({len(bash_fields)} from bash)"
+            )
 
-        if 'top_users' in self.schema:
-            fields = self.schema['top_users'].get('fields', [])
-            bash_fields = [f for f in fields if f.get('bash_output')]
+        if "top_users" in self.schema:
+            fields = self.schema["top_users"].get("fields", [])
+            bash_fields = [f for f in fields if f.get("bash_output")]
             print(f"Top Users: {len(fields)} fields ({len(bash_fields)} from bash)")
 
-        if 'api_endpoints' in self.schema:
-            endpoints = self.schema.get('api_endpoints', [])
+        if "api_endpoints" in self.schema:
+            endpoints = self.schema.get("api_endpoints", [])
             print(f"API Endpoints: {len(endpoints)}")
 
         print("=" * 60)
 
+
 def main():
-    parser = argparse.ArgumentParser(description='Generate code from schema definition')
-    parser.add_argument('--schema', default='../metrics_schema.yaml',
-                       help='Path to schema YAML file')
-    parser.add_argument('--validate-only', action='store_true',
-                       help='Only validate schema, do not generate')
-    parser.add_argument('--target', default='all',
-                       help='Comma-separated list of targets to generate (sql,python,typescript,validators,parsers,docs)')
-    parser.add_argument('--summary', action='store_true',
-                       help='Show schema summary')
+    parser = argparse.ArgumentParser(description="Generate code from schema definition")
+    parser.add_argument(
+        "--schema", default="../metrics_schema.yaml", help="Path to schema YAML file"
+    )
+    parser.add_argument(
+        "--validate-only",
+        action="store_true",
+        help="Only validate schema, do not generate",
+    )
+    parser.add_argument(
+        "--target",
+        default="all",
+        help="Comma-separated list of targets to generate (sql,python,typescript,validators,parsers,docs)",
+    )
+    parser.add_argument("--summary", action="store_true", help="Show schema summary")
 
     args = parser.parse_args()
 
@@ -233,11 +253,12 @@ def main():
         return
 
     # Parse targets
-    targets = None if args.target == 'all' else args.target.split(',')
+    targets = None if args.target == "all" else args.target.split(",")
 
     # Generate code
     success = generator.generate_all(targets)
     sys.exit(0 if success else 1)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

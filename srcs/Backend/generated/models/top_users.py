@@ -3,8 +3,8 @@
 # Generated At: 2025-11-05T00:11:46.315719
 # DO NOT EDIT MANUALLY
 
-from dataclasses import dataclass, field
-from typing import Optional, Any
+from dataclasses import dataclass
+from typing import Optional
 from datetime import datetime
 
 
