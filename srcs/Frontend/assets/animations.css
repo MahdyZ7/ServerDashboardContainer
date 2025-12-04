@@ -1,0 +1,834 @@
+/* ============================================
+   ANIMATIONS & MICRO-INTERACTIONS
+   Enhanced UI/UX Animations for Server Dashboard
+   ============================================ */
+
+/* ============================================
+   1. LOADING STATES & SKELETON SCREENS
+   ============================================ */
+
+/* Skeleton Base Styles */
+.skeleton {
+    background: linear-gradient(
+        90deg,
+        #f0f0f0 0%,
+        #e0e0e0 20%,
+        #f0f0f0 40%,
+        #f0f0f0 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s ease-in-out infinite;
+    border-radius: 8px;
+    position: relative;
+    overflow: hidden;
+}
+
+@keyframes shimmer {
+    0% {
+        background-position: -200% 0;
+    }
+    100% {
+        background-position: 200% 0;
+    }
+}
+
+/* Dark Mode Skeleton */
+:root[data-theme="dark"] .skeleton {
+    background: linear-gradient(
+        90deg,
+        #2a2a2a 0%,
+        #3a3a3a 20%,
+        #2a2a2a 40%,
+        #2a2a2a 100%
+    );
+}
+
+/* Skeleton Card Components */
+.skeleton-card {
+    padding: 24px;
+    margin-bottom: 20px;
+}
+
+.skeleton-header {
+    width: 60%;
+    height: 24px;
+    margin-bottom: 16px;
+}
+
+.skeleton-badge {
+    width: 80px;
+    height: 20px;
+    margin-bottom: 20px;
+}
+
+.skeleton-metrics-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+}
+
+.skeleton-metric {
+    height: 60px;
+    border-radius: 8px;
+}
+
+/* Skeleton Table */
+.skeleton-table-header {
+    height: 50px;
+    margin-bottom: 12px;
+    background: linear-gradient(90deg, #003DA5 0%, #0057B8 100%);
+}
+
+.skeleton-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 12px;
+}
+
+.skeleton-cell {
+    height: 40px;
+}
+
+/* Skeleton Graph */
+.skeleton-graph-title {
+    width: 40%;
+    height: 28px;
+    margin-bottom: 20px;
+}
+
+.skeleton-graph-chart {
+    width: 100%;
+    height: 400px;
+    margin-bottom: 16px;
+}
+
+.skeleton-graph-legend {
+    width: 80%;
+    height: 30px;
+    margin: 0 auto;
+}
+
+/* ============================================
+   2. LOADING SPINNER
+   ============================================ */
+
+.loading-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    min-height: 200px;
+}
+
+.spinner {
+    position: relative;
+    display: inline-block;
+}
+
+.spinner-small {
+    width: 40px;
+    height: 40px;
+}
+
+.spinner-medium {
+    width: 60px;
+    height: 60px;
+}
+
+.spinner-large {
+    width: 80px;
+    height: 80px;
+}
+
+.spinner-ring {
+    position: absolute;
+    border: 4px solid transparent;
+    border-top-color: var(--ku-primary);
+    border-radius: 50%;
+    animation: spinner-rotate 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+}
+
+.spinner-small .spinner-ring {
+    width: 40px;
+    height: 40px;
+    border-width: 3px;
+}
+
+.spinner-medium .spinner-ring {
+    width: 60px;
+    height: 60px;
+    border-width: 4px;
+}
+
+.spinner-large .spinner-ring {
+    width: 80px;
+    height: 80px;
+    border-width: 5px;
+}
+
+.spinner-ring:nth-child(1) {
+    animation-delay: -0.45s;
+    border-top-color: var(--ku-primary);
+}
+
+.spinner-ring:nth-child(2) {
+    animation-delay: -0.3s;
+    border-top-color: var(--ku-secondary);
+}
+
+.spinner-ring:nth-child(3) {
+    animation-delay: -0.15s;
+    border-top-color: var(--ku-accent);
+}
+
+.spinner-ring:nth-child(4) {
+    border-top-color: var(--ku-orange);
+}
+
+@keyframes spinner-rotate {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+.spinner-message {
+    margin-top: 20px;
+    font-size: 14px;
+    color: var(--ku-muted);
+    font-weight: 500;
+}
+
+/* ============================================
+   3. LOADING OVERLAY
+   ============================================ */
+
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(8px);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.loading-overlay.active {
+    opacity: 1;
+}
+
+:root[data-theme="dark"] .loading-overlay {
+    background: rgba(15, 20, 25, 0.95);
+}
+
+.loading-overlay-content {
+    text-align: center;
+}
+
+/* ============================================
+   4. EMPTY STATES
+   ============================================ */
+
+.empty-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 40px;
+    min-height: 400px;
+    text-align: center;
+}
+
+.empty-state-content {
+    max-width: 500px;
+}
+
+.empty-state i {
+    color: var(--ku-light-gray);
+    opacity: 0.5;
+    animation: float 3s ease-in-out infinite;
+}
+
+.empty-state-title {
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--ku-text-primary);
+    margin-bottom: 12px;
+    font-family: 'Inter', sans-serif;
+}
+
+.empty-state-message {
+    font-size: 16px;
+    color: var(--ku-text-secondary);
+    line-height: 1.6;
+    margin-bottom: 24px;
+}
+
+@keyframes float {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-10px);
+    }
+}
+
+/* ============================================
+   5. MICRO-INTERACTIONS
+   ============================================ */
+
+/* Hover Effects */
+.card,
+.server-card {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card:hover,
+.server-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px rgba(0, 61, 165, 0.15);
+}
+
+/* Button Click Feedback */
+.btn {
+    position: relative;
+    overflow: hidden;
+    transition: all 0.2s ease;
+}
+
+.btn:active {
+    transform: scale(0.98);
+}
+
+.btn::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.5);
+    transform: translate(-50%, -50%);
+    transition: width 0.6s, height 0.6s;
+}
+
+.btn:active::after {
+    width: 300px;
+    height: 300px;
+}
+
+/* Badge Pulse */
+.badge {
+    animation: badge-entrance 0.3s ease;
+}
+
+@keyframes badge-entrance {
+    from {
+        opacity: 0;
+        transform: scale(0.8);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* ============================================
+   6. PULSE INDICATOR (Live Status)
+   ============================================ */
+
+.pulse-indicator {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.pulse-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    position: relative;
+    z-index: 2;
+}
+
+.pulse-dot.online {
+    background-color: var(--status-healthy);
+}
+
+.pulse-dot.warning {
+    background-color: var(--status-warning);
+}
+
+.pulse-dot.offline {
+    background-color: var(--status-critical);
+}
+
+.pulse-ring {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    opacity: 0.6;
+}
+
+.pulse-ring.online {
+    background-color: var(--status-healthy);
+}
+
+.pulse-ring.warning {
+    background-color: var(--status-warning);
+}
+
+.pulse-ring.offline {
+    background-color: var(--status-critical);
+}
+
+@keyframes pulse-ring {
+    0% {
+        transform: scale(1);
+        opacity: 0.6;
+    }
+    50% {
+        transform: scale(2.5);
+        opacity: 0;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 0;
+    }
+}
+
+.pulse-small .pulse-dot {
+    width: 6px;
+    height: 6px;
+}
+
+.pulse-small .pulse-ring {
+    width: 6px;
+    height: 6px;
+}
+
+.pulse-medium .pulse-dot {
+    width: 10px;
+    height: 10px;
+}
+
+.pulse-medium .pulse-ring {
+    width: 10px;
+    height: 10px;
+}
+
+.pulse-large .pulse-dot {
+    width: 14px;
+    height: 14px;
+}
+
+.pulse-large .pulse-ring {
+    width: 14px;
+    height: 14px;
+}
+
+/* ============================================
+   7. NUMBER COUNTER ANIMATION
+   ============================================ */
+
+.number-counter {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.counter-number {
+    display: flex;
+    align-items: baseline;
+    font-family: 'Inter', sans-serif;
+}
+
+.counter-value.animated {
+    animation: countUp 0.6s ease-out;
+}
+
+@keyframes countUp {
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.counter-prefix,
+.counter-suffix {
+    font-size: 0.7em;
+    opacity: 0.7;
+    margin: 0 4px;
+}
+
+.counter-label {
+    margin-top: 8px;
+    font-size: 13px;
+    color: var(--ku-text-secondary);
+    font-weight: 500;
+}
+
+/* ============================================
+   8. TREND INDICATORS
+   ============================================ */
+
+.trend-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+.trend-success {
+    background-color: rgba(39, 174, 96, 0.1);
+    color: var(--status-healthy);
+}
+
+.trend-danger {
+    background-color: rgba(227, 30, 36, 0.1);
+    color: var(--status-critical);
+}
+
+.trend-neutral {
+    background-color: rgba(109, 110, 113, 0.1);
+    color: var(--ku-muted);
+}
+
+.trend-icon {
+    font-size: 10px;
+    animation: trend-bounce 0.5s ease;
+}
+
+@keyframes trend-bounce {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-3px);
+    }
+}
+
+/* ============================================
+   9. PROGRESS BAR
+   ============================================ */
+
+.progress-container {
+    margin: 12px 0;
+}
+
+.progress-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.progress-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ku-text-primary);
+}
+
+.progress-percentage {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ku-text-secondary);
+}
+
+.progress-bar {
+    height: 8px;
+    background-color: var(--neutral-200);
+    border-radius: 10px;
+    overflow: hidden;
+    position: relative;
+}
+
+.progress-fill {
+    height: 100%;
+    border-radius: 10px;
+    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.3),
+        transparent
+    );
+    animation: progress-shine 2s ease infinite;
+}
+
+@keyframes progress-shine {
+    0% {
+        transform: translateX(-100%);
+    }
+    100% {
+        transform: translateX(100%);
+    }
+}
+
+.progress-success {
+    background: linear-gradient(90deg, #27AE60, #2ECC71);
+}
+
+.progress-warning {
+    background: linear-gradient(90deg, #F57F29, #FF8F1C);
+}
+
+.progress-danger {
+    background: linear-gradient(90deg, #E31E24, #FF4757);
+}
+
+/* ============================================
+   10. CARD ANIMATIONS
+   ============================================ */
+
+/* Entrance Animations */
+.card,
+.server-card {
+    animation: slideInUp 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes slideInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Stagger entrance for multiple cards */
+.server-card:nth-child(1) { animation-delay: 0.05s; }
+.server-card:nth-child(2) { animation-delay: 0.1s; }
+.server-card:nth-child(3) { animation-delay: 0.15s; }
+.server-card:nth-child(4) { animation-delay: 0.2s; }
+.server-card:nth-child(5) { animation-delay: 0.25s; }
+.server-card:nth-child(6) { animation-delay: 0.3s; }
+.server-card:nth-child(7) { animation-delay: 0.35s; }
+
+/* ============================================
+   11. DATA UPDATE FLASH
+   ============================================ */
+
+@keyframes data-flash {
+    0% {
+        background-color: transparent;
+    }
+    50% {
+        background-color: rgba(120, 214, 75, 0.3);
+    }
+    100% {
+        background-color: transparent;
+    }
+}
+
+.data-updated {
+    animation: data-flash 1s ease;
+}
+
+/* ============================================
+   12. TOOLTIP
+   ============================================ */
+
+.tooltip-container {
+    position: relative;
+    display: inline-block;
+}
+
+.tooltip-text {
+    visibility: hidden;
+    opacity: 0;
+    position: absolute;
+    z-index: 1000;
+    background-color: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    white-space: nowrap;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+    pointer-events: none;
+}
+
+.tooltip-container:hover .tooltip-text {
+    visibility: visible;
+    opacity: 1;
+}
+
+.tooltip-top {
+    bottom: 125%;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.tooltip-bottom {
+    top: 125%;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.tooltip-left {
+    right: 125%;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.tooltip-right {
+    left: 125%;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+/* ============================================
+   13. RESPONSIVE ANIMATIONS
+   ============================================ */
+
+/* Reduce animations on mobile for better performance */
+@media (max-width: 768px) {
+    .card:hover,
+    .server-card:hover {
+        transform: none;
+    }
+
+    .card,
+    .server-card {
+        animation: none;
+    }
+
+    .spinner {
+        animation-duration: 0.8s;
+    }
+}
+
+/* Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+
+    .skeleton,
+    .spinner-ring,
+    .pulse-ring {
+        animation: none !important;
+    }
+}
+
+/* ============================================
+   14. FOCUS STATES (Accessibility)
+   ============================================ */
+
+*:focus-visible {
+    outline: 3px solid var(--ku-primary);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+button:focus-visible,
+a:focus-visible,
+.btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(0, 61, 165, 0.3);
+}
+
+/* ============================================
+   15. PAGE TRANSITIONS
+   ============================================ */
+
+.fade-enter {
+    opacity: 0;
+}
+
+.fade-enter-active {
+    opacity: 1;
+    transition: opacity 300ms ease-in;
+}
+
+.fade-exit {
+    opacity: 1;
+}
+
+.fade-exit-active {
+    opacity: 0;
+    transition: opacity 300ms ease-out;
+}
+
+/* ============================================
+   16. BADGE STYLES (Enhanced)
+   ============================================ */
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    transition: all 0.2s ease;
+}
+
+.badge-success {
+    background-color: rgba(39, 174, 96, 0.1);
+    color: var(--status-healthy);
+    border: 1px solid rgba(39, 174, 96, 0.3);
+}
+
+.badge-warning {
+    background-color: rgba(245, 127, 41, 0.1);
+    color: var(--status-warning);
+    border: 1px solid rgba(245, 127, 41, 0.3);
+}
+
+.badge-danger {
+    background-color: rgba(227, 30, 36, 0.1);
+    color: var(--status-critical);
+    border: 1px solid rgba(227, 30, 36, 0.3);
+}
+
+.badge-info {
+    background-color: rgba(0, 169, 206, 0.1);
+    color: var(--ku-info);
+    border: 1px solid rgba(0, 169, 206, 0.3);
+}
+
+.badge:hover {
+    transform: scale(1.05);
+}

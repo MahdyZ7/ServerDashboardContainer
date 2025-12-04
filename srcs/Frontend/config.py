@@ -88,15 +88,18 @@ TABLE_CONFIG = {
     "max_alerts": 5,
 }
 
-# Font Configuration - KU Brand Guidelines specify Noto Sans
+# Font Configuration - KU Brand Guidelines 2020 specify DIN Next (commercial)
+# Using Inter as the closest free alternative to DIN Next
+# Inter is a geometric sans-serif with excellent screen readability and similar proportions
 FONTS = {
-    "primary": "'Noto Sans', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif",
-    "secondary": "'Noto Sans', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif",
+    "primary": "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    "secondary": "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
     "google_fonts": [
-        "https://fonts.googleapis.com/css2?family=Noto+Sans:wght@300;400;500;600;700;800&display=swap",
-        "https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@300;400;500;600;700&display=swap",
+        # Inter - geometric sans-serif, closest free alternative to DIN Next
+        "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap",
     ],
     "fontawesome": "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css",
+    "font_note": "Using Inter (free) as closest alternative to KU's official DIN Next (commercial)",
 }
 
 # Status Configuration

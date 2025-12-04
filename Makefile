@@ -215,3 +215,42 @@ cron-logs:
 cron-logs-follow:
 	@echo -e "${CYAN}Following DataCollection cron logs (Ctrl+C to exit):${NC}"
 	docker exec DataCollection tail -f /var/log/datacollection.log
+
+# Port conflict resolution
+fix-port-conflict:
+	@echo -e "${YELLOW}Checking and fixing port 80 conflicts...${NC}"
+	@if [ ! -f ./fix-port-conflict.sh ]; then \
+		echo -e "${RED}Error: fix-port-conflict.sh not found${NC}"; \
+		exit 1; \
+	fi
+	sudo ./fix-port-conflict.sh
+
+# Auto-start management targets
+enable-autostart:
+	@echo -e "${GREEN}Setting up auto-start on system boot...${NC}"
+	@if [ ! -f ./setup-autostart.sh ]; then \
+		echo -e "${RED}Error: setup-autostart.sh not found${NC}"; \
+		exit 1; \
+	fi
+	sudo ./setup-autostart.sh
+
+disable-autostart:
+	@echo -e "${YELLOW}Disabling auto-start...${NC}"
+	sudo systemctl disable server-dashboard.service
+	@echo -e "${GREEN}Auto-start disabled${NC}"
+
+autostart-status:
+	@echo -e "${CYAN}Auto-start service status:${NC}"
+	@systemctl is-enabled server-dashboard.service 2>/dev/null && \
+		echo -e "${GREEN}Auto-start: ENABLED${NC}" || \
+		echo -e "${YELLOW}Auto-start: DISABLED${NC}"
+	@echo ""
+	@sudo systemctl status server-dashboard.service --no-pager || true
+
+autostart-logs:
+	@echo -e "${CYAN}Auto-start service logs:${NC}"
+	sudo journalctl -u server-dashboard.service -n 50 --no-pager
+
+autostart-logs-follow:
+	@echo -e "${CYAN}Following auto-start service logs (Ctrl+C to exit):${NC}"
+	sudo journalctl -u server-dashboard.service -f

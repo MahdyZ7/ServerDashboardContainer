@@ -1,0 +1,689 @@
+/* ============================================
+   DARK MODE THEME
+   Professional Dark Theme for Server Dashboard
+   ============================================ */
+
+/* Dark Mode Color Variables */
+:root[data-theme="dark"] {
+    /* Background Colors */
+    --ku-bg-primary: #0F1419;
+    --ku-bg-secondary: #1A1F2E;
+    --ku-bg-tertiary: #252D3C;
+    --ku-bg-elevated: #2A3142;
+
+    /* Text Colors - Enhanced contrast for better readability */
+    --ku-text-primary: #F3F4F6;
+    --ku-text-secondary: #D1D5DB;
+    --ku-text-muted: #9CA3AF;
+
+    /* Border Colors */
+    --ku-border: #374151;
+    --ku-border-light: #2D3748;
+
+    /* Brand Colors (adjusted for dark mode) */
+    --ku-primary: #3B82F6;
+    --ku-secondary: #8B5CF6;
+    --ku-accent: #10B981;
+    --ku-orange: #F59E0B;
+
+    /* Status Colors */
+    --status-healthy: #10B981;
+    --status-warning: #F59E0B;
+    --status-critical: #EF4444;
+    --status-offline: #6B7280;
+
+    /* Shadows */
+    --ku-card-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    --ku-hover-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+
+    /* Overlays */
+    --overlay-bg: rgba(15, 20, 25, 0.95);
+}
+
+/* ============================================
+   DARK MODE BASE STYLES
+   ============================================ */
+
+:root[data-theme="dark"] body {
+    background: linear-gradient(135deg, #0F1419 0%, #1A1F2E 100%);
+    color: var(--ku-text-primary);
+}
+
+/* Header */
+:root[data-theme="dark"] .header {
+    background: linear-gradient(135deg, #1A1F2E 0%, #252D3C 100%);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+/* Cards */
+:root[data-theme="dark"] .card,
+:root[data-theme="dark"] .server-card {
+    background: var(--ku-bg-secondary);
+    border-color: var(--ku-border);
+    box-shadow: var(--ku-card-shadow);
+}
+
+:root[data-theme="dark"] .card:hover,
+:root[data-theme="dark"] .server-card:hover {
+    background: var(--ku-bg-tertiary);
+    box-shadow: var(--ku-hover-shadow);
+}
+
+:root[data-theme="dark"] .card::before {
+    background: linear-gradient(90deg, var(--ku-primary), var(--ku-accent));
+}
+
+/* Card Headers */
+:root[data-theme="dark"] .card-header,
+:root[data-theme="dark"] .server-header {
+    border-bottom-color: var(--ku-border);
+}
+
+:root[data-theme="dark"] .card-title,
+:root[data-theme="dark"] .server-name {
+    color: var(--ku-text-primary);
+}
+
+:root[data-theme="dark"] .card-subtitle {
+    color: var(--ku-text-secondary);
+}
+
+/* System Overview Stats - Enhanced contrast */
+:root[data-theme="dark"] .overview-stat {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(59, 130, 246, 0.2));
+    border-color: rgba(59, 130, 246, 0.3);
+}
+
+:root[data-theme="dark"] .stat-value {
+    color: #60A5FA;  /* Brighter blue for better visibility */
+    font-weight: 600;
+}
+
+:root[data-theme="dark"] .stat-label {
+    color: #D1D5DB;  /* Brighter labels */
+    font-weight: 500;
+}
+
+/* Metrics - Enhanced contrast */
+:root[data-theme="dark"] .metric-item {
+    background: var(--ku-bg-tertiary);
+    border-color: var(--ku-border);
+}
+
+:root[data-theme="dark"] .metric-label,
+:root[data-theme="dark"] .detail-label {
+    color: #D1D5DB;  /* Brighter labels */
+    font-weight: 500;
+}
+
+:root[data-theme="dark"] .metric-value {
+    color: #F3F4F6;  /* Very bright metric values */
+    font-weight: 600;
+}
+
+:root[data-theme="dark"] .detail-value {
+    color: #E5E9F0;  /* Brighter detail values */
+}
+
+/* Server Details */
+:root[data-theme="dark"] .server-details {
+    background: var(--ku-bg-tertiary);
+}
+
+:root[data-theme="dark"] .detail-row {
+    border-bottom-color: var(--ku-border-light);
+}
+
+/* Metrics Row - Enhanced contrast */
+:root[data-theme="dark"] .metrics-row {
+    background: var(--ku-bg-tertiary);
+}
+
+:root[data-theme="dark"] .metric-inline-label {
+    color: #D1D5DB;  /* Brighter labels for better readability */
+    font-weight: 500;
+}
+
+:root[data-theme="dark"] .metric-inline-value {
+    color: #F3F4F6;  /* Very bright values */
+    font-weight: 600;
+}
+
+/* Tables - ULTRA MAXIMUM contrast for readability */
+:root[data-theme="dark"] .dash-table-container,
+:root[data-theme="dark"] div.dash-table-container {
+    background: var(--ku-bg-secondary) !important;
+    border-color: var(--ku-border) !important;
+}
+
+:root[data-theme="dark"] .dash-spreadsheet,
+:root[data-theme="dark"] div.dash-spreadsheet {
+    background: var(--ku-bg-secondary) !important;
+}
+
+:root[data-theme="dark"] .dash-spreadsheet-container {
+    background: var(--ku-bg-secondary) !important;
+}
+
+:root[data-theme="dark"] .dash-cell,
+:root[data-theme="dark"] div.dash-cell,
+:root[data-theme="dark"] td.dash-cell {
+    background-color: var(--ku-bg-secondary) !important;
+    color: #FFFFFF !important;  /* PURE WHITE for maximum contrast */
+    border-color: var(--ku-border-light) !important;
+}
+
+:root[data-theme="dark"] .dash-header,
+:root[data-theme="dark"] div.dash-header,
+:root[data-theme="dark"] th.dash-header {
+    background-color: var(--ku-bg-elevated) !important;
+    color: #FFFFFF !important;  /* Pure white for headers */
+    font-weight: 700 !important;  /* Extra bold */
+    border-color: var(--ku-border) !important;
+}
+
+:root[data-theme="dark"] .dash-cell.focused {
+    background-color: var(--ku-bg-elevated) !important;
+    color: #FFFFFF !important;
+}
+
+/* Table Rows - Better contrast */
+:root[data-theme="dark"] tr:nth-child(odd) .dash-cell {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+:root[data-theme="dark"] tr:hover .dash-cell {
+    background-color: rgba(59, 130, 246, 0.25) !important;
+    color: #FFFFFF !important;
+}
+
+/* Table filter row */
+:root[data-theme="dark"] .dash-filter,
+:root[data-theme="dark"] div.dash-filter {
+    background-color: var(--ku-bg-tertiary) !important;
+    color: #FFFFFF !important;
+}
+
+/* Table pagination */
+:root[data-theme="dark"] .previous-next-container button,
+:root[data-theme="dark"] .dash-table-container .row {
+    background-color: var(--ku-bg-tertiary) !important;
+    color: #F0F4F8 !important;
+    border-color: var(--ku-border) !important;
+}
+
+/* Table cell values - ALL variations */
+:root[data-theme="dark"] .dash-cell div,
+:root[data-theme="dark"] .dash-cell span,
+:root[data-theme="dark"] .dash-cell p,
+:root[data-theme="dark"] .dash-cell *,
+:root[data-theme="dark"] td.dash-cell *,
+:root[data-theme="dark"] div.dash-cell * {
+    color: #FFFFFF !important;
+}
+
+/* Target data cells with inline styles */
+:root[data-theme="dark"] .dash-cell[style],
+:root[data-theme="dark"] td[style].dash-cell {
+    color: #FFFFFF !important;
+}
+
+/* Extra aggressive - target by data attributes */
+:root[data-theme="dark"] [data-dash-column],
+:root[data-theme="dark"] [data-dash-row] {
+    color: #FFFFFF !important;
+}
+
+/* Buttons */
+:root[data-theme="dark"] .btn {
+    background: linear-gradient(135deg, var(--ku-primary) 0%, #2563EB 100%);
+}
+
+:root[data-theme="dark"] .btn:hover {
+    box-shadow: 0 8px 24px rgba(59, 130, 246, 0.4);
+}
+
+:root[data-theme="dark"] .btn-secondary {
+    background: linear-gradient(135deg, var(--ku-bg-elevated) 0%, var(--ku-bg-tertiary) 100%);
+    border: 1px solid var(--ku-border);
+}
+
+/* Tabs - Enhanced contrast for DCC Tabs */
+:root[data-theme="dark"] .custom-tabs,
+:root[data-theme="dark"] ._dash-undo-redo {
+    background: var(--ku-bg-secondary);
+    border-color: var(--ku-border);
+}
+
+:root[data-theme="dark"] .custom-tab {
+    color: #D1D5DB;  /* Brighter unselected text */
+    background: var(--ku-bg-tertiary);
+    border-color: var(--ku-border);
+    font-weight: 500;
+}
+
+:root[data-theme="dark"] .custom-tab--selected,
+:root[data-theme="dark"] .custom-tab:hover {
+    background: var(--ku-primary);
+    color: #FFFFFF;  /* Pure white for selected/hover */
+    border-color: var(--ku-primary);
+    font-weight: 600;
+}
+
+/* DCC Tabs component styling - ULTRA AGGRESSIVE */
+:root[data-theme="dark"] .tab,
+:root[data-theme="dark"] div.tab,
+:root[data-theme="dark"] div[class*="tab"]:not([class*="table"]) {
+    background-color: var(--ku-bg-tertiary) !important;
+    border-color: var(--ku-border) !important;
+    color: #F0F4F8 !important;
+}
+
+:root[data-theme="dark"] .tab--selected,
+:root[data-theme="dark"] div.tab--selected {
+    background-color: var(--ku-primary) !important;
+    color: #FFFFFF !important;
+    border-bottom-color: var(--ku-primary) !important;
+}
+
+:root[data-theme="dark"] .tabs {
+    border-bottom-color: var(--ku-border) !important;
+}
+
+/* More specific DCC Tab selectors with higher specificity */
+:root[data-theme="dark"] div[role="tab"],
+:root[data-theme="dark"] div[role="tab"]:not([aria-selected="true"]) {
+    background-color: var(--ku-bg-tertiary) !important;
+    color: #F0F4F8 !important;
+    border-color: var(--ku-border) !important;
+    font-weight: 500 !important;
+}
+
+:root[data-theme="dark"] div[role="tab"][aria-selected="true"],
+:root[data-theme="dark"] div[role="tab"].tab--selected {
+    background-color: var(--ku-primary) !important;
+    color: #FFFFFF !important;
+    font-weight: 600 !important;
+    border-bottom-color: var(--ku-primary) !important;
+}
+
+:root[data-theme="dark"] div[role="tablist"] {
+    border-bottom: 1px solid var(--ku-border) !important;
+}
+
+/* Target any inline styles on tabs */
+:root[data-theme="dark"] [role="tab"][style*="color"],
+:root[data-theme="dark"] [role="tab"][style*="background"] {
+    color: #F0F4F8 !important;
+    background-color: var(--ku-bg-tertiary) !important;
+}
+
+:root[data-theme="dark"] [role="tab"][aria-selected="true"][style] {
+    color: #FFFFFF !important;
+    background-color: var(--ku-primary) !important;
+}
+
+/* Alerts */
+:root[data-theme="dark"] .alert-panel {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(239, 68, 68, 0.15));
+    border-color: rgba(239, 68, 68, 0.3);
+}
+
+:root[data-theme="dark"] .alert-item {
+    background: rgba(42, 49, 66, 0.7);
+}
+
+:root[data-theme="dark"] .alert-title {
+    color: var(--ku-text-primary);
+}
+
+:root[data-theme="dark"] .alert-description,
+:root[data-theme="dark"] .alert-time {
+    color: var(--ku-text-secondary);
+}
+
+/* Network Activity */
+:root[data-theme="dark"] .network-stat {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.15));
+    border-color: rgba(16, 185, 129, 0.2);
+}
+
+/* Resource Bars */
+:root[data-theme="dark"] .resource-bar {
+    background: var(--ku-bg-tertiary);
+}
+
+/* Dropdowns - Enhanced contrast */
+:root[data-theme="dark"] .Select-control,
+:root[data-theme="dark"] .dash-dropdown {
+    background-color: var(--ku-bg-tertiary);
+    border-color: var(--ku-border);
+    color: #E5E9F0;  /* Brighter text */
+}
+
+:root[data-theme="dark"] .Select-menu-outer,
+:root[data-theme="dark"] .dash-dropdown-menu {
+    background-color: var(--ku-bg-elevated);
+    border-color: var(--ku-border);
+}
+
+:root[data-theme="dark"] .Select-option,
+:root[data-theme="dark"] .dash-dropdown-option {
+    background-color: var(--ku-bg-elevated);
+    color: #E5E9F0;  /* Brighter text */
+}
+
+:root[data-theme="dark"] .Select-option:hover,
+:root[data-theme="dark"] .dash-dropdown-option:hover {
+    background-color: var(--ku-bg-tertiary);
+    color: #FFFFFF;  /* Pure white on hover */
+}
+
+/* Selected dropdown option */
+:root[data-theme="dark"] .Select-option.is-selected,
+:root[data-theme="dark"] .dash-dropdown-option.is-selected {
+    background-color: rgba(59, 130, 246, 0.2);
+    color: #FFFFFF;
+}
+
+/* Inputs - Enhanced contrast */
+:root[data-theme="dark"] input,
+:root[data-theme="dark"] select,
+:root[data-theme="dark"] textarea {
+    background-color: var(--ku-bg-tertiary);
+    border-color: var(--ku-border);
+    color: #E5E9F0;  /* Brighter text */
+}
+
+:root[data-theme="dark"] input::placeholder,
+:root[data-theme="dark"] textarea::placeholder {
+    color: #9CA3AF;  /* Visible placeholder text */
+}
+
+:root[data-theme="dark"] input:focus,
+:root[data-theme="dark"] select:focus,
+:root[data-theme="dark"] textarea:focus {
+    border-color: var(--ku-primary);
+    outline-color: rgba(59, 130, 246, 0.5);
+    color: #FFFFFF;  /* Pure white when focused */
+}
+
+/* Toast Notifications */
+:root[data-theme="dark"] .toast {
+    background-color: var(--ku-bg-elevated);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+/* Empty States */
+:root[data-theme="dark"] .empty-state-title {
+    color: var(--ku-text-primary);
+}
+
+:root[data-theme="dark"] .empty-state-message {
+    color: var(--ku-text-secondary);
+}
+
+/* Scrollbars */
+:root[data-theme="dark"] ::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+}
+
+:root[data-theme="dark"] ::-webkit-scrollbar-track {
+    background: var(--ku-bg-secondary);
+}
+
+:root[data-theme="dark"] ::-webkit-scrollbar-thumb {
+    background: var(--ku-bg-elevated);
+    border-radius: 6px;
+    border: 2px solid var(--ku-bg-secondary);
+}
+
+:root[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+    background: var(--ku-border);
+}
+
+/* ============================================
+   DARK MODE TOGGLE BUTTON
+   ============================================ */
+
+.theme-toggle-btn {
+    position: relative;
+    width: 50px;
+    height: 26px;
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    padding: 0;
+    overflow: hidden;
+}
+
+.theme-toggle-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.theme-toggle-btn::before {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 20px;
+    height: 20px;
+    background: white;
+    border-radius: 50%;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+:root[data-theme="dark"] .theme-toggle-btn {
+    background: rgba(59, 130, 246, 0.3);
+}
+
+:root[data-theme="dark"] .theme-toggle-btn::before {
+    transform: translateX(24px);
+    background: #3B82F6;
+}
+
+.theme-toggle-btn i {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 12px;
+    transition: all 0.3s ease;
+}
+
+.theme-toggle-btn .fa-sun {
+    left: 6px;
+    color: #FCD34D;
+    opacity: 1;
+}
+
+.theme-toggle-btn .fa-moon {
+    right: 6px;
+    color: white;
+    opacity: 0.5;
+}
+
+:root[data-theme="dark"] .theme-toggle-btn .fa-sun {
+    opacity: 0.5;
+}
+
+:root[data-theme="dark"] .theme-toggle-btn .fa-moon {
+    opacity: 1;
+}
+
+/* ============================================
+   SMOOTH THEME TRANSITION
+   ============================================ */
+
+:root,
+:root[data-theme="dark"] {
+    transition:
+        background-color 0.3s ease,
+        color 0.3s ease;
+}
+
+body,
+.card,
+.server-card,
+.btn,
+.header,
+.dash-cell,
+.dash-header,
+input,
+select,
+textarea {
+    transition:
+        background-color 0.3s ease,
+        color 0.3s ease,
+        border-color 0.3s ease,
+        box-shadow 0.3s ease;
+}
+
+/* ============================================
+   DARK MODE SPECIFIC ANIMATIONS
+   ============================================ */
+
+@keyframes dark-mode-shimmer {
+    0% {
+        background-position: -200% 0;
+    }
+    100% {
+        background-position: 200% 0;
+    }
+}
+
+:root[data-theme="dark"] .skeleton {
+    background: linear-gradient(
+        90deg,
+        #1A1F2E 0%,
+        #252D3C 20%,
+        #1A1F2E 40%,
+        #1A1F2E 100%
+    );
+    background-size: 200% 100%;
+    animation: dark-mode-shimmer 1.5s ease-in-out infinite;
+}
+
+/* ============================================
+   CONTRAST ADJUSTMENTS FOR READABILITY
+   ============================================ */
+
+:root[data-theme="dark"] .metric-inline-value.warning {
+    color: #FCD34D;
+}
+
+:root[data-theme="dark"] .metric-inline-value.critical {
+    color: #F87171;
+}
+
+:root[data-theme="dark"] .server-status-badge {
+    border-width: 1px;
+}
+
+:root[data-theme="dark"] .status-online {
+    background: rgba(16, 185, 129, 0.15);
+    color: #34D399;
+    border-color: rgba(16, 185, 129, 0.3);
+}
+
+:root[data-theme="dark"] .status-warning {
+    background: rgba(245, 158, 11, 0.15);
+    color: #FCD34D;
+    border-color: rgba(245, 158, 11, 0.3);
+}
+
+:root[data-theme="dark"] .status-offline {
+    background: rgba(239, 68, 68, 0.15);
+    color: #F87171;
+    border-color: rgba(239, 68, 68, 0.3);
+}
+
+/* Performance indicators in dark mode */
+:root[data-theme="dark"] .perf-excellent {
+    background: rgba(16, 185, 129, 0.15);
+    color: #34D399;
+    border-color: rgba(16, 185, 129, 0.3);
+}
+
+:root[data-theme="dark"] .perf-good {
+    background: rgba(59, 130, 246, 0.15);
+    color: #60A5FA;
+    border-color: rgba(59, 130, 246, 0.3);
+}
+
+:root[data-theme="dark"] .perf-fair {
+    background: rgba(245, 158, 11, 0.15);
+    color: #FCD34D;
+    border-color: rgba(245, 158, 11, 0.3);
+}
+
+:root[data-theme="dark"] .perf-poor {
+    background: rgba(239, 68, 68, 0.15);
+    color: #F87171;
+    border-color: rgba(239, 68, 68, 0.3);
+}
+
+/* ============================================
+   LOADING OVERLAY IN DARK MODE
+   ============================================ */
+
+:root[data-theme="dark"] .loading-overlay {
+    background: rgba(15, 20, 25, 0.95);
+}
+
+:root[data-theme="dark"] .spinner-message {
+    color: var(--ku-text-secondary);
+}
+
+/* ============================================
+   ACCESSIBILITY IN DARK MODE
+   ============================================ */
+
+:root[data-theme="dark"] *:focus-visible {
+    outline-color: var(--ku-primary);
+}
+
+:root[data-theme="dark"] button:focus-visible,
+:root[data-theme="dark"] a:focus-visible,
+:root[data-theme="dark"] .btn:focus-visible {
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5);
+}
+
+/* ============================================
+   HIGH CONTRAST MODE ADJUSTMENTS
+   ============================================ */
+
+@media (prefers-contrast: high) {
+    :root[data-theme="dark"] {
+        --ku-text-primary: #FFFFFF;
+        --ku-bg-primary: #000000;
+        --ku-bg-secondary: #1A1A1A;
+        --ku-border: #FFFFFF;
+    }
+
+    :root[data-theme="dark"] .card,
+    :root[data-theme="dark"] .server-card {
+        border: 2px solid var(--ku-border);
+    }
+}
+
+/* ============================================
+   PRINT STYLES FOR DARK MODE
+   ============================================ */
+
+@media print {
+    :root[data-theme="dark"] body {
+        background: white;
+        color: black;
+    }
+
+    :root[data-theme="dark"] .card,
+    :root[data-theme="dark"] .server-card {
+        background: white;
+        color: black;
+        border: 1px solid #ddd;
+    }
+}

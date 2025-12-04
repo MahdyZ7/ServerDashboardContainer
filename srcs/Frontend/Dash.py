@@ -35,15 +35,16 @@ app.title = DASHBOARD_CONFIG["title"]
 # Minimal index string (CSS is now external in assets/styles.css)
 app.index_string = f'''
 <!DOCTYPE html>
-<html>
+<html data-theme="light">
     <head>
         {{%metas%}}
         <title>{{%title%}}</title>
         {{%favicon%}}
         {{%css%}}
         <link href="{FONTS["google_fonts"][0]}" rel="stylesheet">
-        <link href="{FONTS["google_fonts"][1]}" rel="stylesheet">
         <link rel="stylesheet" href="{FONTS["fontawesome"]}">
+        <link rel="stylesheet" href="./assets/animations.css">
+        <link rel="stylesheet" href="./assets/dark-mode.css">
     </head>
     <body>
         <div class="header">
@@ -54,6 +55,10 @@ app.index_string = f'''
                 </div>
             </div>
             <div class="header-right">
+                <button class="theme-toggle-btn" id="theme-toggle" aria-label="Toggle dark mode" title="Toggle dark mode (Ctrl+D)">
+                    <i class="fas fa-sun"></i>
+                    <i class="fas fa-moon"></i>
+                </button>
                 <div class="system-time" id="system-time">
                     <i class="fas fa-clock"></i> <span id="current-time"></span>
                 </div>
@@ -66,6 +71,7 @@ app.index_string = f'''
         {{%scripts%}}
         {{%renderer%}}
         <script>
+            // Time update function
             function updateTime() {{
                 const now = new Date();
                 const element = document.getElementById('current-time');
@@ -75,6 +81,147 @@ app.index_string = f'''
             }}
             setInterval(updateTime, 1000);
             updateTime();
+
+            // Dark mode toggle functionality
+            (function() {{
+                const themeToggle = document.getElementById('theme-toggle');
+                const html = document.documentElement;
+
+                // Check for saved theme preference or default to light mode
+                const currentTheme = localStorage.getItem('theme') || 'light';
+                html.setAttribute('data-theme', currentTheme);
+
+                // Check system preference if no saved preference
+                if (!localStorage.getItem('theme')) {{
+                    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                    if (prefersDark) {{
+                        html.setAttribute('data-theme', 'dark');
+                        localStorage.setItem('theme', 'dark');
+                    }}
+                }}
+
+                // Toggle theme on button click
+                if (themeToggle) {{
+                    themeToggle.addEventListener('click', function() {{
+                        const currentTheme = html.getAttribute('data-theme');
+                        const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+
+                        html.setAttribute('data-theme', newTheme);
+                        localStorage.setItem('theme', newTheme);
+
+                        // Add a subtle animation to the button
+                        themeToggle.style.transform = 'scale(0.95)';
+                        setTimeout(() => {{
+                            themeToggle.style.transform = 'scale(1)';
+                        }}, 100);
+                    }});
+
+                    // Keyboard shortcut: Ctrl/Cmd + D
+                    document.addEventListener('keydown', function(e) {{
+                        if ((e.ctrlKey || e.metaKey) && e.key === 'd') {{
+                            e.preventDefault();
+                            themeToggle.click();
+                        }}
+                    }});
+                }}
+
+                // Listen for system theme changes
+                window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {{
+                    // Only update if user hasn't explicitly set a preference
+                    if (!localStorage.getItem('theme')) {{
+                        const newTheme = e.matches ? 'dark' : 'light';
+                        html.setAttribute('data-theme', newTheme);
+                    }}
+                }});
+            }})();
+
+            // Mobile-specific enhancements
+            (function() {{
+                // Detect mobile device
+                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+                if (isMobile || isTouch) {{
+                    // Add mobile class to body for CSS targeting
+                    document.body.classList.add('mobile-device');
+
+                    // Prevent double-tap zoom on buttons and interactive elements
+                    document.addEventListener('touchend', function(e) {{
+                        const target = e.target;
+                        if (target.tagName === 'BUTTON' ||
+                            target.classList.contains('clickable') ||
+                            target.closest('button') ||
+                            target.closest('.dash-table-container')) {{
+                            e.preventDefault();
+                            // Trigger click manually
+                            target.click();
+                        }}
+                    }}, {{ passive: false }});
+
+                    // Enhanced scroll performance for tables
+                    const tables = document.querySelectorAll('.dash-table-container');
+                    tables.forEach(table => {{
+                        table.style.webkitOverflowScrolling = 'touch';
+                        table.style.overflowX = 'auto';
+                    }});
+
+                    // Add touch feedback for interactive elements
+                    document.addEventListener('touchstart', function(e) {{
+                        const target = e.target;
+                        if (target.tagName === 'BUTTON' ||
+                            target.classList.contains('clickable') ||
+                            target.closest('button')) {{
+                            target.style.opacity = '0.7';
+                            setTimeout(() => {{ target.style.opacity = '1'; }}, 100);
+                        }}
+                    }}, {{ passive: true }});
+
+                    // Optimize Plotly graphs for touch
+                    if (window.Plotly) {{
+                        const plots = document.querySelectorAll('.js-plotly-plot');
+                        plots.forEach(plot => {{
+                            // Disable scroll zoom by default on mobile
+                            if (plot.layout) {{
+                                plot.layout.dragmode = 'pan';
+                            }}
+                        }});
+                    }}
+
+                    // Add orientation change handler
+                    window.addEventListener('orientationchange', function() {{
+                        setTimeout(() => {{
+                            // Force re-render of graphs on orientation change
+                            if (window.Plotly) {{
+                                const plots = document.querySelectorAll('.js-plotly-plot');
+                                plots.forEach(plot => {{
+                                    Plotly.Plots.resize(plot);
+                                }});
+                            }}
+                        }}, 200);
+                    }});
+
+                    // Smooth scroll for navigation
+                    document.querySelectorAll('a[href^="#"]').forEach(anchor => {{
+                        anchor.addEventListener('click', function(e) {{
+                            e.preventDefault();
+                            const target = document.querySelector(this.getAttribute('href'));
+                            if (target) {{
+                                target.scrollIntoView({{ behavior: 'smooth', block: 'start' }});
+                            }}
+                        }});
+                    }});
+                }}
+
+                // Viewport height fix for mobile browsers (address bar issue)
+                function setVHProperty() {{
+                    const vh = window.innerHeight * 0.01;
+                    document.documentElement.style.setProperty('--vh', `${{vh}}px`);
+                }}
+                setVHProperty();
+                window.addEventListener('resize', setVHProperty);
+                window.addEventListener('orientationchange', setVHProperty);
+            }})();
+
         </script>
     </body>
 </html>

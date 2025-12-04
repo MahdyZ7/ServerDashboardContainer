@@ -42,13 +42,20 @@
     --space-4: 16px;
     --space-5: 20px;
 
-    /* Typography */
-    --text-xs: 11px;
-    --text-s: 12px;
-    --text-md: 14px;
-    --text-lg: 16px;
+    /* Typography - Adapted from KU Brand Guidelines for web interface */
+    /* Guidelines: Headlines 40pt+, Sub-headlines 26pt+, Body 12pt max */
+    /* Web adaptation uses smaller, screen-optimized sizes */
+    --heading-1: 28px;      /* Main page heading (adapted from 40pt guideline) */
+    --heading-2: 24px;      /* Section heading (adapted from 26pt guideline) */
+    --heading-3: 20px;      /* Card/subsection heading */
+    --heading-4: 18px;      /* Minor heading */
+    --text-lg: 16px;        /* Body large */
+    --text-md: 14px;        /* Body default */
+    --text-s: 12px;         /* Body small (12pt max per guidelines) */
+    --text-xs: 11px;        /* Caption/fine print */
 
-    /* Font weights */
+    /* Font weights - KU Brand Guidelines: Light (300), Regular (400), Medium (500), Bold (700) */
+    --font-light: 300;
     --font-normal: 400;
     --font-medium: 500;
     --font-semibold: 600;
@@ -72,7 +79,10 @@
 }
 
 body {
-    font-family: 'Noto Sans', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    /* KU Brand Guidelines 2020: DIN Next is the official font (commercial)
+     * Using Inter as closest free alternative - geometric sans-serif, excellent screen readability
+     * Inter closely matches DIN Next's proportions and modern aesthetic */
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     background: linear-gradient(135deg, #f8f9fa 0%, #e6ebf0 100%);
     min-height: 100vh;
     color: var(--ku-dark);
@@ -106,11 +116,11 @@ body {
 }
 
 .header h1 {
-    font-size: 24px;
+    font-size: var(--heading-1);
     font-weight: 600;
     letter-spacing: -0.3px;
     margin: 0;
-    font-family: 'Noto Sans', sans-serif;
+    font-family: 'Inter', sans-serif;
 }
 
 .header-right {
@@ -174,13 +184,13 @@ body {
 }
 
 .card-title {
-    font-size: 22px;
+    font-size: var(--heading-2);
     font-weight: 600;
     color: var(--ku-dark);
     display: flex;
     align-items: center;
     gap: 12px;
-    font-family: 'Noto Sans', sans-serif;
+    font-family: 'Inter', sans-serif;
 }
 
 .card-subtitle {
@@ -244,13 +254,13 @@ body {
 }
 
 .server-name {
-    font-size: 20px;
+    font-size: var(--heading-3);
     font-weight: 600;
     color: var(--ku-dark);
     display: flex;
     align-items: center;
     gap: 12px;
-    font-family: 'Noto Sans', sans-serif;
+    font-family: 'Inter', sans-serif;
 }
 /* .server-name {
     font-size: var(--text-md);
@@ -302,7 +312,7 @@ body {
 }
 
 .metric-inline-label {
-    font-family: 'Noto Sans', sans-serif;
+    font-family: 'Inter', sans-serif;
     font-size: var(--text-s);
     color: var(--neutral-800);
     text-transform: uppercase;
@@ -343,12 +353,12 @@ body {
 }
 
 .stat-value {
-    font-size: 24px;
+    font-size: var(--heading-2);
     font-weight: 600;
     color: var(--ku-primary);
     display: block;
     line-height: 1.2;
-    font-family: 'Noto Sans', sans-serif;
+    font-family: 'Inter', sans-serif;
 }
 
 .stat-label {
@@ -418,11 +428,11 @@ body {
 }
 
 .metric-value {
-    font-size: 24px;
+    font-size: var(--heading-2);
     font-weight: 600;
     display: block;
     margin-bottom: 4px;
-    font-family: 'Noto Sans', sans-serif;
+    font-family: 'Inter', sans-serif;
 }
 
 .metric-label {
@@ -495,7 +505,7 @@ body {
     font-weight: 500;
     color: var(--ku-dark);
     margin-bottom: 4px;
-    font-family: 'Noto Sans', sans-serif;
+    font-family: 'Inter', sans-serif;
 }
 
 .alert-description {
@@ -517,7 +527,7 @@ body {
     border-radius: 20px;
     font-size: 12px;
     font-weight: 500;
-    font-family: 'Noto Sans', sans-serif;
+    font-family: 'Inter', sans-serif;
     text-transform: uppercase;
     letter-spacing: 0.5px;
 	margin-top: 10px;
@@ -601,7 +611,7 @@ body {
     cursor: pointer;
     font-size: 14px;
     font-weight: 600;
-    font-family: 'Noto Sans', sans-serif;
+    font-family: 'Inter', sans-serif;
     transition: var(--ku-transition);
     box-shadow: 0 4px 16px rgba(0,87,184,0.2);
     display: inline-flex;
@@ -683,33 +693,478 @@ body {
     }
 }
 
-/* Responsive Design */
-@media (max-width: 768px) {
+/* ============================================
+   RESPONSIVE DESIGN - Mobile-First Approach
+   ============================================ */
+
+/* Small Mobile Devices (320px - 480px) */
+@media (max-width: 480px) {
+    /* Dashboard Container */
+    .dashboard-container {
+        padding: 12px;
+    }
+
+    /* Header */
+    .header {
+        padding: 12px 16px;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .header h1 {
+        font-size: var(--text-lg);
+        line-height: 1.3;
+    }
+
+    .header-left,
+    .header-right {
+        width: 100%;
+    }
+
+    /* Server Grid - Single Column */
+    .server-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    /* Server Cards - Optimized for Mobile */
+    .server-card,
+    .server-card-compact {
+        padding: 16px;
+        margin-bottom: 12px;
+    }
+
+    .server-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .server-name {
+        font-size: var(--text-md);
+    }
+
+    .server-status-badge {
+        width: 100%;
+        text-align: center;
+        padding: 8px 12px;
+        font-size: var(--text-xs);
+    }
+
+    /* Metrics - Stack Vertically */
+    .metrics-row {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .metric-inline {
+        width: 100%;
+        padding: 12px;
+        justify-content: space-between;
+    }
+
+    .metric-inline-label {
+        font-size: var(--text-s);
+    }
+
+    .metric-inline-value {
+        font-size: var(--heading-4);
+    }
+
+    /* System Overview - Single Column */
+    .system-overview {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .overview-stat {
+        padding: 16px;
+    }
+
+    .stat-value {
+        font-size: var(--heading-2);
+    }
+
+    .stat-label {
+        font-size: var(--text-s);
+    }
+
+    /* Server Metrics Grid */
+    .server-metrics {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    /* Cards */
+    .card {
+        padding: 16px;
+        margin-bottom: 16px;
+        border-radius: 12px;
+    }
+
+    .card-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        margin-bottom: 16px;
+    }
+
+    .card-title {
+        font-size: var(--heading-3);
+    }
+
+    .card-subtitle {
+        font-size: var(--text-s);
+    }
+
+    /* Tables - Horizontal Scroll */
+    .dash-table-container {
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .dash-table-container table {
+        min-width: 100%;
+        font-size: var(--text-s);
+    }
+
+    .dash-cell,
+    .dash-header {
+        padding: 10px 8px !important;
+        font-size: var(--text-s) !important;
+    }
+
+    /* Graphs - Optimized Height for Mobile */
+    .js-plotly-plot {
+        min-height: 300px !important;
+    }
+
+    /* Toast Notifications */
+    .toast-container {
+        right: 8px;
+        left: 8px;
+        max-width: none;
+        bottom: 8px;
+    }
+
+    .toast {
+        padding: 12px;
+        font-size: var(--text-s);
+    }
+
+    /* Touch Targets - Minimum 44px */
+    button,
+    a,
+    .clickable,
+    .dash-dropdown,
+    input,
+    select {
+        min-height: 44px;
+        min-width: 44px;
+    }
+
+    /* Tabs */
+    .custom-tabs {
+        flex-direction: column;
+    }
+
+    .custom-tab {
+        width: 100%;
+        border-radius: 8px;
+        margin-bottom: 8px;
+        padding: 12px;
+        font-size: var(--text-md);
+    }
+
+    /* Dropdown Menus */
+    .Select-menu-outer {
+        max-height: 200px;
+    }
+
+    /* Pagination */
+    .previous-next-container {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .previous-next-container button {
+        width: 100%;
+        padding: 12px;
+        font-size: var(--text-md);
+    }
+}
+
+/* Tablet Devices (481px - 768px) */
+@media (min-width: 481px) and (max-width: 768px) {
+    /* Dashboard Container */
     .dashboard-container {
         padding: 16px;
     }
 
-    .server-metrics {
-        grid-template-columns: repeat(2, 1fr);
-    }
-
-    .system-overview {
-        grid-template-columns: 1fr;
-    }
-
+    /* Header */
     .header {
         padding: 16px 20px;
     }
 
     .header h1 {
-        font-size: 20px;
+        font-size: var(--heading-3);
     }
 
+    /* Server Grid - Two Columns */
+    .server-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 20px;
+    }
+
+    /* Server Cards */
+    .server-card,
+    .server-card-compact {
+        padding: 20px;
+    }
+
+    /* Metrics */
+    .metrics-row {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+
+    /* System Overview - Two Columns */
+    .system-overview {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+    }
+
+    /* Server Metrics */
+    .server-metrics {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+    }
+
+    /* Cards */
+    .card {
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+
+    /* Tables */
+    .dash-table-container {
+        overflow-x: auto !important;
+    }
+
+    .dash-cell,
+    .dash-header {
+        padding: 12px 10px !important;
+        font-size: var(--text-s) !important;
+    }
+
+    /* Graphs */
+    .js-plotly-plot {
+        min-height: 350px !important;
+    }
+
+    /* Toast Notifications */
     .toast-container {
         right: 10px;
         left: 10px;
         max-width: none;
     }
+
+    /* Touch Targets */
+    button,
+    a,
+    .clickable {
+        min-height: 44px;
+    }
+
+    /* Tabs */
+    .custom-tab {
+        padding: 12px 20px;
+        font-size: var(--text-md);
+    }
+}
+
+/* Small Desktop (769px - 1024px) */
+@media (min-width: 769px) and (max-width: 1024px) {
+    /* Dashboard Container */
+    .dashboard-container {
+        padding: 20px;
+    }
+
+    /* Server Grid - Two or Three Columns */
+    .server-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 24px;
+    }
+
+    /* System Overview - Three Columns */
+    .system-overview {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+    }
+
+    /* Server Metrics */
+    .server-metrics {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+    }
+
+    /* Graphs */
+    .js-plotly-plot {
+        min-height: 400px !important;
+    }
+}
+
+/* Large Desktop (1025px+) */
+@media (min-width: 1025px) {
+    /* Server Grid - Full Layout */
+    .server-grid {
+        grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+        gap: 28px;
+    }
+
+    /* System Overview - Four+ Columns */
+    .system-overview {
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 24px;
+    }
+
+    /* Server Metrics */
+    .server-metrics {
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 24px;
+    }
+
+    /* Graphs - Full Height */
+    .js-plotly-plot {
+        min-height: 450px !important;
+    }
+}
+
+/* Landscape Orientation Adjustments */
+@media (max-width: 768px) and (orientation: landscape) {
+    /* Header - Compact in Landscape */
+    .header {
+        padding: 8px 16px;
+    }
+
+    .header h1 {
+        font-size: var(--text-md);
+    }
+
+    /* Reduce vertical spacing */
+    .card {
+        margin-bottom: 12px;
+        padding: 12px;
+    }
+
+    .server-card,
+    .server-card-compact {
+        padding: 12px;
+        margin-bottom: 12px;
+    }
+
+    /* Graphs - Reduced height in landscape */
+    .js-plotly-plot {
+        min-height: 250px !important;
+    }
+}
+
+/* High-DPI Displays (Retina) */
+@media (-webkit-min-device-pixel-ratio: 2),
+       (min-resolution: 192dpi) {
+    /* Ensure crisp rendering on retina displays */
+    .card,
+    .server-card,
+    .server-card-compact {
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* Slightly thinner borders on high-DPI */
+    .card,
+    .server-card {
+        border-width: 0.5px;
+    }
+}
+
+/* Print Styles */
+@media print {
+    .header,
+    .toast-container,
+    .card-actions {
+        display: none;
+    }
+
+    .dashboard-container {
+        padding: 0;
+    }
+
+    .card,
+    .server-card {
+        page-break-inside: avoid;
+        box-shadow: none;
+        border: 1px solid #ddd;
+    }
+
+    .js-plotly-plot {
+        max-height: 400px;
+    }
+}
+
+/* Mobile-Device Specific Enhancements (JS-detected) */
+body.mobile-device {
+    /* Enhanced touch targets */
+    -webkit-tap-highlight-color: rgba(0, 61, 165, 0.1);
+    touch-action: manipulation;
+}
+
+body.mobile-device button,
+body.mobile-device a,
+body.mobile-device .clickable {
+    /* Ensure minimum touch target size */
+    min-height: 44px;
+    min-width: 44px;
+}
+
+body.mobile-device .dash-table-container {
+    /* Smooth scrolling on mobile */
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+}
+
+body.mobile-device .js-plotly-plot {
+    /* Optimize Plotly for touch */
+    touch-action: pan-y;
+}
+
+body.mobile-device .custom-tab {
+    /* Larger tap targets for tabs */
+    min-height: 48px;
+    padding: 14px 20px;
+}
+
+body.mobile-device input,
+body.mobile-device select,
+body.mobile-device textarea {
+    /* Prevent zoom on input focus (iOS) */
+    font-size: 16px;
+}
+
+/* Viewport height fix for mobile browsers */
+.dashboard-container {
+    min-height: calc(var(--vh, 1vh) * 100 - 80px);
+}
+
+/* Prevent horizontal scroll on mobile */
+body.mobile-device {
+    overflow-x: hidden;
+}
+
+body.mobile-device .dashboard-container {
+    overflow-x: hidden;
+    max-width: 100vw;
 }
 
 /* Enhanced Tables */

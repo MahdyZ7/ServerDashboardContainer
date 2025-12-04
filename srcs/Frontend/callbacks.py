@@ -17,6 +17,12 @@ from components import (
 )
 from api_client import get_historical_metrics
 from export_utils import generate_export_report, export_to_excel
+from graph_config import (
+    GRAPH_COLORS,
+    ENHANCED_LAYOUT,
+    ENHANCED_XAXIS,
+    ENHANCED_YAXIS,
+)
 
 
 def register_callbacks(app):
@@ -122,31 +128,35 @@ def register_callbacks(app):
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors="coerce")
 
-        # Create the comprehensive chart
+        # Create enhanced comprehensive chart with professional styling
         fig = make_subplots(
             rows=2,
             cols=2,
             subplot_titles=(
-                "CPU Load Averages",
-                "Memory Usage",
-                "Disk Usage",
-                "Network Activity",
+                "<b>CPU Load Averages</b>",
+                "<b>Memory Usage</b>",
+                "<b>Disk Usage</b>",
+                "<b>Network Activity</b>",
             ),
             specs=[
                 [{"secondary_y": False}, {"secondary_y": False}],
                 [{"secondary_y": False}, {"secondary_y": True}],
             ],
+            vertical_spacing=0.12,
+            horizontal_spacing=0.1,
         )
 
-        # CPU Load
+        # Enhanced CPU Load traces with smooth curves and fills
         fig.add_trace(
             go.Scatter(
                 x=df["timestamp"],
                 y=df["cpu_load_1min"],
                 mode="lines",
                 name="1-min Load",
-                line_shape="spline",
-                line=dict(color=KU_COLORS["primary"], width=2),
+                line=dict(color=KU_COLORS["primary"], width=2.5, shape="spline", smoothing=1.0),
+                fill="tozeroy",
+                fillcolor=GRAPH_COLORS["cpu"]["fill"],
+                hovertemplate="<b>1-min</b>: %{y:.2f}%<extra></extra>",
             ),
             row=1,
             col=1,
@@ -157,8 +167,9 @@ def register_callbacks(app):
                 y=df["cpu_load_5min"],
                 mode="lines",
                 name="5-min Load",
-                line_shape="spline",
-                line=dict(color=KU_COLORS["secondary"], width=2),
+                line=dict(color=KU_COLORS["secondary"], width=2, shape="spline", smoothing=1.0),
+                hovertemplate="<b>5-min</b>: %{y:.2f}%<extra></extra>",
+                opacity=0.8,
             ),
             row=1,
             col=1,
@@ -169,8 +180,9 @@ def register_callbacks(app):
                 y=df["cpu_load_15min"],
                 mode="lines",
                 name="15-min Load",
-                line_shape="spline",
-                line=dict(color=KU_COLORS["accent"], width=2),
+                line=dict(color=KU_COLORS["accent"], width=1.5, shape="spline", smoothing=1.0, dash="dot"),
+                hovertemplate="<b>15-min</b>: %{y:.2f}%<extra></extra>",
+                opacity=0.6,
             ),
             row=1,
             col=1,
@@ -178,29 +190,60 @@ def register_callbacks(app):
         fig.update_yaxes(title_text="CPU Load %", range=[0, 100], row=1, col=1)
         fig.update_xaxes(title_text="Time", row=1, col=1, tickformat="%H:%M\n%b %d")
 
-        # Memory Usage
+        # Enhanced Memory Usage with smooth curves and area fill
         fig.add_trace(
             go.Scatter(
                 x=df["timestamp"],
                 y=df["ram_percentage"],
-                mode="lines+markers",
-                name="RAM %",
-                line=dict(color=KU_COLORS["warning"], width=3),
+                mode="lines",
+                name="RAM Usage",
+                line=dict(color=KU_COLORS["secondary"], width=3, shape="spline", smoothing=1.0),
+                fill="tozeroy",
+                fillcolor=GRAPH_COLORS["ram"]["fill"],
+                hovertemplate="<b>RAM</b>: %{y:.1f}%<extra></extra>",
             ),
+            row=1,
+            col=2,
+        )
+        # Add threshold lines for memory
+        fig.add_hline(
+            y=90,
+            line_dash="dash",
+            line_color=GRAPH_COLORS["critical"]["line"],
+            line_width=1.5,
+            opacity=0.7,
+            annotation_text="Critical (90%)",
+            annotation_position="right",
+            annotation_font=dict(size=10, color=GRAPH_COLORS["critical"]["line"]),
+            row=1,
+            col=2,
+        )
+        fig.add_hline(
+            y=75,
+            line_dash="dot",
+            line_color=GRAPH_COLORS["warning"]["line"],
+            line_width=1.5,
+            opacity=0.7,
+            annotation_text="Warning (75%)",
+            annotation_position="right",
+            annotation_font=dict(size=10, color=GRAPH_COLORS["warning"]["line"]),
             row=1,
             col=2,
         )
         fig.update_yaxes(title_text="Memory Usage %", range=[0, 100], row=1, col=2)
         fig.update_xaxes(title_text="Time", row=1, col=2, tickformat="%H:%M\n%b %d")
 
-        # Disk Usage
+        # Enhanced Disk Usage with gradient fill
         fig.add_trace(
             go.Scatter(
                 x=df["timestamp"],
                 y=df["disk_percentage"],
-                mode="lines+markers",
-                name="Disk %",
-                line=dict(color=KU_COLORS["primary"], width=3),
+                mode="lines",
+                name="Disk Usage",
+                line=dict(color=KU_COLORS["accent"], width=3, shape="spline", smoothing=1.0),
+                fill="tozeroy",
+                fillcolor=GRAPH_COLORS["disk"]["fill"],
+                hovertemplate="<b>Disk</b>: %{y:.1f}%<extra></extra>",
             ),
             row=2,
             col=1,
@@ -208,15 +251,18 @@ def register_callbacks(app):
         fig.update_yaxes(title_text="Disk Usage %", range=[0, 100], row=2, col=1)
         fig.update_xaxes(title_text="Time", row=2, col=1, tickformat="%H:%M\n%b %d")
 
-        # Network Activity
+        # Enhanced Network Activity with smooth curves
         fig.add_trace(
             go.Scatter(
                 x=df["timestamp"],
                 y=df["logged_users"],
                 mode="lines+markers",
-                name="Users",
-                line_shape="hv",
-                line=dict(color=KU_COLORS["info"], width=2),
+                name="Logged Users",
+                line=dict(color=GRAPH_COLORS["users"]["line"], width=2.5, shape="spline", smoothing=0.8),
+                marker=dict(size=4, opacity=0.7),
+                fill="tozeroy",
+                fillcolor=GRAPH_COLORS["users"]["fill"],
+                hovertemplate="<b>Users</b>: %{y}<extra></extra>",
             ),
             row=2,
             col=2,
@@ -227,7 +273,9 @@ def register_callbacks(app):
                 y=df["tcp_connections"],
                 mode="lines+markers",
                 name="TCP Connections",
-                line=dict(color=KU_COLORS["accent"], width=2),
+                line=dict(color=GRAPH_COLORS["network"]["line"], width=2.5, shape="spline", smoothing=0.8),
+                marker=dict(size=4, opacity=0.7, symbol="diamond"),
+                hovertemplate="<b>Connections</b>: %{y}<extra></extra>",
             ),
             row=2,
             col=2,
@@ -256,11 +304,36 @@ def register_callbacks(app):
             secondary_y=True,
         )
         fig.update_xaxes(title_text="Time", row=2, col=2, tickformat="%H:%M\n%b %d")
+
+        # Apply enhanced layout with professional styling
+        fig.update_layout(**ENHANCED_LAYOUT)
         fig.update_layout(
             height=CHART_CONFIG["default_height"],
+            title={
+                "text": f"<b>Performance Analytics</b><br><sub>{server_name}</sub>",
+                "font": {"size": 22, "color": KU_COLORS["text_primary"]},
+                "x": 0.5,
+                "xanchor": "center",
+            },
             showlegend=True,
-            title_text=f"Performance Analytics - {server_name}",
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=-0.08,
+                xanchor="center",
+                x=0.5,
+                bgcolor="rgba(255, 255, 255, 0.9)",
+                bordercolor=KU_COLORS["border"],
+                borderwidth=1,
+                font={"size": 11},
+            ),
+            hovermode="x unified",
+            margin=dict(l=60, r=60, t=100, b=80),
         )
+
+        # Apply enhanced axis styling to all subplots
+        fig.update_xaxes(**ENHANCED_XAXIS)
+        fig.update_yaxes(**ENHANCED_YAXIS)
 
         # Performance Summary
         latest_data = df.iloc[-1] if not df.empty else {}

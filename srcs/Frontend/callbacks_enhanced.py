@@ -255,9 +255,16 @@ def register_callbacks(app):
                 go.Scatter(
                     x=df["timestamp"],
                     y=df["ram_percentage"],
-                    mode="lines+markers",
+                    mode="lines+markers+text",
                     name="RAM %",
                     line=dict(color=KU_COLORS["warning"], width=3),
+                    text=["RAM %" if i == len(df["ram_percentage"]) - 1 else "" for i in range(len(df["ram_percentage"]))],
+					textposition="top left",
+					textfont=dict(
+						size=10,
+						color=KU_COLORS["warning"],
+						weight=500,
+					),
                 ),
                 row=1,
                 col=2,
@@ -270,9 +277,16 @@ def register_callbacks(app):
                 go.Scatter(
                     x=df["timestamp"],
                     y=df["disk_percentage"],
-                    mode="lines+markers",
+                    mode="lines+markers+text",
                     name="Disk %",
                     line=dict(color=KU_COLORS["primary"], width=3),
+                    text=["Disk %" if i == len(df["disk_percentage"]) - 1 else "" for i in range(len(df["disk_percentage"]))],
+					textposition="top left",
+					textfont=dict(
+						size=10,
+						color=KU_COLORS["primary"],
+						weight=500,
+					),
                 ),
                 row=2,
                 col=1,
@@ -285,10 +299,17 @@ def register_callbacks(app):
                 go.Scatter(
                     x=df["timestamp"],
                     y=df["logged_users"],
-                    mode="lines+markers",
+                    mode="lines+markers+text",
                     name="Users",
                     line_shape="hv",
                     line=dict(color=KU_COLORS["info"], width=2),
+                    text=["Users" if i == len(df["logged_users"]) - 1 else "" for i in range(len(df["logged_users"]))],
+					textposition="top left",
+					textfont=dict(
+						size=10,
+						color=KU_COLORS["info"],
+						weight=500,
+					),
                 ),
                 row=2,
                 col=2,
@@ -297,9 +318,16 @@ def register_callbacks(app):
                 go.Scatter(
                     x=df["timestamp"],
                     y=df["tcp_connections"],
-                    mode="lines+markers",
+                    mode="lines+markers+text",
                     name="TCP Connections",
                     line=dict(color=KU_COLORS["accent"], width=2),
+                    text=["TCP Conn" if i == len(df["tcp_connections"]) - 1 else "" for i in range(len(df["tcp_connections"]))],
+					textposition="top left",
+					textfont=dict(
+						size=10,
+						color=KU_COLORS["accent"],
+						weight=500,
+					),
                 ),
                 row=2,
                 col=2,
@@ -330,6 +358,8 @@ def register_callbacks(app):
                 secondary_y=True,
             )
             fig.update_xaxes(title_text="Time", row=2, col=2, tickformat="%H:%M\n%b %d")
+
+            # Simple layout update - CSS will handle dark mode colors
             fig.update_layout(
                 height=CHART_CONFIG["default_height"],
                 showlegend=True,

@@ -21,6 +21,19 @@ from utils import (
 )
 from validation import validate_timestamp
 from data_processing import prepare_historical_dataframe
+from graph_config import (
+    GRAPH_COLORS,
+    ENHANCED_LAYOUT,
+    ENHANCED_XAXIS,
+    ENHANCED_YAXIS,
+    get_percentage_trace_config,
+    INTERACTIVE_CONFIG,
+)
+from table_card_config import (
+    ENHANCED_TABLE_STYLE,
+    get_enhanced_table_conditional_styles,
+    get_network_table_conditional_styles,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -347,15 +360,25 @@ def create_enhanced_server_cards():
                 str(timestamp_raw) if timestamp_raw != "Unknown" else "Unknown"
             )
 
-        # Historical dataframe with improved error handling
-        # fig = make_subplots(rows=1, cols=1,
-        # subplot_titles=(f"Load History - {server_name}",))
+        # Enhanced historical graph with polished styling
         fig = go.Figure()
-        fig.layout.title = "24H Load History"
-        fig.layout.xaxis.title = "Time"
-        fig.layout.yaxis.title = "Load (%)"
-        fig.update_layout(title_x=0.5)
-        fig.update_yaxes(range=[-5, 110])
+
+        # Apply enhanced layout configuration
+        fig.update_layout(**ENHANCED_LAYOUT)
+        fig.update_layout(
+            title={
+                "text": "24-Hour Load History",
+                "font": {"size": 16, "weight": 600},
+                "x": 0.5,
+                "xanchor": "center",
+            },
+            height=400,
+            margin=dict(l=45, r=25, t=50, b=45),
+        )
+
+        # Apply enhanced axis styling
+        fig.update_xaxes(**ENHANCED_XAXIS, title_text="Time")
+        fig.update_yaxes(**ENHANCED_YAXIS, title_text="Usage (%)", range=[-5, 110])
 
         if historical_data and len(historical_data) > 0:
             try:
@@ -372,60 +395,45 @@ def create_enhanced_server_cards():
                 )
 
                 if not df.empty and "timestamp" in df.columns:
-                    # Add traces only if data exists
+                    # Add enhanced traces with smooth lines and area fills
                     if "cpu_load_15min" in df.columns:
-                        fig.add_trace(
-                            go.Scatter(
-                                x=df["timestamp"],
-                                y=df["cpu_load_15min"],
-                                mode="lines+text",
-                                name="CPU Load",
-                                line=dict(color=KU_COLORS["primary"], width=2),
-                                text=[
-                                    "CPU Load" if i == len(df) - 1 else ""
-                                    for i in range(len(df))
-                                ],
-                                textposition="top left",
-                                textfont=dict(size=12, color=KU_COLORS["primary"]),
-                                showlegend=False,
-                            ),
+                        cpu_trace = get_percentage_trace_config(
+                            "CPU Load",
+                            "cpu",
+                            df["timestamp"],
+                            df["cpu_load_15min"]
                         )
+                        fig.add_trace(go.Scatter(**cpu_trace))
 
                     if "ram_percentage" in df.columns:
-                        fig.add_trace(
-                            go.Scatter(
-                                x=df["timestamp"],
-                                y=df["ram_percentage"],
-                                mode="lines+text",
-                                name="RAM Usage",
-                                line=dict(color=KU_COLORS["secondary"], width=2),
-                                text=[
-                                    "RAM Usage" if i == len(df) - 1 else ""
-                                    for i in range(len(df))
-                                ],
-                                textposition="top left",
-                                textfont=dict(size=12, color=KU_COLORS["secondary"]),
-                                showlegend=False,
-                            ),
+                        ram_trace = get_percentage_trace_config(
+                            "RAM Usage",
+                            "ram",
+                            df["timestamp"],
+                            df["ram_percentage"]
                         )
+                        fig.add_trace(go.Scatter(**ram_trace))
 
                     if "disk_percentage" in df.columns:
-                        fig.add_trace(
-                            go.Scatter(
-                                x=df["timestamp"],
-                                y=df["disk_percentage"],
-                                mode="lines+text",
-                                name="Disk Usage",
-                                line=dict(color=KU_COLORS["accent"], width=2),
-                                text=[
-                                    "Disk Usage" if i == len(df) - 1 else ""
-                                    for i in range(len(df))
-                                ],
-                                textposition="top left",
-                                textfont=dict(size=12, color=KU_COLORS["accent"]),
-                                showlegend=False,
-                            ),
+                        disk_trace = get_percentage_trace_config(
+                            "Disk Usage",
+                            "disk",
+                            df["timestamp"],
+                            df["disk_percentage"]
                         )
+                        fig.add_trace(go.Scatter(**disk_trace))
+
+                    # Add threshold reference lines
+                    fig.add_hline(
+                        y=85,
+                        line_dash="dash",
+                        line_color=GRAPH_COLORS["warning"]["line"],
+                        line_width=1,
+                        opacity=0.5,
+                        annotation_text="Warning (85%)",
+                        annotation_position="right",
+                        annotation_font=dict(size=9, color=GRAPH_COLORS["warning"]["line"]),
+                    )
                 else:
                     # Data preparation failed
                     fig.add_annotation(
@@ -461,16 +469,21 @@ def create_enhanced_server_cards():
                 font=dict(size=16, color="gray"),
             )
 
+        # Update legend positioning for server cards (compact view)
         fig.update_layout(
             showlegend=False,
-            # height=10,
-            margin=dict(l=40, r=40, t=40, b=40),
-            plot_bgcolor="rgba(0,0,0,0)",
-            paper_bgcolor="rgba(0,0,0,0)",
-            xaxis=dict(autorange=True),
+            legend=dict(
+                orientation="h",
+                yanchor="top",
+                y=-0.12,
+                xanchor="center",
+                x=0.5,
+                font={"size": 10},
+                bgcolor="rgba(255, 255, 255, 0.8)",
+                bordercolor=KU_COLORS["border"],
+                borderwidth=0.5,
+            )
         )
-        # Fix y-axis range to be consistent across all server cards
-        # fig.update_yaxes(range=[0, 110])
 
         card = html.Div(
             [
@@ -502,9 +515,13 @@ def create_enhanced_server_cards():
                     ],
                     className="server-header",
                 ),
-                # Historical Data Graph
+                # Enhanced Historical Data Graph with interactivity
                 html.Div(
-                    [dcc.Graph(figure=fig, style={"height": "400px"})],
+                    [dcc.Graph(
+                        figure=fig,
+                        config=INTERACTIVE_CONFIG,
+                        style={"height": "450px"}  # Slightly taller for legend
+                    )],
                     style={"margin": "16px 0"},
                 ),
                 # Key Metrics Grid
@@ -791,26 +808,27 @@ def create_network_monitor():
                     ),
                     html.Div(
                         [
+                            # Enhanced network table with modern styling
                             dash_table.DataTable(
                                 id="network-table",
                                 columns=[
-                                    {"name": "Server", "id": "server_name"},
+                                    {"name": "🖥️ Server", "id": "server_name"},
                                     {
-                                        "name": "TCP Connections",
+                                        "name": "🔌 TCP Connections",
                                         "id": "tcp_connections",
                                         "type": "numeric",
                                     },
                                     {
-                                        "name": "SSH Users",
+                                        "name": "🔐 SSH Users",
                                         "id": "active_ssh_users",
                                         "type": "numeric",
                                     },
                                     {
-                                        "name": "VNC Users",
+                                        "name": "🖥️ VNC Users",
                                         "id": "active_vnc_users",
                                         "type": "numeric",
                                     },
-                                    {"name": "Status", "id": "status"},
+                                    {"name": "⚡ Status", "id": "status"},
                                 ],
                                 data=[
                                     {
@@ -826,50 +844,19 @@ def create_network_monitor():
                                     }
                                     for m in metrics
                                 ],
-                                style_table={"overflowX": "auto"},
-                                style_cell={
-                                    "textAlign": "left",
-                                    "padding": "12px",
-                                    "font-family": "DM Sans, Inter, sans-serif",
-                                    "fontSize": "14px",
-                                },
-                                style_header={
-                                    "backgroundColor": KU_COLORS["primary"],
-                                    "color": "white",
-                                    "fontWeight": "600",
-                                    "fontSize": "14px",
-                                    "padding": "16px 12px",
-                                },
-                                style_data_conditional=[
-                                    {
-                                        "if": {
-                                            "column_id": "tcp_connections",
-                                            "filter_query": "{tcp_connections} > 100",
-                                        },
-                                        "backgroundColor": "rgba(248, 72, 94, 0.1)",
-                                        "color": KU_COLORS["danger"],
-                                        "fontWeight": "600",
-                                    },
-                                    {
-                                        "if": {
-                                            "column_id": "status",
-                                            "filter_query": "{status} = Offline",
-                                        },
-                                        "backgroundColor": "rgba(248, 72, 94, 0.1)",
-                                        "color": KU_COLORS["danger"],
-                                    },
-                                    {
-                                        "if": {
-                                            "column_id": "status",
-                                            "filter_query": "{status} = Warning",
-                                        },
-                                        "backgroundColor": "rgba(255, 143, 28, 0.1)",
-                                        "color": KU_COLORS["warning"],
-                                    },
-                                ],
+                                style_table=ENHANCED_TABLE_STYLE["table"],
+                                style_cell=ENHANCED_TABLE_STYLE["cell"],
+                                style_header=ENHANCED_TABLE_STYLE["header"],
+                                style_data=ENHANCED_TABLE_STYLE["data"],
+                                style_data_conditional=get_network_table_conditional_styles(),
                                 sort_action="native",
                                 filter_action="native",
                                 page_size=TABLE_CONFIG["network_page_size"],
+                                page_action="native",
+                                css=[{
+                                    "selector": ".dash-spreadsheet-container",
+                                    "rule": "border-radius: 12px; overflow: hidden;"
+                                }],
                             )
                         ],
                         className="enhanced-table",
@@ -947,18 +934,19 @@ def create_enhanced_users_table():
     # Create tabs for each server
     tabs = []
     for server_name, users in servers.items():
+        # Enhanced users table with modern styling
         table = dash_table.DataTable(
             id=f"users-table-{sanitize_server_name(server_name)}",
             columns=[
-                {"name": "Username", "id": "username"},
-                {"name": "CPU Usage (%)", "id": "cpu", "type": "numeric"},
-                {"name": "Memory Usage (%)", "id": "mem", "type": "numeric"},
-                {"name": "Disk Usage (GB)", "id": "disk", "type": "numeric"},
-                {"name": "Processes", "id": "process_count", "type": "numeric"},
-                {"name": "Top Process", "id": "top_process"},
-                {"name": "Last Login", "id": "last_login", "type": "datetime"},
-                {"name": "Full Name", "id": "full_name"},
-                {"name": "Status", "id": "status"},
+                {"name": "👤 Username", "id": "username"},
+                {"name": "💻 CPU %", "id": "cpu", "type": "numeric"},
+                {"name": "🧠 Memory %", "id": "mem", "type": "numeric"},
+                {"name": "💾 Disk (GB)", "id": "disk", "type": "numeric"},
+                {"name": "⚙️ Processes", "id": "process_count", "type": "numeric"},
+                {"name": "📊 Top Process", "id": "top_process"},
+                {"name": "🕐 Last Login", "id": "last_login", "type": "datetime"},
+                {"name": "📝 Full Name", "id": "full_name"},
+                {"name": "⚡ Status", "id": "status"},
             ],
             data=[
                 {
@@ -972,63 +960,19 @@ def create_enhanced_users_table():
                 }
                 for user in users
             ],
-            style_table={"overflowX": "auto", "borderRadius": "10px"},
-            style_cell={
-                "textAlign": "left",
-                "padding": "12px",
-                "font-family": "DM Sans, Inter, sans-serif",
-                "fontSize": "14px",
-            },
-            style_header={
-                "backgroundColor": KU_COLORS["primary"],
-                "color": "white",
-                "fontWeight": "600",
-                "fontSize": "14px",
-                "padding": "16px 12px",
-                "fontFamily": "DM Sans, sans-serif",
-            },
-            style_data_conditional=[
-                {"if": {"row_index": "odd"}, "backgroundColor": "#f7f7fa"},
-                {
-                    "if": {"column_id": "cpu", "filter_query": "{cpu} > 70"},
-                    "backgroundColor": "rgba(248, 72, 94, 0.1)",
-                    "color": KU_COLORS["danger"],
-                    "fontWeight": "600",
-                },
-                {
-                    "if": {
-                        "column_id": "cpu",
-                        "filter_query": "{cpu} > 50 && {cpu} <= 70",
-                    },
-                    "backgroundColor": "rgba(255, 143, 28, 0.1)",
-                    "color": KU_COLORS["warning"],
-                    "fontWeight": "600",
-                },
-                {
-                    "if": {"column_id": "mem", "filter_query": "{mem} > 70"},
-                    "backgroundColor": "rgba(248, 72, 94, 0.1)",
-                    "color": KU_COLORS["danger"],
-                    "fontWeight": "600",
-                },
-                {
-                    "if": {
-                        "column_id": "mem",
-                        "filter_query": "{mem} > 50 && {mem} <= 70",
-                    },
-                    "backgroundColor": "rgba(255, 143, 28, 0.1)",
-                    "color": KU_COLORS["warning"],
-                    "fontWeight": "600",
-                },
-                {
-                    "if": {"column_id": "disk", "filter_query": "{disk} > 10"},
-                    "backgroundColor": "rgba(255, 143, 28, 0.1)",
-                    "color": KU_COLORS["warning"],
-                    "fontWeight": "600",
-                },
-            ],
+            style_table=ENHANCED_TABLE_STYLE["table"],
+            style_cell=ENHANCED_TABLE_STYLE["cell"],
+            style_header=ENHANCED_TABLE_STYLE["header"],
+            style_data=ENHANCED_TABLE_STYLE["data"],
+            style_data_conditional=get_enhanced_table_conditional_styles(),
             sort_action="native",
             filter_action="native",
             page_size=TABLE_CONFIG["users_page_size"],
+            page_action="native",
+            css=[{
+                "selector": ".dash-spreadsheet-container",
+                "rule": "border-radius: 12px; overflow: hidden;"
+            }],
         )
 
         tab = dcc.Tab(
@@ -1084,25 +1028,35 @@ def create_enhanced_historical_graphs():
     if not df.empty:
         df["timestamp"] = pd.to_datetime(df["timestamp"])
 
-    # Create comprehensive multi-metric dashboard
+    # Create comprehensive multi-metric dashboard with enhanced styling
     fig = make_subplots(
         rows=2,
         cols=2,
-        subplot_titles=("CPU Load", "Memory Usage", "Disk Usage", "User Activity"),
+        subplot_titles=(
+            "<b>CPU Load Average</b>",
+            "<b>Memory Usage</b>",
+            "<b>Disk Usage</b>",
+            "<b>User Activity</b>"
+        ),
         specs=[
             [{"secondary_y": False}, {"secondary_y": False}],
             [{"secondary_y": False}, {"secondary_y": True}],
         ],
+        vertical_spacing=0.12,
+        horizontal_spacing=0.1,
     )
 
-    # CPU Load with multiple averages
+    # Enhanced CPU Load traces with smooth curves and fills
     fig.add_trace(
         go.Scatter(
             x=df["timestamp"],
             y=df["cpu_load_1min"],
             mode="lines",
             name="1-min Load",
-            line=dict(color=KU_COLORS["primary"], width=2),
+            line=dict(color=KU_COLORS["primary"], width=2.5, shape="spline", smoothing=1.0),
+            hovertemplate="<b>1-min</b>: %{y:.2f}%<extra></extra>",
+            fill="tonexty",
+            fillcolor=GRAPH_COLORS["cpu"]["fill"],
         ),
         row=1,
         col=1,
@@ -1113,7 +1067,9 @@ def create_enhanced_historical_graphs():
             y=df["cpu_load_5min"],
             mode="lines",
             name="5-min Load",
-            line=dict(color=KU_COLORS["secondary"], width=2),
+            line=dict(color=KU_COLORS["secondary"], width=2, shape="spline", smoothing=1.0),
+            hovertemplate="<b>5-min</b>: %{y:.2f}%<extra></extra>",
+            opacity=0.8,
         ),
         row=1,
         col=1,
@@ -1124,66 +1080,83 @@ def create_enhanced_historical_graphs():
             y=df["cpu_load_15min"],
             mode="lines",
             name="15-min Load",
-            line=dict(color=KU_COLORS["primary"], width=2),
+            line=dict(color=KU_COLORS["accent"], width=1.5, shape="spline", smoothing=1.0, dash="dot"),
+            hovertemplate="<b>15-min</b>: %{y:.2f}%<extra></extra>",
+            opacity=0.6,
         ),
         row=1,
         col=1,
     )
 
-    # Memory Usage with threshold lines
+    # Enhanced Memory Usage with smooth curves and area fill
     fig.add_trace(
         go.Scatter(
             x=df["timestamp"],
             y=df["ram_percentage"],
-            mode="lines+markers",
-            name="RAM %",
-            line=dict(color=KU_COLORS["warning"], width=3),
-            marker=dict(size=4),
+            mode="lines",
+            name="RAM Usage",
+            line=dict(color=KU_COLORS["secondary"], width=3, shape="spline", smoothing=1.0),
+            fill="tozeroy",
+            fillcolor=GRAPH_COLORS["ram"]["fill"],
+            hovertemplate="<b>RAM</b>: %{y:.1f}%<extra></extra>",
         ),
         row=1,
         col=2,
     )
-    # Add critical threshold line
+    # Enhanced threshold lines
     fig.add_hline(
         y=90,
         line_dash="dash",
-        line_color=KU_COLORS["danger"],
-        annotation_text="Critical",
+        line_color=GRAPH_COLORS["critical"]["line"],
+        line_width=1.5,
+        opacity=0.7,
+        annotation_text="Critical (90%)",
+        annotation_position="right",
+        annotation_font=dict(size=10, color=GRAPH_COLORS["critical"]["line"]),
         row=1,
         col=2,
     )
     fig.add_hline(
         y=75,
         line_dash="dot",
-        line_color=KU_COLORS["warning"],
-        annotation_text="Warning",
+        line_color=GRAPH_COLORS["warning"]["line"],
+        line_width=1.5,
+        opacity=0.7,
+        annotation_text="Warning (75%)",
+        annotation_position="right",
+        annotation_font=dict(size=10, color=GRAPH_COLORS["warning"]["line"]),
         row=1,
         col=2,
     )
 
-    # Disk Usage
+    # Enhanced Disk Usage with gradient fill
     fig.add_trace(
         go.Scatter(
             x=df["timestamp"],
             y=df["disk_percentage"],
-            mode="lines+markers",
-            name="Disk %",
-            line=dict(color=KU_COLORS["primary"], width=3),
-            marker=dict(size=4),
-            fill="tonexty",
+            mode="lines",
+            name="Disk Usage",
+            line=dict(color=KU_COLORS["accent"], width=3, shape="spline", smoothing=1.0),
+            fill="tozeroy",
+            fillcolor=GRAPH_COLORS["disk"]["fill"],
+            hovertemplate="<b>Disk</b>: %{y:.1f}%<extra></extra>",
         ),
         row=2,
         col=1,
     )
 
-    # User Activity (dual y-axis)
+    # Enhanced User Activity (dual y-axis) with smooth curves
     fig.add_trace(
         go.Scatter(
             x=df["timestamp"],
             y=df["logged_users"],
             mode="lines+markers",
             name="Logged Users",
-            line=dict(color=KU_COLORS["info"], width=2),
+            line=dict(color=GRAPH_COLORS["users"]["line"], width=2.5, shape="spline", smoothing=0.8),
+            marker=dict(size=4, opacity=0.7),
+            fill="tozeroy",
+            fillcolor=GRAPH_COLORS["users"]["fill"],
+            hovertemplate="<b>Users</b>: %{y}<extra></extra>",
         ),
         row=2,
         col=2,
@@ -1194,7 +1167,9 @@ def create_enhanced_historical_graphs():
             y=df["tcp_connections"],
             mode="lines+markers",
             name="TCP Connections",
-            line=dict(color=KU_COLORS["accent"], width=2),
+            line=dict(color=GRAPH_COLORS["network"]["line"], width=2.5, shape="spline", smoothing=0.8),
+            marker=dict(size=4, opacity=0.7, symbol="diamond"),
+            hovertemplate="<b>Connections</b>: %{y}<extra></extra>",
             yaxis="y4",
         ),
         row=2,
@@ -1202,14 +1177,35 @@ def create_enhanced_historical_graphs():
         secondary_y=True,
     )
 
+    # Apply enhanced layout with professional styling
+    fig.update_layout(**ENHANCED_LAYOUT)
     fig.update_layout(
         height=CHART_CONFIG["default_height"],
+        title={
+            "text": f"<b>Comprehensive Performance Analytics</b><br><sub>{server_name}</sub>",
+            "font": {"size": 22, "color": KU_COLORS["text_primary"]},
+            "x": 0.5,
+            "xanchor": "center",
+        },
         showlegend=True,
-        title_text=f"Comprehensive Performance Analytics - {server_name}",
-        title_x=0.5,
-        title_font_size=20,
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=-0.08,
+            xanchor="center",
+            x=0.5,
+            bgcolor="rgba(255, 255, 255, 0.9)",
+            bordercolor=KU_COLORS["border"],
+            borderwidth=1,
+            font={"size": 11},
+        ),
+        hovermode="x unified",
+        margin=dict(l=60, r=60, t=100, b=80),
     )
+
+    # Apply enhanced axis styling to all subplots
+    fig.update_xaxes(**ENHANCED_XAXIS)
+    fig.update_yaxes(**ENHANCED_YAXIS)
 
     return html.Div(
         [
@@ -1246,8 +1242,12 @@ def create_enhanced_historical_graphs():
                     "margin-bottom": "20px",
                 },
             ),
-            # Main analytics chart
-            dcc.Graph(id="enhanced-analytics-chart", figure=fig),
+            # Enhanced analytics chart with interactivity
+            dcc.Graph(
+                id="enhanced-analytics-chart",
+                figure=fig,
+                config=INTERACTIVE_CONFIG
+            ),
             # Performance summary
             html.Div(
                 [
