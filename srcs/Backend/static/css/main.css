@@ -1,0 +1,524 @@
+/**
+ * Main Stylesheet
+ * Khalifa University Server Monitoring Dashboard
+ * Following KU Brand Guidelines 2020 V7
+ * Mobile-First Responsive Design
+ */
+
+/* ========================================
+   CSS Variables - KU Brand Colors
+   ======================================== */
+:root {
+    /* KU Primary Colors */
+    --ku-primary: #003DA5;
+    --ku-primary-light: #1a5bc4;
+    --ku-primary-dark: #002B74;
+    --ku-secondary: #6F5091;
+    --ku-accent: #78D64B;
+    --ku-orange: #F57F29;
+
+    /* Status Colors */
+    --ku-success: #003DA5;
+    --ku-warning: #F57F29;
+    --ku-danger: #E31E24;
+    --ku-info: #00A9CE;
+
+    /* Grays */
+    --ku-light-gray: #D1D3D4;
+    --ku-dark-gray: #6D6E71;
+    --ku-body-text: #231F20;
+
+    /* Background Colors */
+    --bg-primary: #FFFFFF;
+    --bg-secondary: #F5F6F8;
+    --bg-tertiary: #EEF0F4;
+    --card-bg: #FFFFFF;
+    --hover-bg: #F1F3F7;
+
+    /* Glassmorphism */
+    --glass-bg: rgba(255, 255, 255, 0.7);
+    --glass-border: rgba(255, 255, 255, 0.3);
+    --glass-blur: 12px;
+
+    /* Text Colors */
+    --text-primary: #1A1A2E;
+    --text-secondary: #64748B;
+    --text-muted: #94A3B8;
+
+    /* Border */
+    --border-color: #E2E8F0;
+    --border-radius: 16px;
+    --border-radius-sm: 10px;
+    --border-radius-xs: 6px;
+
+    /* Shadows */
+    --shadow-sm: 0 1px 3px rgba(0, 61, 165, 0.04), 0 1px 2px rgba(0, 0, 0, 0.03);
+    --shadow-md: 0 4px 16px rgba(0, 61, 165, 0.06), 0 2px 4px rgba(0, 0, 0, 0.03);
+    --shadow-lg: 0 12px 40px rgba(0, 61, 165, 0.1), 0 4px 12px rgba(0, 0, 0, 0.04);
+    --shadow-xl: 0 20px 60px rgba(0, 61, 165, 0.12), 0 8px 20px rgba(0, 0, 0, 0.06);
+    --shadow-colored: 0 4px 20px rgba(0, 61, 165, 0.15);
+
+    /* Spacing */
+    --spacing-xs: 0.25rem;
+    --spacing-sm: 0.5rem;
+    --spacing-md: 1rem;
+    --spacing-lg: 1.5rem;
+    --spacing-xl: 2rem;
+    --spacing-2xl: 3rem;
+
+    /* Typography */
+    --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-size-base: 16px;
+    --font-weight-normal: 400;
+    --font-weight-medium: 500;
+    --font-weight-semibold: 600;
+    --font-weight-bold: 700;
+
+    /* Transitions */
+    --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-spring: 500ms cubic-bezier(0.34, 1.56, 0.64, 1);
+
+    /* Layout */
+    --header-height: 72px;
+    --container-max-width: 1440px;
+}
+
+/* ========================================
+   Base Styles - Mobile First
+   ======================================== */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html {
+    font-size: var(--font-size-base);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    scroll-behavior: smooth;
+}
+
+body {
+    font-family: var(--font-family);
+    font-weight: var(--font-weight-normal);
+    line-height: 1.6;
+    color: var(--text-primary);
+    background-color: var(--bg-secondary);
+    min-height: 100vh;
+}
+
+/* ========================================
+   Header
+   ======================================== */
+.dashboard-header {
+    background: linear-gradient(135deg, var(--ku-primary) 0%, var(--ku-primary-dark) 100%);
+    color: white;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 2px solid rgba(120, 214, 75, 0.4);
+}
+
+.header-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-md) var(--spacing-lg);
+    max-width: var(--container-max-width);
+    margin: 0 auto;
+    gap: var(--spacing-md);
+    flex-wrap: wrap;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+.ku-logo {
+    height: 40px;
+    width: auto;
+    filter: brightness(0) invert(1);
+    transition: transform var(--transition-base);
+}
+
+.ku-logo:hover {
+    transform: scale(1.05);
+}
+
+.header-title h1 {
+    font-size: 1.125rem;
+    font-weight: var(--font-weight-bold);
+    margin: 0;
+    letter-spacing: -0.01em;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+.theme-toggle-btn {
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all var(--transition-base);
+    font-size: 1rem;
+}
+
+.theme-toggle-btn:hover {
+    background: rgba(255, 255, 255, 0.22);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.theme-toggle-btn .fa-sun {
+    display: block;
+}
+
+.theme-toggle-btn .fa-moon {
+    display: none;
+}
+
+[data-theme="dark"] .theme-toggle-btn .fa-sun {
+    display: none;
+}
+
+[data-theme="dark"] .theme-toggle-btn .fa-moon {
+    display: block;
+}
+
+.system-time {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    font-size: 0.8125rem;
+    white-space: nowrap;
+    opacity: 0.85;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ========================================
+   Main Container
+   ======================================== */
+.dashboard-container {
+    max-width: var(--container-max-width);
+    margin: 0 auto;
+    padding: var(--spacing-md);
+}
+
+/* ========================================
+   Cards
+   ======================================== */
+.card {
+    background: var(--card-bg);
+    border-radius: var(--border-radius);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-sm);
+    margin-bottom: var(--spacing-lg);
+    overflow: hidden;
+    transition: box-shadow var(--transition-base), transform var(--transition-base);
+}
+
+.card:hover {
+    box-shadow: var(--shadow-md);
+}
+
+.card-header {
+    padding: var(--spacing-lg) var(--spacing-xl);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.card-title {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    font-size: 1.125rem;
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-primary);
+    margin-bottom: 0;
+    letter-spacing: -0.01em;
+}
+
+.card-title i {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    background: linear-gradient(135deg, rgba(0, 61, 165, 0.1), rgba(0, 61, 165, 0.05));
+    color: var(--ku-primary);
+    font-size: 0.875rem;
+}
+
+.card-subtitle {
+    color: var(--text-secondary);
+    font-size: 0.8125rem;
+    margin-top: var(--spacing-xs);
+}
+
+.card-body {
+    padding: var(--spacing-lg);
+}
+
+/* ========================================
+   Buttons
+   ======================================== */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: 0.625rem 1.25rem;
+    font-size: 0.875rem;
+    font-weight: var(--font-weight-medium);
+    text-decoration: none;
+    border: none;
+    border-radius: var(--border-radius-sm);
+    cursor: pointer;
+    transition: all var(--transition-base);
+    white-space: nowrap;
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, var(--ku-primary) 0%, var(--ku-primary-dark) 100%);
+    color: white;
+    box-shadow: 0 2px 8px rgba(0, 61, 165, 0.25);
+}
+
+.btn-primary:hover {
+    background: linear-gradient(135deg, var(--ku-primary-light) 0%, var(--ku-primary) 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(0, 61, 165, 0.3);
+}
+
+.btn-secondary {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+}
+
+.btn-secondary:hover {
+    background: var(--hover-bg);
+    border-color: var(--ku-primary);
+    color: var(--ku-primary);
+}
+
+.btn:active {
+    transform: translateY(0);
+}
+
+/* Export dropdown */
+.export-dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.export-menu {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    right: 0;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+    box-shadow: var(--shadow-lg);
+    min-width: 180px;
+    padding: var(--spacing-xs);
+    z-index: 100;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(8px);
+    transition: all var(--transition-base);
+}
+
+.export-menu.show {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.export-menu-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: 0.625rem 0.875rem;
+    font-size: 0.875rem;
+    color: var(--text-primary);
+    background: none;
+    border: none;
+    border-radius: var(--border-radius-xs);
+    cursor: pointer;
+    width: 100%;
+    text-align: left;
+    transition: background var(--transition-fast);
+}
+
+.export-menu-item:hover {
+    background: var(--hover-bg);
+}
+
+.export-menu-item i {
+    width: 20px;
+    color: var(--text-secondary);
+}
+
+/* ========================================
+   Loading States
+   ======================================== */
+.loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-2xl);
+    gap: var(--spacing-md);
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--border-color);
+    border-top-color: var(--ku-primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ========================================
+   Empty States
+   ======================================== */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-2xl);
+    text-align: center;
+    color: var(--text-secondary);
+}
+
+.empty-state i {
+    color: var(--ku-light-gray);
+    margin-bottom: var(--spacing-lg);
+}
+
+.empty-state h3 {
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-sm);
+}
+
+.empty-state .btn {
+    margin-top: var(--spacing-lg);
+}
+
+/* ========================================
+   Footer
+   ======================================== */
+.dashboard-footer {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    margin: var(--spacing-xl) 0;
+    padding: var(--spacing-md) var(--spacing-lg);
+}
+
+.footer-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-md);
+    align-items: center;
+    justify-content: space-between;
+}
+
+.footer-left {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    flex-wrap: wrap;
+}
+
+.last-updated {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+}
+
+.refresh-countdown {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+/* ========================================
+   Tablet Breakpoint (768px and up)
+   ======================================== */
+@media (min-width: 768px) {
+    .dashboard-container {
+        padding: var(--spacing-xl);
+    }
+
+    .header-container {
+        padding: var(--spacing-md) var(--spacing-xl);
+        flex-wrap: nowrap;
+    }
+
+    .header-title h1 {
+        font-size: 1.375rem;
+    }
+
+    .ku-logo {
+        height: 44px;
+    }
+
+    .card-body {
+        padding: var(--spacing-xl);
+    }
+}
+
+/* ========================================
+   Desktop Breakpoint (1024px and up)
+   ======================================== */
+@media (min-width: 1024px) {
+    .dashboard-container {
+        padding: var(--spacing-xl) var(--spacing-2xl);
+    }
+
+    .header-title h1 {
+        font-size: 1.5rem;
+    }
+}
+
+/* ========================================
+   Utility Classes
+   ======================================== */
+.text-center { text-align: center; }
+.text-right { text-align: right; }
+.mt-1 { margin-top: var(--spacing-sm); }
+.mt-2 { margin-top: var(--spacing-md); }
+.mt-3 { margin-top: var(--spacing-lg); }
+.mb-1 { margin-bottom: var(--spacing-sm); }
+.mb-2 { margin-bottom: var(--spacing-md); }
+.mb-3 { margin-bottom: var(--spacing-lg); }
+.hidden { display: none !important; }

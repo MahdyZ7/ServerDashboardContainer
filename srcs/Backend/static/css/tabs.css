@@ -1,0 +1,170 @@
+/**
+ * Tab Navigation Styles
+ * Modern pill-shaped tabs with sliding indicator
+ * Mobile-First Responsive Design
+ */
+
+/* ========================================
+   Tab Navigation
+   ======================================== */
+.dashboard-tabs {
+    margin-bottom: var(--spacing-xl);
+}
+
+.tabs-nav {
+    display: flex;
+    gap: var(--spacing-xs);
+    background: var(--card-bg);
+    padding: 6px;
+    border-radius: var(--border-radius);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-sm);
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    position: relative;
+}
+
+.tabs-nav::-webkit-scrollbar {
+    display: none;
+}
+
+/* ========================================
+   Tab Indicator (sliding underline)
+   ======================================== */
+.tab-indicator {
+    position: absolute;
+    bottom: 6px;
+    height: calc(100% - 12px);
+    background: linear-gradient(135deg, var(--ku-primary) 0%, var(--ku-primary-dark) 100%);
+    border-radius: var(--border-radius-sm);
+    transition: left var(--transition-slow), width var(--transition-slow);
+    z-index: 0;
+    box-shadow: 0 2px 8px rgba(0, 61, 165, 0.25);
+}
+
+/* ========================================
+   Tab Buttons
+   ======================================== */
+.tab-button {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: 0.625rem 1.125rem;
+    background: transparent;
+    border: none;
+    border-radius: var(--border-radius-sm);
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    font-weight: var(--font-weight-medium);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: color var(--transition-base);
+    position: relative;
+    z-index: 1;
+}
+
+.tab-button i {
+    font-size: 1rem;
+    transition: color var(--transition-base);
+}
+
+.tab-button:hover {
+    color: var(--text-primary);
+}
+
+.tab-button:focus-visible {
+    outline: 2px solid var(--ku-primary);
+    outline-offset: 2px;
+}
+
+.tab-button.active {
+    color: white;
+}
+
+.tab-button.active i {
+    color: white;
+}
+
+/* Mobile: Icon only */
+@media (max-width: 639px) {
+    .tab-button span {
+        display: none;
+    }
+
+    .tab-button {
+        padding: 0.625rem;
+        justify-content: center;
+        min-width: 44px;
+    }
+
+    .tab-button i {
+        margin: 0;
+    }
+}
+
+@media (min-width: 640px) and (max-width: 1023px) {
+    .tab-button {
+        font-size: 0.8125rem;
+        padding: 0.5rem 0.875rem;
+    }
+}
+
+/* ========================================
+   Tab Panels
+   ======================================== */
+.tabs-content {
+    margin-top: var(--spacing-lg);
+}
+
+.tab-panel {
+    display: none;
+    animation: tabFadeIn 0.35s ease-out;
+}
+
+.tab-panel.active {
+    display: block;
+}
+
+@keyframes tabFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ========================================
+   Tab Content Containers
+   ======================================== */
+.overview-container,
+.servers-container,
+.users-container,
+.analytics-container,
+.network-container {
+    animation: tabFadeIn 0.35s ease-out;
+}
+
+/* ========================================
+   Tablet and Desktop
+   ======================================== */
+@media (min-width: 768px) {
+    .tabs-nav {
+        padding: 6px;
+        gap: 4px;
+    }
+
+    .tab-button {
+        padding: 0.625rem 1.25rem;
+    }
+}
+
+@media (min-width: 1024px) {
+    .tabs-nav {
+        overflow-x: visible;
+    }
+}

@@ -1,0 +1,216 @@
+/**
+ * Dark Mode Stylesheet
+ * Khalifa University Server Monitoring Dashboard
+ * Rich dark theme with subtle gradients and blue glow accents
+ */
+
+[data-theme="dark"] {
+    /* Dark Mode Color Palette */
+    --ku-primary: #5B9CED;
+    --ku-primary-light: #7AB3F5;
+    --ku-primary-dark: #3A7BDB;
+    --ku-secondary: #A88FCC;
+    --ku-accent: #8BE65D;
+
+    /* Background Colors - subtle gradient dark */
+    --bg-primary: #0F1117;
+    --bg-secondary: #151820;
+    --bg-tertiary: #1C2029;
+    --card-bg: #1A1E27;
+    --hover-bg: #252A35;
+
+    /* Glassmorphism dark */
+    --glass-bg: rgba(26, 30, 39, 0.8);
+    --glass-border: rgba(91, 156, 237, 0.15);
+
+    /* Text Colors */
+    --text-primary: #E8ECF1;
+    --text-secondary: #8B95A5;
+    --text-muted: #5E6778;
+
+    /* Border */
+    --border-color: #2A2F3A;
+
+    /* Shadows - blue glow */
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(91, 156, 237, 0.03);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(91, 156, 237, 0.05);
+    --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.6), 0 0 20px rgba(91, 156, 237, 0.06);
+    --shadow-xl: 0 20px 60px rgba(0, 0, 0, 0.7), 0 0 30px rgba(91, 156, 237, 0.08);
+    --shadow-colored: 0 4px 20px rgba(91, 156, 237, 0.2);
+}
+
+/* Dark Mode Specific Adjustments */
+[data-theme="dark"] body {
+    background-color: var(--bg-secondary);
+}
+
+[data-theme="dark"] .dashboard-header {
+    background: linear-gradient(135deg, #0D1525 0%, #0A0E18 100%);
+    border-bottom-color: rgba(91, 156, 237, 0.25);
+}
+
+[data-theme="dark"] .btn-primary {
+    background: linear-gradient(135deg, #3A7BDB 0%, #2A5FA8 100%);
+    box-shadow: 0 2px 12px rgba(91, 156, 237, 0.3);
+}
+
+[data-theme="dark"] .btn-primary:hover {
+    background: linear-gradient(135deg, #5B9CED 0%, #3A7BDB 100%);
+    box-shadow: 0 4px 20px rgba(91, 156, 237, 0.4);
+}
+
+[data-theme="dark"] .btn-secondary {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .btn-secondary:hover {
+    background: var(--hover-bg);
+    border-color: var(--ku-primary);
+    color: var(--ku-primary);
+}
+
+[data-theme="dark"] .card {
+    background: var(--card-bg);
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .card:hover {
+    border-color: rgba(91, 156, 237, 0.15);
+    box-shadow: var(--shadow-md);
+}
+
+[data-theme="dark"] .server-card:hover {
+    border-color: rgba(91, 156, 237, 0.2);
+    box-shadow: var(--shadow-lg), 0 0 20px rgba(91, 156, 237, 0.05);
+}
+
+/* Dark mode for form inputs */
+[data-theme="dark"] input,
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] input:focus,
+[data-theme="dark"] select:focus,
+[data-theme="dark"] textarea:focus {
+    border-color: var(--ku-primary);
+    background: var(--bg-primary);
+    box-shadow: 0 0 0 3px rgba(91, 156, 237, 0.15);
+}
+
+/* Dark mode for tables */
+[data-theme="dark"] .data-table {
+    background: var(--card-bg);
+}
+
+[data-theme="dark"] .data-table thead {
+    background: var(--bg-tertiary);
+}
+
+[data-theme="dark"] .data-table thead th {
+    border-bottom-color: rgba(91, 156, 237, 0.2);
+}
+
+[data-theme="dark"] .data-table tbody tr:hover {
+    background: var(--hover-bg);
+}
+
+[data-theme="dark"] .data-table tbody tr:nth-child(even) {
+    background: rgba(255, 255, 255, 0.015);
+}
+
+/* Dark mode tabs */
+[data-theme="dark"] .tab-button.active {
+    background: linear-gradient(135deg, #3A7BDB 0%, #2A5FA8 100%);
+    box-shadow: 0 2px 12px rgba(91, 156, 237, 0.3);
+}
+
+[data-theme="dark"] .tab-indicator {
+    background: var(--ku-primary);
+    box-shadow: 0 0 12px rgba(91, 156, 237, 0.4);
+}
+
+/* Dark mode for metric items */
+[data-theme="dark"] .metric-item {
+    background: var(--bg-primary);
+}
+
+[data-theme="dark"] .metric-item:hover {
+    background: var(--hover-bg);
+}
+
+[data-theme="dark"] .overview-stat {
+    background: var(--bg-primary);
+}
+
+[data-theme="dark"] .overview-stat:hover {
+    background: var(--bg-tertiary);
+    border-color: rgba(91, 156, 237, 0.15);
+}
+
+/* Dark mode for server card footer */
+[data-theme="dark"] .server-card-footer {
+    background: var(--bg-primary);
+    border-top-color: var(--border-color);
+}
+
+/* Dark mode charts - proper colors instead of brightness filter */
+[data-theme="dark"] .chart-container {
+    background: var(--bg-primary);
+    border-color: var(--border-color);
+}
+
+/* Dark mode export menu */
+[data-theme="dark"] .export-menu {
+    background: var(--card-bg);
+    border-color: var(--border-color);
+    box-shadow: var(--shadow-xl);
+}
+
+[data-theme="dark"] .export-menu-item:hover {
+    background: var(--hover-bg);
+}
+
+/* Dark mode skeleton */
+[data-theme="dark"] .skeleton {
+    background: linear-gradient(
+        90deg,
+        var(--bg-tertiary) 25%,
+        var(--hover-bg) 50%,
+        var(--bg-tertiary) 75%
+    );
+    background-size: 200% 100%;
+}
+
+/* Dark mode KU logo - already inverted in light mode header */
+[data-theme="dark"] .ku-logo {
+    filter: brightness(0) invert(1);
+}
+
+/* Smooth transition between themes */
+body,
+.card,
+.server-card,
+.btn,
+.dashboard-header,
+.dashboard-footer,
+.tab-button,
+.tabs-nav,
+.metric-item,
+.overview-stat,
+.chart-container,
+.data-table,
+.toast,
+input,
+select,
+textarea {
+    transition: background-color var(--transition-base),
+                color var(--transition-base),
+                border-color var(--transition-base),
+                box-shadow var(--transition-base);
+}

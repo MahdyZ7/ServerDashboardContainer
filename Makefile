@@ -5,7 +5,7 @@ Network_list = $(shell docker network ls -q)
 
 MAGENTA=\033[0;35m
 YELLOW=\033[0;33m
-CYAN=\033[0;36m  
+CYAN=\033[0;36m
 BLUE=\033[0;34m
 RED=\033[0;31m
 GREEN=\033[0;32m
@@ -53,14 +53,6 @@ test:
 		echo "hello"; \
 	fi
 
-logs-nginx:
-	@echo -e "\t${MAGENTA}=== Nginx Logs ===${NC}"
-	docker logs nginx
-
-logs-nginx-tail:
-	@echo -e "\t${MAGENTA}=== Nginx Logs (Last 50 lines) ===${NC}"
-	docker logs --tail=50 nginx
-
 logs-db:
 	@echo -e "\t${MAGENTA}=== Postgres Logs ===${NC}"
 	docker logs postgres
@@ -77,25 +69,17 @@ logs-DataCollection-tail:
 	@echo -e "\t${MAGENTA}=== DataCollection Logs (Last 50 lines) ===${NC}"
 	docker logs --tail=50 DataCollection
 
-logs-API:
-	@echo -e "\t${MAGENTA}=== API Logs ===${NC}"
-	docker logs API
+logs-Dashboard:
+	@echo -e "\t${MAGENTA}=== Dashboard Logs ===${NC}"
+	docker logs Dashboard
 
-logs-API-tail:
-	@echo -e "\t${MAGENTA}=== API Logs (Last 50 lines) ===${NC}"
-	docker logs --tail=50 API
+logs-Dashboard-tail:
+	@echo -e "\t${MAGENTA}=== Dashboard Logs (Last 50 lines) ===${NC}"
+	docker logs --tail=50 Dashboard
 
-logs-Frontend:
-	@echo -e "\t${MAGENTA}=== Frontend Logs ===${NC}"
-	docker logs Frontend
+logs: logs-db-tail logs-DataCollection-tail logs-Dashboard-tail
 
-logs-Frontend-tail:
-	@echo -e "\t${MAGENTA}=== Frontend Logs (Last 50 lines) ===${NC}"
-	docker logs --tail=50 Frontend
-
-logs: logs-nginx-tail logs-db-tail logs-DataCollection-tail logs-API-tail logs-Frontend-tail
-
-logs-all: logs-nginx logs-db logs-DataCollection logs-API logs-Frontend
+logs-all: logs-db logs-DataCollection logs-Dashboard
 
 
 rebuild: clean build
@@ -120,16 +104,12 @@ logs-follow-service:
 
 logs-errors:
 	@echo -e "${RED}=== Error Logs from All Services ===${NC}"
-	@echo -e "${CYAN}Checking nginx logs...${NC}"
-	@docker logs nginx 2>&1 | grep -i error || echo "No nginx errors found"
 	@echo -e "\n${CYAN}Checking postgres logs...${NC}"
 	@docker logs postgres 2>&1 | grep -i error || echo "No postgres errors found"
 	@echo -e "\n${CYAN}Checking DataCollection logs...${NC}"
 	@docker logs DataCollection 2>&1 | grep -i error || echo "No DataCollection errors found"
-	@echo -e "\n${CYAN}Checking API logs...${NC}"
-	@docker logs API 2>&1 | grep -i error || echo "No API errors found"
-	@echo -e "\n${CYAN}Checking Frontend logs...${NC}"
-	@docker logs --timestamps Frontend 2>&1 | grep -i error || echo "No Frontend errors found"
+	@echo -e "\n${CYAN}Checking Dashboard logs...${NC}"
+	@docker logs Dashboard 2>&1 | grep -i error || echo "No Dashboard errors found"
 
 logs-since:
 	@if [ -z "$(TIME)" ]; then \
@@ -149,7 +129,7 @@ status:
 
 restart-service:
 	@if [ -z "$(SERVICE)" ]; then \
-		echo "Please specify SERVICE, e.g., make restart-service SERVICE=Frontend"; \
+		echo "Please specify SERVICE, e.g., make restart-service SERVICE=Dashboard"; \
 		exit 1; \
 	else \
 		docker compose restart $(SERVICE); \
@@ -157,7 +137,7 @@ restart-service:
 
 rebuild-service:
 	@if [ -z "$(SERVICE)" ]; then \
-		echo "Please specify SERVICE, e.g., make rebuild-service SERVICE=Frontend"; \
+		echo "Please specify SERVICE, e.g., make rebuild-service SERVICE=Dashboard"; \
 		exit 1; \
 	else \
 		docker compose up --build -d $(SERVICE); \
@@ -165,7 +145,7 @@ rebuild-service:
 
 shell:
 	@if [ -z "$(SERVICE)" ]; then \
-		echo "Please specify SERVICE, e.g., make shell SERVICE=Frontend"; \
+		echo "Please specify SERVICE, e.g., make shell SERVICE=Dashboard"; \
 		exit 1; \
 	else \
 		docker exec -it $(SERVICE) /bin/bash; \

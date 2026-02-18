@@ -1,0 +1,40 @@
+<!-- Usage Overview Panel - Compact Server Grid with Progress Rings -->
+<div class="overview-container" role="region" aria-label="Server usage overview">
+    <!-- Loading State - Skeleton Cards -->
+    <div id="overview-loading" class="server-grid">
+        {% for i in range(4) %}
+        <div class="skeleton-card skeleton">
+            <div class="skeleton-line short" style="margin-top: 16px;"></div>
+            <div class="skeleton-line medium" style="margin-top: 24px;"></div>
+            <div class="skeleton-line long" style="margin-top: 8px;"></div>
+            <div class="skeleton-line medium" style="margin-top: 8px;"></div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Server Grid -->
+    <div id="server-grid" class="server-grid" style="display: none;" aria-label="Server cards grid">
+        <!-- Server cards will be dynamically loaded here -->
+    </div>
+
+    <!-- Empty State -->
+    <div id="overview-empty" class="empty-state" style="display: none;" role="status">
+        <i class="fas fa-server fa-3x"></i>
+        <h3>No Servers Available</h3>
+        <p>No server data is currently available. Please check your connection.</p>
+        <button class="btn btn-primary" onclick="loadServerGrid()" aria-label="Retry loading server data">
+            <i class="fas fa-sync-alt"></i> Retry
+        </button>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    if (document.getElementById('overview-panel').classList.contains('active')) {
+        loadServerGrid();
+    }
+});
+document.querySelector('[data-tab="overview"]')?.addEventListener('click', function() {
+    loadServerGrid();
+});
+</script>

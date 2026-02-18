@@ -1,0 +1,41 @@
+<!-- Server Details Panel -->
+<div class="servers-container" role="region" aria-label="Server details">
+    <!-- System Overview Card -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">
+                <i class="fas fa-tachometer-alt"></i>
+                <span>System Overview</span>
+            </div>
+        </div>
+        <div class="card-body">
+            <div id="system-overview" class="system-overview-grid" aria-label="System overview statistics">
+                <!-- Skeleton loading -->
+                {% for i in range(4) %}
+                <div class="overview-stat skeleton" style="min-height: 72px;"></div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Enhanced Server Cards -->
+    <div id="enhanced-server-cards" class="enhanced-server-cards" aria-label="Detailed server cards">
+        <!-- Skeleton loading -->
+        {% for i in range(3) %}
+        <div class="skeleton-card skeleton" style="min-height: 200px;"></div>
+        {% endfor %}
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    if (document.getElementById('servers-panel').classList.contains('active')) {
+        loadSystemOverview();
+        loadEnhancedServerCards();
+    }
+});
+document.querySelector('[data-tab="servers"]')?.addEventListener('click', function() {
+    loadSystemOverview();
+    loadEnhancedServerCards();
+});
+</script>

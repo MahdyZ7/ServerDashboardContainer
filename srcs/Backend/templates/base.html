@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <meta name="description" content="Khalifa University Server Monitoring Dashboard - Real-time server metrics and performance analytics">
+    <meta name="theme-color" content="{{ KU_COLORS.primary }}">
+
+    <title>{% block title %}{{ DASHBOARD_CONFIG.title }}{% endblock %}</title>
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/KU_logo.png') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='images/KU_logo.png') }}">
+
+    <!-- Fonts (preload for performance) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    {% for font_url in FONTS.google_fonts %}
+    <link rel="preload" href="{{ font_url }}" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link href="{{ font_url }}" rel="stylesheet"></noscript>
+    {% endfor %}
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="{{ FONTS.fontawesome }}" crossorigin="anonymous">
+
+    <!-- CSS (preload critical stylesheet) -->
+    <link rel="preload" href="{{ url_for('static', filename='css/main.css') }}" as="style">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dark-mode.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/animations.css') }}">
+
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- Header -->
+    <header class="dashboard-header" role="banner">
+        <div class="header-container">
+            <div class="header-left">
+                <img src="{{ url_for('static', filename='images/KU_logo.png') }}"
+                     alt="{{ DASHBOARD_CONFIG.logo_alt }}"
+                     class="ku-logo"
+                     width="44"
+                     height="44"
+                     loading="eager">
+                <div class="header-title">
+                    <h1>{{ DASHBOARD_CONFIG.header_title }}</h1>
+                </div>
+            </div>
+
+            <div class="header-right">
+                <!-- Theme Toggle Button -->
+                <button class="theme-toggle-btn"
+                        id="theme-toggle"
+                        aria-label="Toggle dark mode"
+                        title="Toggle dark mode (Ctrl+D)">
+                    <i class="fas fa-sun"></i>
+                    <i class="fas fa-moon"></i>
+                </button>
+
+                <!-- System Time -->
+                <div class="system-time" id="system-time" aria-live="polite">
+                    <i class="fas fa-clock"></i>
+                    <span id="current-time"></span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="dashboard-container" role="main">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="toast-container" role="alert" aria-live="assertive"></div>
+
+    <!-- Core JavaScript -->
+    <script>
+        const DASHBOARD_CONFIG = {
+            refreshInterval: {{ DASHBOARD_CONFIG.refresh_interval }},
+            apiBaseUrl: '/api'
+        };
+        const KU_COLORS = {{ KU_COLORS | tojson }};
+    </script>
+
+    <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/time.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/toast.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/mobile.js') }}"></script>
+
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

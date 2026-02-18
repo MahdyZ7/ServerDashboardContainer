@@ -1,0 +1,578 @@
+/**
+ * Dashboard Specific Styles
+ * Server Cards, Overview Grid, System Stats
+ * Mobile-First Responsive Design
+ */
+
+/* ========================================
+   Server Grid (Overview Tab)
+   ======================================== */
+.server-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--spacing-lg);
+    margin-top: var(--spacing-lg);
+}
+
+@media (min-width: 640px) {
+    .server-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (min-width: 1024px) {
+    .server-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (min-width: 1400px) {
+    .server-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+/* ========================================
+   Server Cards
+   ======================================== */
+.server-card {
+    background: var(--card-bg);
+    border-radius: var(--border-radius);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-sm);
+    padding: 0;
+    transition: all var(--transition-base);
+    position: relative;
+    overflow: hidden;
+}
+
+/* Simplified server card for overview (less crowded) */
+.server-card-simple {
+    padding: var(--spacing-xl);
+}
+
+.server-card-simple .server-card-header {
+    padding: 0;
+    margin-bottom: var(--spacing-xl);
+}
+
+.server-card-simple .progress-rings {
+    padding: var(--spacing-lg) 0;
+    justify-content: space-between;
+    gap: var(--spacing-md);
+}
+
+.server-card-simple .progress-ring {
+    width: 80px;
+    height: 80px;
+    font-size: 0.9375rem;
+}
+
+.server-card-simple .progress-ring-label {
+    font-size: 0.75rem;
+}
+
+/* Top gradient stripe */
+.server-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--ku-primary), var(--ku-info));
+    transition: height var(--transition-base);
+}
+
+.server-card.status-warning::before {
+    background: linear-gradient(90deg, var(--ku-warning), var(--ku-orange));
+}
+
+.server-card.status-offline::before {
+    background: linear-gradient(90deg, var(--ku-danger), #c41019);
+}
+
+.server-card:hover {
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-4px);
+    border-color: transparent;
+}
+
+.server-card:hover::before {
+    height: 4px;
+}
+
+.server-card-inner {
+    padding: var(--spacing-lg);
+}
+
+.server-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-lg);
+    gap: var(--spacing-sm);
+    padding: var(--spacing-lg) var(--spacing-lg) 0;
+}
+
+.server-card-header h3 {
+    font-size: 1rem;
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-primary);
+    margin: 0;
+    letter-spacing: -0.01em;
+}
+
+/* Status Badge */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: var(--font-weight-semibold);
+    white-space: nowrap;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.status-badge.status-online {
+    background: rgba(0, 61, 165, 0.08);
+    color: var(--ku-success);
+}
+
+.status-badge.status-warning {
+    background: rgba(245, 127, 41, 0.08);
+    color: var(--ku-warning);
+}
+
+.status-badge.status-offline {
+    background: rgba(227, 30, 36, 0.08);
+    color: var(--ku-danger);
+}
+
+/* Animated status dot */
+.status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.status-online .status-dot {
+    background: var(--ku-success);
+    animation: pulse-online 2s ease-in-out infinite;
+}
+
+.status-warning .status-dot {
+    background: var(--ku-warning);
+}
+
+.status-offline .status-dot {
+    background: var(--ku-danger);
+}
+
+@keyframes pulse-online {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
+/* ========================================
+   Server Info (Text Details)
+   ======================================== */
+.server-info {
+    padding: 0 var(--spacing-lg) var(--spacing-sm);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.server-info-row {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    padding: 3px 0;
+}
+
+.server-info-row i {
+    width: 16px;
+    text-align: center;
+    font-size: 0.6875rem;
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+
+.server-info-label {
+    color: var(--text-secondary);
+    font-weight: var(--font-weight-medium);
+    min-width: 58px;
+    flex-shrink: 0;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.server-info-value {
+    color: var(--text-primary);
+    font-weight: var(--font-weight-medium);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
+/* ========================================
+   Progress Rings (Circular Indicators)
+   ======================================== */
+.progress-rings {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    padding: var(--spacing-sm) var(--spacing-lg);
+    gap: var(--spacing-sm);
+}
+
+.progress-ring-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+}
+
+.progress-ring {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    font-size: 0.8125rem;
+    font-weight: var(--font-weight-bold);
+    color: var(--text-primary);
+}
+
+.progress-ring-label {
+    font-size: 0.6875rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: var(--font-weight-medium);
+}
+
+/* ========================================
+   Server Metrics Grid
+   ======================================== */
+.server-metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-lg);
+}
+
+.metric-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--bg-tertiary);
+    border-radius: var(--border-radius-sm);
+    transition: background var(--transition-fast);
+}
+
+.metric-item:hover {
+    background: var(--hover-bg);
+}
+
+.metric-icon-bg {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.metric-icon-bg.cpu {
+    background: rgba(0, 61, 165, 0.1);
+    color: var(--ku-primary);
+}
+
+.metric-icon-bg.ram {
+    background: rgba(111, 80, 145, 0.1);
+    color: var(--ku-secondary);
+}
+
+.metric-icon-bg.disk {
+    background: rgba(120, 214, 75, 0.1);
+    color: #4CAF50;
+}
+
+.metric-icon-bg.users {
+    background: rgba(0, 169, 206, 0.1);
+    color: var(--ku-info);
+}
+
+.metric-icon-bg.connections {
+    background: rgba(245, 127, 41, 0.1);
+    color: var(--ku-orange);
+}
+
+.metric-icon-bg.ssh {
+    background: rgba(0, 61, 165, 0.1);
+    color: var(--ku-primary);
+}
+
+.metric-icon-bg.vnc {
+    background: rgba(111, 80, 145, 0.1);
+    color: var(--ku-secondary);
+}
+
+.metric-item i {
+    font-size: 1rem;
+    color: var(--ku-primary);
+}
+
+.metric-content {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.metric-label {
+    font-size: 0.6875rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: var(--font-weight-medium);
+}
+
+.metric-value {
+    font-size: 1.0625rem;
+    font-weight: var(--font-weight-bold);
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.2;
+}
+
+/* ========================================
+   Quick Stats (for simplified cards)
+   ======================================== */
+.server-quick-stats {
+    display: flex;
+    justify-content: center;
+    gap: var(--spacing-xl);
+    padding-top: var(--spacing-lg);
+    margin-top: var(--spacing-lg);
+    border-top: 1px solid var(--border-color);
+}
+
+.quick-stat {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    font-weight: var(--font-weight-medium);
+}
+
+.quick-stat i {
+    font-size: 1rem;
+    color: var(--ku-primary);
+}
+
+.quick-stat span {
+    color: var(--text-primary);
+}
+
+/* ========================================
+   Server Card Footer
+   ======================================== */
+.server-card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-top: 1px solid var(--border-color);
+    background: var(--bg-tertiary);
+}
+
+.performance-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0.25rem 0.625rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: var(--font-weight-semibold);
+}
+
+.performance-badge.perf-excellent {
+    background: rgba(0, 61, 165, 0.08);
+    color: var(--ku-success);
+}
+
+.performance-badge.perf-good {
+    background: rgba(120, 214, 75, 0.08);
+    color: #388E3C;
+}
+
+.performance-badge.perf-fair {
+    background: rgba(245, 127, 41, 0.08);
+    color: var(--ku-warning);
+}
+
+.performance-badge.perf-poor {
+    background: rgba(227, 30, 36, 0.08);
+    color: var(--ku-danger);
+}
+
+/* ========================================
+   System Overview Grid
+   ======================================== */
+.system-overview-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--spacing-md);
+}
+
+@media (min-width: 640px) {
+    .system-overview-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (min-width: 1024px) {
+    .system-overview-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+.overview-stat {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-lg);
+    background: var(--bg-tertiary);
+    border-radius: var(--border-radius-sm);
+    border: 1px solid transparent;
+    transition: all var(--transition-base);
+}
+
+.overview-stat:hover {
+    border-color: var(--border-color);
+    background: var(--card-bg);
+    box-shadow: var(--shadow-sm);
+}
+
+.overview-stat .stat-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    flex-shrink: 0;
+}
+
+.overview-stat i {
+    font-size: 1.5rem;
+    color: var(--ku-primary);
+}
+
+.stat-value {
+    font-size: 1.5rem;
+    font-weight: var(--font-weight-bold);
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.2;
+}
+
+.stat-label {
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+}
+
+.stat-trend {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    font-size: 0.6875rem;
+    font-weight: var(--font-weight-semibold);
+    margin-left: var(--spacing-xs);
+}
+
+.stat-trend.trend-up {
+    color: var(--ku-danger);
+}
+
+.stat-trend.trend-down {
+    color: var(--ku-success);
+}
+
+.stat-trend.trend-stable {
+    color: var(--text-muted);
+}
+
+/* ========================================
+   Enhanced Server Cards
+   ======================================== */
+.enhanced-server-cards {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--spacing-lg);
+    margin-top: var(--spacing-lg);
+}
+
+@media (min-width: 768px) {
+    .enhanced-server-cards {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (min-width: 1200px) {
+    .enhanced-server-cards {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+/* ========================================
+   Responsive Utilities
+   ======================================== */
+@media (max-width: 767px) {
+    .server-metrics-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .metric-item {
+        padding: var(--spacing-sm);
+    }
+
+    .metric-value {
+        font-size: 1rem;
+    }
+
+    .progress-rings {
+        gap: var(--spacing-xs);
+        padding: var(--spacing-sm);
+    }
+
+    .progress-ring {
+        width: 56px;
+        height: 56px;
+        font-size: 0.75rem;
+    }
+
+    .server-info {
+        padding: 0 var(--spacing-md) var(--spacing-xs);
+    }
+
+    .server-info-row {
+        font-size: 0.75rem;
+    }
+}

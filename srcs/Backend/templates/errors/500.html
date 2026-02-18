@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block title %}500 - Server Error{% endblock %}
+
+{% block content %}
+<div class="error-page">
+    <div class="error-content">
+        <div class="error-icon">
+            <i class="fas fa-exclamation-circle"></i>
+        </div>
+        <h1>500</h1>
+        <h2>Internal Server Error</h2>
+        <p>Something went wrong on our end. We're working to fix the issue.</p>
+        <div class="error-actions">
+            <a href="/" class="btn btn-primary">
+                <i class="fas fa-home"></i>
+                Return to Dashboard
+            </a>
+            <button class="btn btn-secondary" onclick="location.reload()">
+                <i class="fas fa-sync-alt"></i>
+                Retry
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+.error-page {
+    min-height: 60vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+}
+
+.error-content {
+    text-align: center;
+    max-width: 600px;
+}
+
+.error-icon {
+    font-size: 5rem;
+    color: {{ KU_COLORS.danger }};
+    margin-bottom: 1rem;
+}
+
+.error-content h1 {
+    font-size: 6rem;
+    font-weight: 800;
+    color: {{ KU_COLORS.primary }};
+    margin: 0;
+    line-height: 1;
+}
+
+.error-content h2 {
+    font-size: 2rem;
+    font-weight: 600;
+    color: {{ KU_COLORS.text_primary }};
+    margin: 1rem 0;
+}
+
+.error-content p {
+    font-size: 1.125rem;
+    color: {{ KU_COLORS.text_secondary }};
+    margin-bottom: 2rem;
+}
+
+.error-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+</style>
+{% endblock %}

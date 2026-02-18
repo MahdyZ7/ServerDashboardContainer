@@ -1,0 +1,102 @@
+<!-- Performance Analytics Panel -->
+<div class="analytics-container" role="region" aria-label="Performance analytics">
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">
+                <i class="fas fa-chart-line"></i>
+                <span>Performance Analytics</span>
+            </div>
+            <div class="card-subtitle">
+                Historical metrics and trend analysis
+            </div>
+        </div>
+        <div class="card-body">
+            <!-- Chart Controls -->
+            <div class="chart-controls" role="toolbar" aria-label="Chart controls">
+                <div class="time-range-selector">
+                    <label for="time-range">Time Range:</label>
+                    <select id="time-range" aria-label="Select time range">
+                        <option value="6">Last 6 Hours</option>
+                        <option value="12">Last 12 Hours</option>
+                        <option value="24" selected>Last 24 Hours</option>
+                        <option value="72">Last 3 Days</option>
+                        <option value="168">Last Week</option>
+                    </select>
+                </div>
+
+                <div class="server-selector">
+                    <label for="analytics-server">Server:</label>
+                    <select id="analytics-server" aria-label="Select server for analytics">
+                    </select>
+                </div>
+
+                <button class="btn btn-secondary" id="refresh-charts" aria-label="Refresh charts">
+                    <i class="fas fa-sync-alt"></i>
+                    <span>Refresh</span>
+                </button>
+            </div>
+
+            <!-- Charts Grid -->
+            <div class="charts-grid" aria-label="Performance charts">
+                <div class="chart-container">
+                    <h3 class="chart-title">
+                        <i class="fas fa-microchip"></i>
+                        CPU Load Average
+                    </h3>
+                    <div class="chart-wrapper"><canvas id="cpu-chart" aria-label="CPU load chart"></canvas></div>
+                </div>
+
+                <div class="chart-container">
+                    <h3 class="chart-title">
+                        <i class="fas fa-memory"></i>
+                        Memory Usage
+                    </h3>
+                    <div class="chart-wrapper"><canvas id="memory-chart" aria-label="Memory usage chart"></canvas></div>
+                </div>
+
+                <div class="chart-container">
+                    <h3 class="chart-title">
+                        <i class="fas fa-hdd"></i>
+                        Disk Usage
+                    </h3>
+                    <div class="chart-wrapper"><canvas id="disk-chart" aria-label="Disk usage chart"></canvas></div>
+                </div>
+
+                <div class="chart-container">
+                    <h3 class="chart-title">
+                        <i class="fas fa-network-wired"></i>
+                        TCP Connections
+                    </h3>
+                    <div class="chart-wrapper"><canvas id="connections-chart" aria-label="TCP connections chart"></canvas></div>
+                </div>
+
+                <div class="chart-container">
+                    <h3 class="chart-title">
+                        <i class="fas fa-users"></i>
+                        Active Users
+                    </h3>
+                    <div class="chart-wrapper"><canvas id="users-chart" aria-label="Active users chart"></canvas></div>
+                </div>
+
+                <div class="chart-container chart-full-width">
+                    <h3 class="chart-title">
+                        <i class="fas fa-chart-area"></i>
+                        Combined Metrics Overview
+                    </h3>
+                    <div class="chart-wrapper"><canvas id="combined-chart" aria-label="Combined metrics chart"></canvas></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    if (document.getElementById('analytics-panel').classList.contains('active')) {
+        loadPerformanceAnalytics();
+    }
+});
+document.querySelector('[data-tab="analytics"]')?.addEventListener('click', function() {
+    loadPerformanceAnalytics();
+});
+</script>

@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+{% block title %}{{ DASHBOARD_CONFIG.title }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/tabs.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/cards.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/tables.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/charts.css') }}">
+{% endblock %}
+
+{% block content %}
+<!-- Dashboard Tabs -->
+<div class="dashboard-tabs">
+    <nav class="tabs-nav" role="tablist" aria-label="Dashboard navigation">
+        <button class="tab-button {% if active_tab == 'overview' %}active{% endif %}"
+                data-tab="overview"
+                role="tab"
+                aria-selected="{% if active_tab == 'overview' %}true{% else %}false{% endif %}"
+                aria-controls="overview-panel">
+            <i class="fas fa-th-large"></i>
+            <span>Usage Overview</span>
+        </button>
+
+        <button class="tab-button {% if active_tab == 'servers' %}active{% endif %}"
+                data-tab="servers"
+                role="tab"
+                aria-selected="{% if active_tab == 'servers' %}true{% else %}false{% endif %}"
+                aria-controls="servers-panel">
+            <i class="fas fa-server"></i>
+            <span>Server Details</span>
+        </button>
+
+        <button class="tab-button {% if active_tab == 'users' %}active{% endif %}"
+                data-tab="users"
+                role="tab"
+                aria-selected="{% if active_tab == 'users' %}true{% else %}false{% endif %}"
+                aria-controls="users-panel">
+            <i class="fas fa-users"></i>
+            <span>User Activity</span>
+        </button>
+
+        <button class="tab-button {% if active_tab == 'analytics' %}active{% endif %}"
+                data-tab="analytics"
+                role="tab"
+                aria-selected="{% if active_tab == 'analytics' %}true{% else %}false{% endif %}"
+                aria-controls="analytics-panel">
+            <i class="fas fa-chart-line"></i>
+            <span>Performance Analytics</span>
+        </button>
+
+        <button class="tab-button {% if active_tab == 'network' %}active{% endif %}"
+                data-tab="network"
+                role="tab"
+                aria-selected="{% if active_tab == 'network' %}true{% else %}false{% endif %}"
+                aria-controls="network-panel">
+            <i class="fas fa-network-wired"></i>
+            <span>Network Monitor</span>
+        </button>
+        <!-- Sliding indicator will be inserted by JS -->
+    </nav>
+
+    <!-- Tab Panels -->
+    <div class="tabs-content">
+        <div id="overview-panel"
+             class="tab-panel {% if active_tab == 'overview' %}active{% endif %}"
+             role="tabpanel"
+             aria-labelledby="overview-tab">
+            {% include 'dashboard/panels/overview.html' %}
+        </div>
+
+        <div id="servers-panel"
+             class="tab-panel {% if active_tab == 'servers' %}active{% endif %}"
+             role="tabpanel"
+             aria-labelledby="servers-tab">
+            {% include 'dashboard/panels/servers.html' %}
+        </div>
+
+        <div id="users-panel"
+             class="tab-panel {% if active_tab == 'users' %}active{% endif %}"
+             role="tabpanel"
+             aria-labelledby="users-tab">
+            {% include 'dashboard/panels/users.html' %}
+        </div>
+
+        <div id="analytics-panel"
+             class="tab-panel {% if active_tab == 'analytics' %}active{% endif %}"
+             role="tabpanel"
+             aria-labelledby="analytics-tab">
+            {% include 'dashboard/panels/analytics.html' %}
+        </div>
+
+        <div id="network-panel"
+             class="tab-panel {% if active_tab == 'network' %}active{% endif %}"
+             role="tabpanel"
+             aria-labelledby="network-tab">
+            {% include 'dashboard/panels/network.html' %}
+        </div>
+    </div>
+</div>
+
+<!-- Footer Controls -->
+<footer class="dashboard-footer" role="contentinfo">
+    <div class="footer-controls">
+        <div class="footer-left">
+            <button class="btn btn-primary" id="refresh-button" aria-label="Refresh all data">
+                <i class="fas fa-sync-alt"></i>
+                <span>Refresh</span>
+            </button>
+
+            <div class="export-dropdown">
+                <button class="btn btn-secondary" id="export-button" aria-label="Export report" aria-haspopup="true">
+                    <i class="fas fa-download"></i>
+                    <span>Export</span>
+                    <i class="fas fa-chevron-up" style="font-size: 0.625rem; margin-left: 2px;"></i>
+                </button>
+                <div class="export-menu" id="export-menu" role="menu">
+                    <button class="export-menu-item" onclick="DashboardExport.toJSON()" role="menuitem">
+                        <i class="fas fa-code"></i>
+                        Export as JSON
+                    </button>
+                    <button class="export-menu-item" onclick="DashboardExport.toCSV()" role="menuitem">
+                        <i class="fas fa-file-csv"></i>
+                        Export as CSV
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: var(--spacing-md);">
+            <span class="refresh-countdown" id="refresh-countdown"></span>
+            <div class="last-updated">
+                <i class="fas fa-clock"></i>
+                <span id="last-updated-time">Loading...</span>
+            </div>
+        </div>
+    </div>
+</footer>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<!-- Dashboard JavaScript -->
+<script src="{{ url_for('static', filename='js/api.js') }}"></script>
+<script src="{{ url_for('static', filename='js/tabs.js') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+<script src="{{ url_for('static', filename='js/export.js') }}"></script>
+{% endblock %}

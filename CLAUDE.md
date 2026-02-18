@@ -4,91 +4,77 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a containerized server monitoring dashboard system that collects metrics from multiple remote servers and displays them in a web-based dashboard. The system consists of four main components:
+This is a containerized server monitoring dashboard system that collects metrics from multiple remote servers and displays them in a web-based dashboard. The system consists of three main components:
 
 1. **DataCollection Backend** (`srcs/DataCollection/`) - Python service that monitors remote servers via SSH
-2. **API Backend** (`srcs/Backend/`) - Flask REST API service for data access
-3. **Frontend Dashboard** (`srcs/Frontend/`) - Dash web application for visualizing server metrics
-4. **PostgreSQL Database** - Stores collected metrics and user activity data
+2. **Unified Dashboard** (`srcs/Backend/`) - Flask application serving both REST API and web dashboard
+3. **PostgreSQL Database** - Stores collected metrics and user activity data
 
 ## Architecture
 
-The system uses Docker Compose to orchestrate four services:
+The system uses Docker Compose to orchestrate **three services**:
 - `postgres`: PostgreSQL database container
 - `datacollection`: Python service that executes monitoring scripts on remote servers
-- `api`: Flask REST API service served on port 5000
-- `frontend`: Dash web application served on port 3000
+- `dashboard`: Unified Flask application serving API + web dashboard on port 80
 
 ### Data Flow
 1. DataCollection service connects to remote servers via SSH using credentials from environment variables
 2. Executes bash monitoring scripts (`BashGetInfo.sh`, `TopUsers.sh`) on remote servers
 3. Parses output and stores metrics in PostgreSQL database
-4. API service provides REST endpoints for accessing stored data
-5. Frontend queries API and renders interactive dashboard with server status, user activity, and historical metrics
+4. Dashboard service provides REST API endpoints and renders the web dashboard
+5. Dashboard frontend (vanilla HTML/CSS/JS + Chart.js) queries API and renders interactive views
 
 ### Database Schema
 - `server_metrics`: System metrics (CPU, RAM, disk usage, connections, users)
 - `top_users`: Per-user resource consumption data
 
-## Frontend Architecture (Recent Major Refactoring)
+## Dashboard Architecture (Unified Flask App)
 
-The Frontend has been significantly refactored with a modular architecture and comprehensive error handling:
+The dashboard is a unified Flask application (`srcs/Backend/app.py`) combining API and frontend:
 
-### Core Modules
-- **`exceptions.py`** - Custom exception hierarchy for typed error handling
-- **`validation.py`** - Input validation utilities with type checking
-- **`data_processing.py`** - Safe DataFrame operations with automatic error handling
-- **`toast_utils.py`** - Toast notification system for user feedback
-- **`api_client.py`** - Enhanced API client with retry logic (3 attempts, exponential backoff) and automatic caching
-- **`callbacks.py`** / **`callbacks_enhanced.py`** - Dash callbacks with error handling and toast notifications
-- **`components.py`** - UI component generators with safe data processing
-- **`utils.py`** - Utility functions with validation and error handling
+### Backend Structure
+- **`app.py`** - Application factory with all API endpoints and error handlers
+- **`flask_config.py`** - KU brand colors, dashboard config, fonts, thresholds
+- **`blueprints/dashboard.py`** - Dashboard page routes (5 tabs)
 
-### Frontend Development Patterns
+### Frontend Structure (Vanilla HTML/CSS/JS)
+- **Templates** (`templates/`) - Jinja2 templates
+  - `base.html` - Base layout with header, theme toggle, scripts
+  - `dashboard/index.html` - Main dashboard with tab navigation
+  - `dashboard/panels/` - Tab panel templates (overview, servers, users, analytics, network)
+  - `errors/` - 404 and 500 error pages
+- **Static CSS** (`static/css/`) - Modular stylesheets
+  - `main.css` - Core design system (variables, header, buttons, cards, footer)
+  - `dashboard.css` - Server cards, progress rings, overview grid
+  - `dark-mode.css` - Rich dark theme with blue glow accents
+  - `tabs.css` - Tab navigation with sliding indicator
+  - `cards.css` - Toast notifications, metric cards, alert cards
+  - `tables.css` - Data tables with alternating rows, search, pagination
+  - `charts.css` - Chart containers, controls, network grids
+  - `animations.css` - Skeleton loading, stagger animations, micro-interactions
+- **Static JS** (`static/js/`) - Modular JavaScript
+  - `api.js` - API client with retry logic (3 attempts, exponential backoff, 10s timeout)
+  - `dashboard.js` - Main data loading, rendering (progress rings, trend arrows)
+  - `charts.js` - Chart.js manager with gradient fills, theme-aware colors
+  - `tabs.js` - Tab switching with sliding indicator animation
+  - `export.js` - JSON and CSV export with dropdown menu
+  - `theme.js` - Dark mode toggle with localStorage persistence
+  - `toast.js` - Toast notification system
+  - `time.js` - System time display
+  - `mobile.js` - Touch optimizations
 
-**Input Validation:**
-```python
-from validation import validate_percentage, validate_server_name, validate_timestamp
-
-# Always validate user inputs
-cpu = validate_percentage(user_input, 'cpu_usage')  # Ensures 0-100
-server = validate_server_name(server_input)  # Sanitizes and validates
-timestamp = validate_timestamp(time_string)  # Handles multiple formats
-```
-
-**Safe DataFrame Operations:**
-```python
-from data_processing import safe_create_dataframe, prepare_historical_dataframe
-
-# Use safe utilities instead of raw pandas
-df = safe_create_dataframe(data, name="metrics")  # Returns empty df on error
-df = prepare_historical_dataframe(data, "Server1")  # Complete validation pipeline
-```
-
-**Error Handling:**
-```python
-from toast_utils import create_success_toast, create_error_toast
-from exceptions import APIConnectionError, ValidationError
-
-# Wrap risky operations
-try:
-    result = risky_operation()
-    return result, create_success_toast("Operation successful!")
-except APIConnectionError as e:
-    logger.error(f"API error: {e}", exc_info=True)
-    return None, create_error_toast("Failed to connect to server")
-```
-
-### CSS and Assets
-- External CSS in `assets/styles.css` (550+ lines, KU brand compliant)
-- Images in `assets/` directory (e.g., `KU_logo.png`)
-- Dash automatically serves files from `assets/` folder
+### KU Brand Guidelines
+- Primary: `#003DA5` (KU Blue, Pantone 293C)
+- Secondary: `#6F5091` (KU Purple)
+- Accent: `#78D64B` (KU Green)
+- Font: Inter (closest free alternative to DIN Next)
+- All colors defined in `flask_config.py` and CSS variables in `main.css`
 
 ## Development Commands
 
 ### Docker Operations
 ```bash
-# Build and start all services
+# Build and start all services (3 containers)
 make build
 
 # Start services (without rebuild)
@@ -107,9 +93,9 @@ make cclean
 make restart
 
 # View logs for specific service
-make logs-db          # PostgreSQL logs
+make logs-db              # PostgreSQL logs
 make logs-DataCollection  # DataCollection service logs
-make logs-Frontend    # Dashboard logs
+make logs-Dashboard       # Dashboard logs
 
 # Follow logs in real-time
 make logs-follow
@@ -122,7 +108,7 @@ make status
 ### Service-Specific Operations
 ```bash
 # Restart specific service
-make restart-service SERVICE=Frontend
+make restart-service SERVICE=Dashboard
 
 # Rebuild specific service
 make rebuild-service SERVICE=DataCollection
@@ -131,65 +117,22 @@ make rebuild-service SERVICE=DataCollection
 make shell SERVICE=postgres
 ```
 
-### Frontend Testing
-```bash
-cd srcs/Frontend
-
-# Run all tests
-pytest
-
-# Run with verbose output
-pytest -v
-
-# Run with coverage report
-pytest --cov=. --cov-report=html --cov-report=term-missing
-
-# Run specific test file
-pytest tests/test_validation.py
-
-# Run specific test
-pytest tests/test_validation.py::TestValidatePercentage::test_valid_percentage_int
-
-# Run only unit tests
-pytest -m unit
-
-# Stop on first failure
-pytest -x
-```
-
 ### Dependency Management (UV Package Manager)
 
 This project uses **UV** (https://docs.astral.sh/uv/), a fast Python package manager, instead of pip.
 
-**Key Benefits:**
-- 10-100x faster than pip
-- Reproducible builds with uv.lock files
-- Better caching and dependency resolution
-
 **Managing Dependencies:**
 ```bash
-# Install dependencies (creates virtual environment)
-cd srcs/Backend  # or Frontend or DataCollection or schema
+cd srcs/Backend  # or DataCollection or schema
 uv sync
 
-# Add a new dependency
+# Add/remove dependencies
 uv add requests
-
-# Remove a dependency
 uv remove requests
 
-# Update dependencies
-uv lock --upgrade
-
 # Run Python scripts with UV
-uv run api.py
-uv run python generate_all.py  # In schema/generators
+uv run app.py
 ```
-
-**Project Structure:**
-- `pyproject.toml` - Dependency specifications
-- `uv.lock` - Locked versions for reproducible builds
-- `requirements.txt` - DEPRECATED (kept for reference only)
 
 **Docker Integration:**
 All Dockerfiles use UV for dependency installation:
@@ -199,48 +142,11 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen
 ```
 
-**Schema Generators:**
-The schema generators also use UV (see `schema/pyproject.toml`):
-```bash
-cd schema
-uv sync                    # Install dependencies (PyYAML)
-cd generators
-uv run python generate_all.py  # Generate code from schema
-```
-
-**Test Infrastructure:**
-- 103 unit tests across `test_validation.py`, `test_utils.py`
-- Fixtures in `tests/conftest.py` (sample data)
-- Target: >80% coverage on core modules (currently >85%)
-
 ### Database Access
 ```bash
 # Connect to PostgreSQL directly
 psql -h localhost -U postgres -d server_db
 ```
-
-## Documentation
-
-All project documentation has been organized into the `Docs/` folder:
-
-- **[Docs/INDEX.md](Docs/INDEX.md)** - Master documentation index (START HERE)
-- **Docs/Schema-System/** - Schema-driven architecture (NEW!)
-  - Daily usage guide, technical specs, migration guide
-- **Docs/Monitoring-Analysis/** - System analysis & monitoring improvements
-- **Docs/Frontend-Improvements/** - Frontend refactoring documentation
-- **Docs/Project-Overview/** - Project setup, testing, references
-- **Docs/generated/** - Auto-generated documentation from schema
-
-### Key Documents for Different Tasks
-
-**Adding a new metric:**
-→ Read: [Docs/Schema-System/SCHEMA_HOWTO.md](Docs/Schema-System/SCHEMA_HOWTO.md)
-
-**Understanding the system:**
-→ Read: [Docs/Monitoring-Analysis/ARCHITECTURE_VISUAL.md](Docs/Monitoring-Analysis/ARCHITECTURE_VISUAL.md)
-
-**Quick reference:**
-→ Read: [Docs/Project-Overview/QUICK_REFERENCE.md](Docs/Project-Overview/QUICK_REFERENCE.md)
 
 ## Configuration
 
@@ -253,22 +159,22 @@ Create `.env` file with:
 - `SERVER{1-7}_PASSWORD`: SSH passwords
 - `DEBUG`: Set to "True" for debug mode
 
-### Frontend Configuration
-Edit `srcs/Frontend/config.py`:
-- `CACHE_TTL`: Cache time-to-live (default 900s)
-- `MAX_RETRIES`: API retry attempts (default 3)
-- `DEFAULT_TIMEOUT`: API timeout (default 10s)
+### Dashboard Configuration
+Edit `srcs/Backend/flask_config.py`:
+- `DASHBOARD_CONFIG`: Title, refresh interval (default 15min), logo
 - `PERFORMANCE_THRESHOLDS`: Alert thresholds for CPU/RAM/disk
 - `KU_COLORS`: Khalifa University brand colors
+- `CHART_CONFIG`: Default chart settings and time ranges
+- `FONTS`: Font families and CDN URLs
 
 ## API Endpoints
 
-The API backend (`srcs/Backend/api.py`) provides the following REST endpoints:
+The unified dashboard (`srcs/Backend/app.py`) provides REST endpoints at `/api/`:
 
 ### Server Metrics
 - `GET /api/servers/metrics/latest` - Latest metrics for all servers
-- `GET /api/servers/<server_name>/metrics/historical/<hours>` - Historical data for specific server
-- `GET /api/servers/<server_name>/status` - Current status of specific server
+- `GET /api/servers/<server_name>/metrics/historical/<hours>` - Historical data
+- `GET /api/servers/<server_name>/status` - Current status
 - `GET /api/servers/list` - List of all available servers
 
 ### User Data
@@ -277,94 +183,88 @@ The API backend (`srcs/Backend/api.py`) provides the following REST endpoints:
 
 ### System Overview
 - `GET /api/system/overview` - Real-time system statistics and trends
-- `GET /api/health` - API health check
+- `GET /api/health` - Health check
 
 ## Common Development Tasks
 
-### Adding a New Frontend Component
-1. Create component function in `components.py`
-2. Add error handling using try-catch
-3. Use `safe_create_dataframe()` for DataFrame operations
-4. Validate all inputs using functions from `validation.py`
-5. Add component to layout in `Dash.py`
-6. Register callback in `callbacks.py` with toast notifications
-7. Write unit tests in `tests/test_components.py`
+### Adding a New Dashboard Component
+1. Create or modify panel template in `templates/dashboard/panels/`
+2. Add data loading function in `static/js/dashboard.js`
+3. Add API method in `static/js/api.js` if new endpoint needed
+4. Add CSS styles in appropriate stylesheet
+5. Register in tab switcher if new tab needed
 
 ### Adding a New API Endpoint
-1. Define route in `srcs/Backend/api.py`
+1. Define route in `srcs/Backend/app.py`
 2. Add database query function
 3. Format response as `{'success': bool, 'data': ..., 'message': str}`
-4. Add corresponding function in `srcs/Frontend/api_client.py`
-5. Add validation for inputs
+4. Add corresponding method in `static/js/api.js`
 
-# Check API response times in logs
-# Look for: "API request successful" with timing info
-```
+### Modifying CSS
+- Design system variables are in `main.css` `:root` block
+- Dark mode overrides in `dark-mode.css` under `[data-theme="dark"]`
+- Each section has its own CSS file for modularity
 
 ## Important Files
 
-### Documentation
-- `FRONTEND_IMPROVEMENT_PLAN.md` - Comprehensive improvement roadmap
-- `FRONTEND_IMPROVEMENTS_SUMMARY.md` - Implementation details and metrics
-- `README_IMPROVEMENTS.md` - Developer guide with code examples
-- `TESTING_CHECKLIST.md` - Pre-deployment testing procedures
-- `QUICK_REFERENCE.md` - Quick commands and tips
-- `tests/README.md` - Testing guide
+### Dashboard Key Files
+- `srcs/Backend/app.py` - Unified Flask application (API + frontend)
+- `srcs/Backend/flask_config.py` - All configuration constants
+- `srcs/Backend/blueprints/dashboard.py` - Dashboard page routes
+- `srcs/Backend/templates/base.html` - Base HTML template
+- `srcs/Backend/templates/dashboard/index.html` - Main dashboard template
+- `srcs/Backend/static/css/main.css` - Core design system
+- `srcs/Backend/static/js/dashboard.js` - Main dashboard logic
 
-### Frontend Key Files
-- `Dash.py` - Main application (refactored with external CSS)
-- `callbacks.py` - Dash callbacks (standard version)
-- `callbacks_enhanced.py` - Enhanced callbacks with toast notifications
-- `config.py` - All configuration constants
-- `assets/styles.css` - External stylesheet (550+ lines)
+### Legacy Files (kept for rollback)
+- `srcs/Frontend/` - Previous Dash-based frontend (not in use)
+- `srcs/Nginx/` - Previous Nginx proxy config (not in use)
+- `srcs/Backend/api.py` - Standalone API fallback
 
 ## Code Quality Standards
 
 ### Error Handling
-- All API calls wrapped with retry logic (automatic in `api_client.py`)
+- All API calls use retry logic with exponential backoff (in `api.js`)
 - All user-facing operations show toast notifications on success/failure
-- All exceptions logged with context using `logger.error(..., exc_info=True)`
-- Never return `None` - return empty list/dict on errors
+- All exceptions logged with context using Python `logger.error(..., exc_info=True)`
+- Empty/error states with retry buttons in all dashboard panels
 
 ### Validation
-- All user inputs validated using `validation.py` functions
-- All API responses validated for structure
-- All numeric values checked for valid ranges
-- All server names sanitized before use
-
-### Testing
-- Write unit tests for all new utility functions
-- Use fixtures from `conftest.py` for test data
-- Aim for >80% coverage on new code
-- Run `pytest` before committing
-
-### Performance
-- Use `safe_create_dataframe()` to avoid memory leaks
+- All API responses validated for structure before rendering
+- All HTML content escaped via `escapeHtml()` to prevent XSS
+- Server names URL-encoded with `encodeURIComponent()` in API calls
 
 ## Troubleshooting
 
-### Frontend not loading
+### Dashboard not loading
 ```bash
 # Check if service is running
-docker ps | grep Frontend
+docker ps | grep Dashboard
 
 # Check logs for errors
-make logs-Frontend
+make logs-Dashboard
 
 # Restart service
-make restart-service SERVICE=Frontend
+make restart-service SERVICE=dashboard
 ```
 
-### Import errors in tests
-Tests must be run from `srcs/Frontend` directory. The `conftest.py` handles path setup automatically.
+### API not responding
+```bash
+# Check health endpoint
+curl http://localhost/api/health
+
+# Check Dashboard container logs
+make logs-Dashboard-tail
+```
 
 ## Development Notes
 
 - Services communicate via Docker network `backend`
-- API backend served on `localhost:5000`
-- Frontend served on `localhost:3000`
+- Dashboard served on `localhost:80` (unified port for API + frontend)
 - Database persisted in Docker volume `postgres_data`
 - Source code mounted as volumes for live development
-- Frontend uses API endpoints (never direct database connections)
+- Dashboard uses API endpoints internally (never direct DB from browser)
 - All containers configured with `init: true` for proper signal handling
-- Auto-refresh interval: 15 minutes (configurable in `config.py`)
+- Auto-refresh interval: 15 minutes (configurable in `flask_config.py`)
+- Dark mode: toggle button or Ctrl+D keyboard shortcut
+- Export: JSON and CSV formats via dropdown menu

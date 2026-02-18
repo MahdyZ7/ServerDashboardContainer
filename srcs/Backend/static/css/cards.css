@@ -1,0 +1,261 @@
+/**
+ * Card Component Styles
+ * Toast notifications, Metric cards, Alert cards
+ * Mobile-First Responsive Design
+ */
+
+/* ========================================
+   Toast Notification Cards
+   ======================================== */
+.toast-container {
+    position: fixed;
+    top: calc(var(--header-height) + var(--spacing-md));
+    right: var(--spacing-md);
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    max-width: 400px;
+    pointer-events: none;
+}
+
+.toast {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md) var(--spacing-lg);
+    background: var(--card-bg);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border-radius: var(--border-radius-sm);
+    box-shadow: var(--shadow-lg);
+    border-left: 3px solid;
+    border-top: 1px solid var(--border-color);
+    border-right: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border-color);
+    pointer-events: all;
+    transform: translateX(400px);
+    opacity: 0;
+    transition: all var(--transition-base);
+}
+
+.toast.show {
+    transform: translateX(0);
+    opacity: 1;
+}
+
+.toast.hide {
+    transform: translateX(400px);
+    opacity: 0;
+}
+
+.toast i:first-child {
+    font-size: 1.125rem;
+    flex-shrink: 0;
+}
+
+.toast span {
+    flex: 1;
+    font-size: 0.875rem;
+    color: var(--text-primary);
+    line-height: 1.4;
+}
+
+.toast-close {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color var(--transition-fast);
+    border-radius: 4px;
+}
+
+.toast-close:hover {
+    color: var(--text-primary);
+    background: var(--hover-bg);
+}
+
+/* Toast variants */
+.toast-success {
+    border-left-color: var(--ku-success);
+}
+
+.toast-success i:first-child {
+    color: var(--ku-success);
+}
+
+.toast-error {
+    border-left-color: var(--ku-danger);
+}
+
+.toast-error i:first-child {
+    color: var(--ku-danger);
+}
+
+.toast-warning {
+    border-left-color: var(--ku-warning);
+}
+
+.toast-warning i:first-child {
+    color: var(--ku-warning);
+}
+
+.toast-info {
+    border-left-color: var(--ku-info);
+}
+
+.toast-info i:first-child {
+    color: var(--ku-info);
+}
+
+/* Mobile adjustments */
+@media (max-width: 639px) {
+    .toast-container {
+        left: var(--spacing-md);
+        right: var(--spacing-md);
+        max-width: none;
+    }
+
+    .toast {
+        transform: translateY(-100px);
+    }
+
+    .toast.show {
+        transform: translateY(0);
+    }
+
+    .toast.hide {
+        transform: translateY(-100px);
+    }
+}
+
+/* ========================================
+   Metric Cards (with gradient accent borders by type)
+   ======================================== */
+.metric-card {
+    background: var(--card-bg);
+    border-radius: var(--border-radius-sm);
+    padding: var(--spacing-lg);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-sm);
+    position: relative;
+    overflow: hidden;
+    transition: all var(--transition-base);
+}
+
+.metric-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+}
+
+.metric-card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+}
+
+/* Gradient accent borders by metric type */
+.metric-card.metric-cpu::before {
+    background: linear-gradient(90deg, #003DA5, #00A9CE);
+}
+
+.metric-card.metric-ram::before {
+    background: linear-gradient(90deg, #6F5091, #A88FCC);
+}
+
+.metric-card.metric-disk::before {
+    background: linear-gradient(90deg, #78D64B, #4CAF50);
+}
+
+.metric-card.metric-network::before {
+    background: linear-gradient(90deg, #F57F29, #FFB74D);
+}
+
+.metric-card.metric-users::before {
+    background: linear-gradient(90deg, #00A9CE, #4FC3F7);
+}
+
+.metric-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-md);
+}
+
+.metric-card-title {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: var(--font-weight-semibold);
+}
+
+.metric-card-value {
+    font-size: 2rem;
+    font-weight: var(--font-weight-bold);
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+}
+
+.metric-card-trend {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    font-size: 0.8125rem;
+    margin-top: var(--spacing-sm);
+    font-weight: var(--font-weight-medium);
+}
+
+.metric-card-trend.up {
+    color: var(--ku-danger);
+}
+
+.metric-card-trend.down {
+    color: var(--ku-success);
+}
+
+.metric-card-trend.stable {
+    color: var(--text-secondary);
+}
+
+/* ========================================
+   Alert Cards
+   ======================================== */
+.alert-card {
+    background: var(--card-bg);
+    border-radius: var(--border-radius-sm);
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-left: 3px solid;
+    border-top: 1px solid var(--border-color);
+    border-right: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: var(--spacing-md);
+}
+
+.alert-card.alert-success {
+    border-left-color: var(--ku-success);
+    background: rgba(0, 61, 165, 0.03);
+}
+
+.alert-card.alert-warning {
+    border-left-color: var(--ku-warning);
+    background: rgba(245, 127, 41, 0.03);
+}
+
+.alert-card.alert-error {
+    border-left-color: var(--ku-danger);
+    background: rgba(227, 30, 36, 0.03);
+}
+
+.alert-card.alert-info {
+    border-left-color: var(--ku-info);
+    background: rgba(0, 169, 206, 0.03);
+}

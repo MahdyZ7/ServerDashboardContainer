@@ -1,0 +1,271 @@
+/**
+ * Table Styles
+ * Professional tables with alternating rows, value badges
+ * Mobile-First Responsive Design with horizontal scroll
+ */
+
+/* ========================================
+   Table Controls
+   ======================================== */
+.table-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+    align-items: center;
+}
+
+.search-box {
+    position: relative;
+    flex: 1;
+    min-width: 200px;
+}
+
+.search-box i {
+    position: absolute;
+    left: 0.875rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    font-size: 0.875rem;
+}
+
+.search-box input {
+    width: 100%;
+    padding: 0.625rem 0.875rem 0.625rem 2.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+    font-size: 0.875rem;
+    font-family: var(--font-family);
+    background: var(--card-bg);
+    color: var(--text-primary);
+    transition: all var(--transition-fast);
+}
+
+.search-box input::placeholder {
+    color: var(--text-muted);
+}
+
+.search-box input:focus {
+    outline: none;
+    border-color: var(--ku-primary);
+    box-shadow: 0 0 0 3px rgba(0, 61, 165, 0.1);
+}
+
+.filter-group,
+.sort-group {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.filter-group label,
+.sort-group label {
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    font-weight: var(--font-weight-medium);
+}
+
+.filter-group select,
+.sort-group select {
+    padding: 0.625rem 2.25rem 0.625rem 0.875rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+    font-size: 0.875rem;
+    font-family: var(--font-family);
+    background: var(--card-bg);
+    color: var(--text-primary);
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2394A3B8' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    transition: all var(--transition-fast);
+}
+
+.filter-group select:focus,
+.sort-group select:focus {
+    outline: none;
+    border-color: var(--ku-primary);
+    box-shadow: 0 0 0 3px rgba(0, 61, 165, 0.1);
+}
+
+/* Mobile adjustments */
+@media (max-width: 639px) {
+    .table-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .search-box,
+    .filter-group,
+    .sort-group {
+        width: 100%;
+    }
+
+    .filter-group,
+    .sort-group {
+        justify-content: space-between;
+    }
+}
+
+/* ========================================
+   Data Table
+   ======================================== */
+.table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: var(--border-radius-sm);
+    border: 1px solid var(--border-color);
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--card-bg);
+    font-size: 0.875rem;
+}
+
+.data-table thead {
+    background: var(--bg-tertiary);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.data-table th {
+    padding: 0.875rem 1rem;
+    text-align: left;
+    font-weight: var(--font-weight-semibold);
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    border-bottom: 2px solid var(--ku-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.data-table td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-primary);
+}
+
+.data-table tbody tr {
+    transition: background-color var(--transition-fast);
+}
+
+/* Alternating row colors */
+.data-table tbody tr:nth-child(even) {
+    background: var(--bg-secondary);
+}
+
+.data-table tbody tr:hover {
+    background: var(--hover-bg);
+}
+
+.data-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* ========================================
+   Table Cell Utilities
+   ======================================== */
+.cell-numeric {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-weight: var(--font-weight-medium);
+}
+
+.cell-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.5rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: var(--font-weight-semibold);
+    font-variant-numeric: tabular-nums;
+}
+
+.cell-badge.high {
+    background: rgba(227, 30, 36, 0.08);
+    color: var(--ku-danger);
+}
+
+.cell-badge.medium {
+    background: rgba(245, 127, 41, 0.08);
+    color: var(--ku-warning);
+}
+
+.cell-badge.low {
+    background: rgba(0, 61, 165, 0.08);
+    color: var(--ku-success);
+}
+
+/* ========================================
+   Pagination
+   ======================================== */
+.pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: var(--spacing-xs);
+    margin-top: var(--spacing-lg);
+    flex-wrap: wrap;
+}
+
+.pagination-button {
+    padding: 0.4rem 0.75rem;
+    border: 1px solid var(--border-color);
+    background: var(--card-bg);
+    color: var(--text-primary);
+    border-radius: var(--border-radius-xs);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    font-size: 0.8125rem;
+    font-family: var(--font-family);
+    font-weight: var(--font-weight-medium);
+}
+
+.pagination-button:hover:not(:disabled) {
+    background: var(--hover-bg);
+    border-color: var(--ku-primary);
+    color: var(--ku-primary);
+}
+
+.pagination-button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.pagination-button.active {
+    background: var(--ku-primary);
+    color: white;
+    border-color: var(--ku-primary);
+}
+
+.pagination-info {
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+}
+
+/* ========================================
+   Mobile Table Optimizations
+   ======================================== */
+@media (max-width: 767px) {
+    .data-table {
+        font-size: 0.8125rem;
+    }
+
+    .data-table th,
+    .data-table td {
+        padding: 0.625rem;
+    }
+
+    @media (max-width: 480px) {
+        .table-wrapper {
+            font-size: 0.75rem;
+        }
+    }
+}

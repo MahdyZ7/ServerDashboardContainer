@@ -22,12 +22,16 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 # Copy application code
 COPY *.py ./
+COPY blueprints/ ./blueprints/
+COPY utils/ ./utils/
+COPY templates/ ./templates/
+COPY static/ ./static/
 
-# Expose the port the API runs on
+# Expose the port the app runs on
 EXPOSE 5000
 
 # Set environment variable for Flask
-ENV FLASK_APP=api.py
+ENV FLASK_APP=app.py
 
-# Run the API
-CMD ["uv", "run", "api.py"]
+# Run the unified dashboard
+CMD ["uv", "run", "app.py"]

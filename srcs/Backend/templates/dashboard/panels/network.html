@@ -1,0 +1,57 @@
+<!-- Network Monitor Panel -->
+<div class="network-container" role="region" aria-label="Network activity monitor">
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">
+                <i class="fas fa-network-wired"></i>
+                <span>Network Activity Monitor</span>
+            </div>
+            <div class="card-subtitle">
+                Connection statistics and network health
+            </div>
+        </div>
+        <div class="card-body">
+            <!-- Network Overview Stats -->
+            <div id="network-overview" class="network-overview-grid" aria-label="Network overview statistics">
+                <!-- Skeleton loading -->
+                {% for i in range(4) %}
+                <div class="overview-stat skeleton" style="min-height: 72px;"></div>
+                {% endfor %}
+            </div>
+
+            <!-- Network Activity Chart -->
+            <div class="chart-container" style="margin-top: var(--spacing-xl);">
+                <h3 class="chart-title">
+                    <i class="fas fa-chart-line"></i>
+                    Connections by Server
+                </h3>
+                <div class="chart-wrapper"><canvas id="network-activity-chart" aria-label="Network connections chart"></canvas></div>
+            </div>
+
+            <!-- Server Connection Details -->
+            <div class="network-details">
+                <h3 class="section-title">
+                    <i class="fas fa-server"></i>
+                    Server Connection Details
+                </h3>
+                <div id="server-connections" class="server-connections-grid" aria-label="Server connection details">
+                    <!-- Skeleton loading -->
+                    {% for i in range(3) %}
+                    <div class="skeleton-card skeleton" style="min-height: 120px;"></div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    if (document.getElementById('network-panel').classList.contains('active')) {
+        loadNetworkMonitor();
+    }
+});
+document.querySelector('[data-tab="network"]')?.addEventListener('click', function() {
+    loadNetworkMonitor();
+});
+</script>
