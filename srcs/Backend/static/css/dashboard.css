@@ -46,30 +46,171 @@
     overflow: hidden;
 }
 
-/* Simplified server card for overview (less crowded) */
-.server-card-simple {
-    padding: var(--spacing-xl);
-}
+/* ========================================
+   Overview Server Card — Gauge Layout
+   ======================================== */
 
-.server-card-simple .server-card-header {
-    padding: 0;
-    margin-bottom: var(--spacing-xl);
-}
-
-.server-card-simple .progress-rings {
-    padding: var(--spacing-lg) 0;
-    justify-content: space-between;
+.sc-overview {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-sm);
+    padding: var(--spacing-lg);
+    display: flex;
+    flex-direction: column;
     gap: var(--spacing-md);
+    position: relative;
+    overflow: hidden;
+    transition: box-shadow var(--transition-base), transform var(--transition-base);
 }
 
-.server-card-simple .progress-ring {
-    width: 80px;
-    height: 80px;
+.sc-overview::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--ku-primary), var(--ku-info));
+    transition: height var(--transition-base);
+}
+
+.sc-overview.status-warning::before { background: linear-gradient(90deg, var(--ku-warning), var(--ku-orange)); }
+.sc-overview.status-offline::before  { background: linear-gradient(90deg, var(--ku-danger), #c41019); }
+
+.sc-overview:hover {
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-3px);
+}
+
+/* Header */
+.sc-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-sm);
+}
+
+.sc-name-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.sc-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.sc-status-dot.status-online  { background: #22c55e; animation: pulse-online 2s ease-in-out infinite; }
+.sc-status-dot.status-warning { background: var(--ku-warning); }
+.sc-status-dot.status-offline { background: var(--ku-danger); }
+
+.sc-name {
     font-size: 0.9375rem;
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-primary);
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    letter-spacing: -0.01em;
 }
 
-.server-card-simple .progress-ring-label {
+.sc-badge {
+    font-size: 0.6875rem;
+    font-weight: var(--font-weight-semibold);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 3px 10px;
+    border-radius: 20px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.sc-badge.status-online  { background: rgba(34,197,94,0.1);  color: #16a34a; }
+.sc-badge.status-warning { background: rgba(245,127,41,0.1);  color: var(--ku-warning); }
+.sc-badge.status-offline { background: rgba(227,30,36,0.1);   color: var(--ku-danger); }
+
+/* Gauge rows */
+.sc-gauges {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+.gauge-row {
+    display: grid;
+    grid-template-columns: 36px 1fr 40px;
+    align-items: center;
+    gap: 8px;
+}
+
+.gauge-label {
+    font-size: 0.6875rem;
+    font-weight: var(--font-weight-semibold);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    text-align: right;
+}
+
+.gauge-track {
+    height: 6px;
+    background: var(--bg-tertiary);
+    border-radius: 99px;
+    overflow: hidden;
+}
+
+.gauge-fill {
+    height: 100%;
+    border-radius: 99px;
+    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.gauge-value {
     font-size: 0.75rem;
+    font-weight: var(--font-weight-bold);
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+/* Footer pills */
+.sc-footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding-top: var(--spacing-sm);
+    border-top: 1px solid var(--border-color);
+}
+
+.sc-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--bg-tertiary);
+    border-radius: 20px;
+    padding: 3px 10px 3px 8px;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.sc-pill i {
+    font-size: 0.625rem;
+    color: var(--text-muted);
+}
+
+.sc-pill strong {
+    color: var(--text-primary);
+    font-weight: var(--font-weight-semibold);
+    font-variant-numeric: tabular-nums;
+}
+
+.sc-pill span {
+    color: var(--text-muted);
 }
 
 /* Top gradient stripe */
@@ -359,35 +500,6 @@
     line-height: 1.2;
 }
 
-/* ========================================
-   Quick Stats (for simplified cards)
-   ======================================== */
-.server-quick-stats {
-    display: flex;
-    justify-content: center;
-    gap: var(--spacing-xl);
-    padding-top: var(--spacing-lg);
-    margin-top: var(--spacing-lg);
-    border-top: 1px solid var(--border-color);
-}
-
-.quick-stat {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-    font-size: 0.875rem;
-    color: var(--text-secondary);
-    font-weight: var(--font-weight-medium);
-}
-
-.quick-stat i {
-    font-size: 1rem;
-    color: var(--ku-primary);
-}
-
-.quick-stat span {
-    color: var(--text-primary);
-}
 
 /* ========================================
    Server Card Footer

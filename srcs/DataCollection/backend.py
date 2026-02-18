@@ -59,7 +59,13 @@ def init_db():
 				tcp_connections INT,
 				logged_users INT,
 				active_vnc_users INT,
-				active_ssh_users INT
+				active_ssh_users INT,
+				cpu_usage_percent DECIMAL(5,2) DEFAULT NULL,
+				swap_used_mb INT DEFAULT 0,
+				swap_total_mb INT DEFAULT 0,
+				swap_percentage INT DEFAULT 0,
+				net_rx_bytes BIGINT DEFAULT 0,
+				net_tx_bytes BIGINT DEFAULT 0
 		)
 	"""
 
@@ -76,14 +82,34 @@ def init_db():
 			top_process VARCHAR(255) DEFAULT NULL,
 			last_login TIMESTAMP DEFAULT NULL,
 			full_name VARCHAR(255) DEFAULT NULL,
+			io_read_bytes BIGINT DEFAULT 0,
+			io_write_bytes BIGINT DEFAULT 0,
 			UNIQUE (server_name, username)
 		)
 	"""
+
+    # Migration: add new columns to existing tables if they don't exist yet
+    migration_queries = [
+        "ALTER TABLE server_metrics ADD COLUMN IF NOT EXISTS cpu_usage_percent DECIMAL(5,2) DEFAULT NULL",
+        "ALTER TABLE server_metrics ADD COLUMN IF NOT EXISTS swap_used_mb INT DEFAULT 0",
+        "ALTER TABLE server_metrics ADD COLUMN IF NOT EXISTS swap_total_mb INT DEFAULT 0",
+        "ALTER TABLE server_metrics ADD COLUMN IF NOT EXISTS swap_percentage INT DEFAULT 0",
+        "ALTER TABLE server_metrics ADD COLUMN IF NOT EXISTS net_rx_bytes BIGINT DEFAULT 0",
+        "ALTER TABLE server_metrics ADD COLUMN IF NOT EXISTS net_tx_bytes BIGINT DEFAULT 0",
+        "ALTER TABLE top_users ADD COLUMN IF NOT EXISTS io_read_bytes BIGINT DEFAULT 0",
+        "ALTER TABLE top_users ADD COLUMN IF NOT EXISTS io_write_bytes BIGINT DEFAULT 0",
+    ]
+
     with psycopg2.connect(**DB_CONFIG) as conn:
         with conn.cursor() as cursor:
             logger.info("Initializing database tables")
             cursor.execute(create_table_query)
             cursor.execute(create_table_query_2)
+            for migration in migration_queries:
+                try:
+                    cursor.execute(migration)
+                except Exception as e:
+                    logger.warning(f"Migration skipped: {e}")
             conn.commit()
 
 
@@ -188,7 +214,13 @@ def parse_top_users(data: str) -> Dict:
         for line in data.splitlines():
             if not line or line.strip() == "":
                 continue
-            user, cpu, mem, disk, procs, top_proc, last_login, full_name = line.split()
+            parts = line.split()
+            if len(parts) < 8:
+                continue
+            user, cpu, mem, disk, procs, top_proc, last_login, full_name = parts[:8]
+            # New I/O fields (columns 9 and 10, index 8 and 9)
+            io_read_bytes = int(parts[8]) if len(parts) > 8 else 0
+            io_write_bytes = int(parts[9]) if len(parts) > 9 else 0
             top_users.append(
                 {
                     "user": user,
@@ -199,6 +231,8 @@ def parse_top_users(data: str) -> Dict:
                     "top_process": top_proc if top_proc != "nan" else None,
                     "last_login": last_login,
                     "full_name": full_name if full_name != "nan" else None,
+                    "io_read_bytes": io_read_bytes,
+                    "io_write_bytes": io_write_bytes,
                 }
             )
         return {"top_users": top_users}
@@ -211,7 +245,9 @@ def parse_top_users(data: str) -> Dict:
 def parse_monitoring_data(data: str) -> Dict:
     """Parse the CSV output from the monitoring script into a dictionary."""
     try:
-        # Split the CSV data
+        parts = data.split(",")
+
+        # Original 16 fields
         (
             arch,
             os_info,
@@ -229,7 +265,15 @@ def parse_monitoring_data(data: str) -> Dict:
             users,
             active_vnc_users,
             active_ssh_users,
-        ) = data.split(",")
+        ) = parts[:16]
+
+        # New high-priority metric fields (fields 17-21, index 16-20)
+        cpu_usage_percent = float(parts[16]) if len(parts) > 16 else None
+        swap_used_mb = int(parts[17]) if len(parts) > 17 else 0
+        swap_total_mb = int(parts[18]) if len(parts) > 18 else 0
+        swap_percentage = int(parts[19]) if len(parts) > 19 else 0
+        net_rx_bytes = int(parts[20]) if len(parts) > 20 else 0
+        net_tx_bytes = int(parts[21]) if len(parts) > 21 else 0
 
         # Parse RAM information
         ram_used, ram_total = ram_ratio.split("/")
@@ -237,10 +281,7 @@ def parse_monitoring_data(data: str) -> Dict:
         # Parse disk information
         disk_used, disk_total = disk_ratio.split("/")
 
-        # Convert last_boot to datetime
-        # last_boot_dt = datetime.strptime(last_boot, '%Y-%m-%d %H:%M')
-
-        # Remove '%' from percentage values and convert to float
+        # Remove '%' from percentage values and convert to int
         disk_perc = int(disk_perc.strip("%"))
         ram_perc = int(ram_perc)
 
@@ -263,6 +304,12 @@ def parse_monitoring_data(data: str) -> Dict:
             "logged_users": int(users),
             "active_vnc_users": int(active_vnc_users),
             "active_ssh_users": int(active_ssh_users),
+            "cpu_usage_percent": cpu_usage_percent,
+            "swap_used_mb": swap_used_mb,
+            "swap_total_mb": swap_total_mb,
+            "swap_percentage": swap_percentage,
+            "net_rx_bytes": net_rx_bytes,
+            "net_tx_bytes": net_tx_bytes,
         }
     except Exception as e:
         logger.error(f"Failed to parse monitoring data: {e}")
@@ -277,12 +324,16 @@ def store_metrics(metrics: Dict):
 		server_name, architecture, operating_system, physical_cpus, virtual_cpus,
 		ram_used, ram_total, ram_percentage, disk_used, disk_total,
 		disk_percentage, cpu_load_1min, cpu_load_5min, cpu_load_15min,
-		last_boot, tcp_connections, logged_users, active_vnc_users, active_ssh_users
+		last_boot, tcp_connections, logged_users, active_vnc_users, active_ssh_users,
+		cpu_usage_percent, swap_used_mb, swap_total_mb, swap_percentage,
+		net_rx_bytes, net_tx_bytes
 	) VALUES (
 		%(server_name)s, %(architecture)s, %(operating_system)s, %(physical_cpus)s, %(virtual_cpus)s,
 		%(ram_used)s, %(ram_total)s, %(ram_percentage)s, %(disk_used)s, %(disk_total)s,
 		%(disk_percentage)s, %(cpu_load_1min)s, %(cpu_load_5min)s, %(cpu_load_15min)s,
-		%(last_boot)s, %(tcp_connections)s, %(logged_users)s, %(active_vnc_users)s, %(active_ssh_users)s
+		%(last_boot)s, %(tcp_connections)s, %(logged_users)s, %(active_vnc_users)s, %(active_ssh_users)s,
+		%(cpu_usage_percent)s, %(swap_used_mb)s, %(swap_total_mb)s, %(swap_percentage)s,
+		%(net_rx_bytes)s, %(net_tx_bytes)s
 	)
 	"""
 
@@ -314,20 +365,22 @@ def store_top_users(server_name: str, top_users_dict: Dict):
                         user["last_login"] = None
                     if user["disk"] == 0:
                         insert_query = """
-							INSERT INTO top_users (server_name, username, cpu, mem, disk, process_count, top_process, last_login, full_name)
-							VALUES (%(server_name)s, %(user)s, %(cpu)s, %(mem)s, %(disk)s, %(process_count)s, %(top_process)s, %(last_login)s, %(full_name)s)
+							INSERT INTO top_users (server_name, username, cpu, mem, disk, process_count, top_process, last_login, full_name, io_read_bytes, io_write_bytes)
+							VALUES (%(server_name)s, %(user)s, %(cpu)s, %(mem)s, %(disk)s, %(process_count)s, %(top_process)s, %(last_login)s, %(full_name)s, %(io_read_bytes)s, %(io_write_bytes)s)
 							ON CONFLICT (server_name, username) DO UPDATE SET
 								cpu = EXCLUDED.cpu,
 								mem = EXCLUDED.mem,
 								process_count = EXCLUDED.process_count,
 								top_process = EXCLUDED.top_process,
 								last_login = EXCLUDED.last_login,
-								full_name = EXCLUDED.full_name
+								full_name = EXCLUDED.full_name,
+								io_read_bytes = EXCLUDED.io_read_bytes,
+								io_write_bytes = EXCLUDED.io_write_bytes
 						"""
                     else:
                         insert_query = """
-							INSERT INTO top_users (server_name, username, cpu, mem, disk, process_count, top_process, last_login, full_name)
-							VALUES (%(server_name)s, %(user)s, %(cpu)s, %(mem)s, %(disk)s, %(process_count)s, %(top_process)s, %(last_login)s, %(full_name)s)
+							INSERT INTO top_users (server_name, username, cpu, mem, disk, process_count, top_process, last_login, full_name, io_read_bytes, io_write_bytes)
+							VALUES (%(server_name)s, %(user)s, %(cpu)s, %(mem)s, %(disk)s, %(process_count)s, %(top_process)s, %(last_login)s, %(full_name)s, %(io_read_bytes)s, %(io_write_bytes)s)
 							ON CONFLICT (server_name, username) DO UPDATE SET
 								cpu = EXCLUDED.cpu,
 								mem = EXCLUDED.mem,
@@ -335,7 +388,9 @@ def store_top_users(server_name: str, top_users_dict: Dict):
 								process_count = EXCLUDED.process_count,
 								top_process = EXCLUDED.top_process,
 								last_login = EXCLUDED.last_login,
-								full_name = EXCLUDED.full_name
+								full_name = EXCLUDED.full_name,
+								io_read_bytes = EXCLUDED.io_read_bytes,
+								io_write_bytes = EXCLUDED.io_write_bytes
 						"""
                     cursor.execute(insert_query, user)
                 # Remove users not in the current top_users list

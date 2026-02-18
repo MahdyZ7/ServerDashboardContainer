@@ -170,7 +170,9 @@ def create_app(config_class=Config):
 
             query = """
             SELECT timestamp, ram_percentage, disk_percentage, cpu_load_1min,
-                   cpu_load_5min, cpu_load_15min, tcp_connections, logged_users
+                   cpu_load_5min, cpu_load_15min, tcp_connections, logged_users,
+                   cpu_usage_percent, swap_used_mb, swap_total_mb, swap_percentage,
+                   net_rx_bytes, net_tx_bytes
             FROM server_metrics
             WHERE server_name = %s AND timestamp > NOW() - INTERVAL %s
             ORDER BY timestamp
@@ -349,8 +351,13 @@ def create_app(config_class=Config):
             ram_percentage = metric.get("ram_percentage", 0)
             disk_percentage = metric.get("disk_percentage", 0)
             cpu_load = float(metric.get("cpu_load_5min", 0))
+            cpu_usage = metric.get("cpu_usage_percent")
+            swap_percentage = metric.get("swap_percentage", 0) or 0
 
-            if ram_percentage > 90 or disk_percentage > 90 or cpu_load > 5:
+            # Use actual CPU utilization if available, otherwise fall back to load heuristic
+            cpu_high = (float(cpu_usage) > 85) if cpu_usage is not None else (cpu_load > 5)
+
+            if ram_percentage > 90 or disk_percentage > 90 or cpu_high or swap_percentage > 90:
                 status = "warning"
             elif datetime.now() - datetime.fromisoformat(metric["timestamp"]) > timedelta(
                 minutes=15
@@ -403,14 +410,23 @@ def create_app(config_class=Config):
             offline_servers = 0
 
             total_cpu_load = 0
+            total_cpu_usage = 0
+            cpu_usage_count = 0
             total_ram_usage = 0
             total_disk_usage = 0
+            total_swap_usage = 0
             total_users = 0
+            total_rx_bytes = 0
+            total_tx_bytes = 0
 
             for metric in metrics:
                 ram_percentage = metric.get("ram_percentage", 0)
                 disk_percentage = metric.get("disk_percentage", 0)
                 cpu_load = float(metric.get("cpu_load_5min", 0))
+                cpu_usage = metric.get("cpu_usage_percent")
+                swap_percentage = metric.get("swap_percentage", 0) or 0
+
+                cpu_high = (float(cpu_usage) > 85) if cpu_usage is not None else (cpu_load > 5)
 
                 # Check if server is offline (no data in last 15 minutes)
                 timestamp = metric.get("timestamp")
@@ -418,27 +434,36 @@ def create_app(config_class=Config):
                     timestamp and (datetime.now() - timestamp).total_seconds() > 900
                 ):  # 15 minutes
                     offline_servers += 1
-                elif ram_percentage > 90 or disk_percentage > 90 or cpu_load > 5:
+                elif ram_percentage > 90 or disk_percentage > 90 or cpu_high or swap_percentage > 90:
                     warning_servers += 1
                 else:
                     online_servers += 1
 
                 # Accumulate totals
                 total_cpu_load += cpu_load
+                if cpu_usage is not None:
+                    total_cpu_usage += float(cpu_usage)
+                    cpu_usage_count += 1
                 total_ram_usage += ram_percentage
                 total_disk_usage += disk_percentage
+                total_swap_usage += swap_percentage
                 total_users += metric.get("logged_users", 0)
+                total_rx_bytes += int(metric.get("net_rx_bytes") or 0)
+                total_tx_bytes += int(metric.get("net_tx_bytes") or 0)
 
             # Calculate averages
-            avg_cpu = total_cpu_load / total_servers if total_servers > 0 else 0
+            avg_cpu_load = total_cpu_load / total_servers if total_servers > 0 else 0
+            avg_cpu_usage = total_cpu_usage / cpu_usage_count if cpu_usage_count > 0 else None
             avg_ram = total_ram_usage / total_servers if total_servers > 0 else 0
             avg_disk = total_disk_usage / total_servers if total_servers > 0 else 0
+            avg_swap = total_swap_usage / total_servers if total_servers > 0 else 0
 
             # Get historical data for trends
             trend_query = """
             SELECT
                 COUNT(DISTINCT server_name) as server_count,
-                AVG(cpu_load_5min) as avg_cpu,
+                AVG(cpu_usage_percent) as avg_cpu_usage,
+                AVG(cpu_load_5min) as avg_cpu_load,
                 AVG(ram_percentage) as avg_ram
             FROM server_metrics
             WHERE timestamp > NOW() - INTERVAL '48 hours'
@@ -459,13 +484,17 @@ def create_app(config_class=Config):
                 elif total_servers < prev_stats[0]:
                     server_trend = "down"
 
-                # Convert Decimal to float for comparison
-                prev_cpu = float(prev_stats[1]) if prev_stats[1] is not None else None
-                prev_ram = float(prev_stats[2]) if prev_stats[2] is not None else None
+                # Use cpu_usage_percent for trend if available, else load
+                prev_cpu_usage = float(prev_stats[1]) if prev_stats[1] is not None else None
+                prev_cpu_load = float(prev_stats[2]) if prev_stats[2] is not None else None
+                prev_ram = float(prev_stats[3]) if prev_stats[3] is not None else None
 
-                if prev_cpu and avg_cpu > prev_cpu * 1.1:
+                current_cpu = avg_cpu_usage if avg_cpu_usage is not None else avg_cpu_load
+                prev_cpu = prev_cpu_usage if prev_cpu_usage is not None else prev_cpu_load
+
+                if prev_cpu and current_cpu > prev_cpu * 1.1:
                     cpu_trend = "up"
-                elif prev_cpu and avg_cpu < prev_cpu * 0.9:
+                elif prev_cpu and current_cpu < prev_cpu * 0.9:
                     cpu_trend = "down"
 
                 if prev_ram and avg_ram > prev_ram * 1.1:
@@ -478,9 +507,13 @@ def create_app(config_class=Config):
                 "online_servers": online_servers,
                 "warning_servers": warning_servers,
                 "offline_servers": offline_servers,
-                "avg_cpu_load": round(avg_cpu, 1),
+                "avg_cpu_load": round(avg_cpu_load, 1),
+                "avg_cpu_usage": round(avg_cpu_usage, 1) if avg_cpu_usage is not None else None,
                 "avg_ram_usage": round(avg_ram, 1),
                 "avg_disk_usage": round(avg_disk, 1),
+                "avg_swap_usage": round(avg_swap, 1),
+                "total_net_rx_bytes": total_rx_bytes,
+                "total_net_tx_bytes": total_tx_bytes,
                 "total_active_users": total_users,
                 "uptime_percentage": round((online_servers / total_servers * 100), 1)
                 if total_servers > 0

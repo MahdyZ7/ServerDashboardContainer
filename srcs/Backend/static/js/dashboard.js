@@ -233,54 +233,92 @@
     }
 
     /**
-     * Render simplified server card for overview (clean, minimal)
+     * Format bytes into human-readable string (KB, MB, GB, TB)
+     */
+    function formatBytes(bytes) {
+        if (!bytes || bytes === 0) return '0 B';
+        const b = parseInt(bytes);
+        if (b < 1024) return b + ' B';
+        if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+        if (b < 1073741824) return (b / 1048576).toFixed(1) + ' MB';
+        if (b < 1099511627776) return (b / 1073741824).toFixed(2) + ' GB';
+        return (b / 1099511627776).toFixed(2) + ' TB';
+    }
+
+    /**
+     * Build a gauge bar row for the simplified overview card
+     */
+    function gaugeBar(label, value, pct, color) {
+        const clampedPct = Math.min(100, Math.max(0, pct));
+        return `
+            <div class="gauge-row">
+                <span class="gauge-label">${label}</span>
+                <div class="gauge-track">
+                    <div class="gauge-fill" style="width:${clampedPct}%;background:${color};"></div>
+                </div>
+                <span class="gauge-value">${value}</span>
+            </div>`;
+    }
+
+    /**
+     * Render simplified server card for overview — horizontal gauge layout
      */
     function renderSimplifiedServerCard(server) {
         const cpuLoad = parseFloat(server.cpu_load_5min || 0);
+        const cpuUsage = server.cpu_usage_percent != null ? parseFloat(server.cpu_usage_percent) : null;
         const ramUsage = parseFloat(server.ram_percentage || 0);
         const diskUsage = parseFloat(server.disk_percentage || 0);
+        const swapPerc = parseFloat(server.swap_percentage || 0);
+
+        const cpuPct = cpuUsage !== null ? cpuUsage : Math.min(cpuLoad * 10, 100);
+        const cpuDisplayVal = cpuUsage !== null ? `${cpuUsage.toFixed(1)}%` : `${cpuLoad.toFixed(2)}`;
+        const cpuLabel = cpuUsage !== null ? 'CPU' : 'Load';
+
+        function gaugeColor(pct) {
+            if (pct > 90) return 'var(--ku-danger)';
+            if (pct > 70) return 'var(--ku-warning)';
+            return 'var(--ku-primary)';
+        }
 
         const status = getServerStatus(server);
-        const performance = getPerformanceRating(cpuLoad, ramUsage, diskUsage);
+
+        const hasNet = server.net_rx_bytes > 0 || server.net_tx_bytes > 0;
 
         return `
-            <div class="server-card server-card-simple ${status.class}">
-                <div class="server-card-header">
-                    <h3>${escapeHtml(server.server_name)}</h3>
-                    <span class="status-badge ${status.class}">
-                        <span class="status-dot"></span>
-                        ${status.label}
-                    </span>
+            <div class="sc-overview ${status.class}">
+                <div class="sc-head">
+                    <div class="sc-name-row">
+                        <span class="sc-status-dot ${status.class}"></span>
+                        <h3 class="sc-name">${escapeHtml(server.server_name)}</h3>
+                    </div>
+                    <span class="sc-badge ${status.class}">${status.label}</span>
                 </div>
-                <div class="progress-rings">
-                    <div class="progress-ring-item">
-                        <div class="progress-ring" style="${progressRingStyle(Math.min(cpuLoad * 10, 100), getPercentageColor(cpuLoad * 10))}">
-                            <span>${cpuLoad.toFixed(1)}</span>
-                        </div>
-                        <span class="progress-ring-label">CPU Load</span>
-                    </div>
-                    <div class="progress-ring-item">
-                        <div class="progress-ring" style="${progressRingStyle(ramUsage, getPercentageColor(ramUsage))}">
-                            <span>${ramUsage.toFixed(0)}%</span>
-                        </div>
-                        <span class="progress-ring-label">Memory</span>
-                    </div>
-                    <div class="progress-ring-item">
-                        <div class="progress-ring" style="${progressRingStyle(diskUsage, getPercentageColor(diskUsage))}">
-                            <span>${diskUsage.toFixed(0)}%</span>
-                        </div>
-                        <span class="progress-ring-label">Disk</span>
-                    </div>
+                <div class="sc-gauges">
+                    ${gaugeBar(cpuLabel, cpuDisplayVal, cpuPct, gaugeColor(cpuPct))}
+                    ${gaugeBar('RAM', `${ramUsage.toFixed(0)}%`, ramUsage, gaugeColor(ramUsage))}
+                    ${gaugeBar('Disk', `${diskUsage.toFixed(0)}%`, diskUsage, gaugeColor(diskUsage))}
+                    ${swapPerc > 0 ? gaugeBar('Swap', `${swapPerc.toFixed(0)}%`, swapPerc, gaugeColor(swapPerc)) : ''}
                 </div>
-                <div class="server-quick-stats">
-                    <div class="quick-stat">
+                <div class="sc-footer">
+                    <div class="sc-pill">
                         <i class="fas fa-users"></i>
-                        <span>${server.logged_users || 0} Users</span>
+                        <strong>${server.logged_users || 0}</strong>
+                        <span>users</span>
                     </div>
-                    <div class="quick-stat">
-                        <i class="fas fa-plug"></i>
-                        <span>${server.tcp_connections || 0} Connections</span>
+                    <div class="sc-pill">
+                        <i class="fas fa-ethernet"></i>
+                        <strong>${server.tcp_connections || 0}</strong>
+                        <span>TCP</span>
                     </div>
+                    ${hasNet ? `
+                    <div class="sc-pill">
+                        <i class="fas fa-arrow-down"></i>
+                        <strong>${formatBytes(server.net_rx_bytes)}</strong>
+                    </div>
+                    <div class="sc-pill">
+                        <i class="fas fa-arrow-up"></i>
+                        <strong>${formatBytes(server.net_tx_bytes)}</strong>
+                    </div>` : ''}
                 </div>
             </div>
         `;
@@ -291,11 +329,20 @@
      */
     function renderDetailedServerCard(server) {
         const cpuLoad = parseFloat(server.cpu_load_5min || 0);
+        const cpuUsage = server.cpu_usage_percent != null ? parseFloat(server.cpu_usage_percent) : null;
         const ramUsage = parseFloat(server.ram_percentage || 0);
         const diskUsage = parseFloat(server.disk_percentage || 0);
+        const swapPerc = parseFloat(server.swap_percentage || 0);
+        const swapUsedMb = parseInt(server.swap_used_mb || 0);
+        const swapTotalMb = parseInt(server.swap_total_mb || 0);
+
+        // Use actual CPU utilization for ring if available
+        const cpuRingValue = cpuUsage !== null ? cpuUsage : Math.min(cpuLoad * 10, 100);
+        const cpuLabel = cpuUsage !== null ? `${cpuUsage.toFixed(1)}%` : cpuLoad.toFixed(1);
+        const cpuRingLabel = cpuUsage !== null ? 'CPU %' : 'CPU Load';
 
         const status = getServerStatus(server);
-        const performance = getPerformanceRating(cpuLoad, ramUsage, diskUsage);
+        const performance = getPerformanceRating(cpuRingValue, ramUsage, diskUsage);
 
         return `
             <div class="server-card ${status.class}">
@@ -327,18 +374,30 @@
                         <span class="server-info-label">RAM</span>
                         <span class="server-info-value">${escapeHtml(server.ram_used || '?')} / ${escapeHtml(server.ram_total || '?')}</span>
                     </div>
+                    ${swapTotalMb > 0 ? `
+                    <div class="server-info-row">
+                        <i class="fas fa-layer-group"></i>
+                        <span class="server-info-label">Swap</span>
+                        <span class="server-info-value">${swapUsedMb} MB / ${swapTotalMb} MB (${swapPerc}%)</span>
+                    </div>` : ''}
                     <div class="server-info-row">
                         <i class="fas fa-hdd"></i>
                         <span class="server-info-label">Disk</span>
                         <span class="server-info-value">${escapeHtml(server.disk_used || '?')} / ${escapeHtml(server.disk_total || '?')}</span>
                     </div>
+                    ${server.net_rx_bytes ? `
+                    <div class="server-info-row">
+                        <i class="fas fa-network-wired"></i>
+                        <span class="server-info-label">Network</span>
+                        <span class="server-info-value">↓${formatBytes(server.net_rx_bytes)} ↑${formatBytes(server.net_tx_bytes)}</span>
+                    </div>` : ''}
                 </div>
                 <div class="progress-rings">
                     <div class="progress-ring-item">
-                        <div class="progress-ring" style="${progressRingStyle(Math.min(cpuLoad * 10, 100), getPercentageColor(cpuLoad * 10))}">
-                            <span>${cpuLoad.toFixed(1)}</span>
+                        <div class="progress-ring" style="${progressRingStyle(cpuRingValue, getPercentageColor(cpuRingValue))}">
+                            <span>${cpuLabel}</span>
                         </div>
-                        <span class="progress-ring-label">CPU</span>
+                        <span class="progress-ring-label">${cpuRingLabel}</span>
                     </div>
                     <div class="progress-ring-item">
                         <div class="progress-ring" style="${progressRingStyle(ramUsage, getPercentageColor(ramUsage))}">
@@ -352,6 +411,13 @@
                         </div>
                         <span class="progress-ring-label">Disk</span>
                     </div>
+                    ${swapPerc > 0 ? `
+                    <div class="progress-ring-item">
+                        <div class="progress-ring" style="${progressRingStyle(swapPerc, getPercentageColor(swapPerc))}">
+                            <span>${swapPerc.toFixed(0)}%</span>
+                        </div>
+                        <span class="progress-ring-label">Swap</span>
+                    </div>` : ''}
                 </div>
                 <div class="server-metrics-grid">
                     <div class="metric-item">
@@ -411,11 +477,16 @@
 
         const ram = parseFloat(server.ram_percentage || 0);
         const disk = parseFloat(server.disk_percentage || 0);
-        const cpu = parseFloat(server.cpu_load_5min || 0);
+        const cpuLoad = parseFloat(server.cpu_load_5min || 0);
+        const cpuUsage = server.cpu_usage_percent != null ? parseFloat(server.cpu_usage_percent) : null;
+        const swapPerc = parseFloat(server.swap_percentage || 0);
+
+        // Use actual CPU utilization if available, otherwise fall back to load heuristic
+        const cpuHigh = cpuUsage !== null ? cpuUsage > 85 : cpuLoad > 5;
 
         if (minutesSinceUpdate > 15) {
             return { label: 'Offline', class: 'status-offline', icon: 'fa-times-circle' };
-        } else if (ram > 90 || disk > 90 || cpu > 5) {
+        } else if (ram > 90 || disk > 90 || cpuHigh || swapPerc > 90) {
             return { label: 'Warning', class: 'status-warning', icon: 'fa-exclamation-triangle' };
         } else {
             return { label: 'Online', class: 'status-online', icon: 'fa-check-circle' };
@@ -462,6 +533,11 @@
                 return '<span class="stat-trend trend-stable"><i class="fas fa-minus"></i></span>';
             }
 
+            const cpuDisplay = data.avg_cpu_usage != null
+                ? `${data.avg_cpu_usage.toFixed(1)}%`
+                : `${(data.avg_cpu_load || 0).toFixed(1)}`;
+            const cpuSubLabel = data.avg_cpu_usage != null ? 'Avg CPU Usage' : 'Avg CPU Load';
+
             container.innerHTML = `
                 <div class="overview-stat">
                     <i class="fas fa-server"></i>
@@ -494,8 +570,8 @@
                 <div class="overview-stat">
                     <i class="fas fa-microchip"></i>
                     <div>
-                        <div class="stat-value">${(data.avg_cpu_load || 0).toFixed(1)} ${trendArrow(trends.cpu)}</div>
-                        <div class="stat-label">Avg CPU Load</div>
+                        <div class="stat-value">${cpuDisplay} ${trendArrow(trends.cpu)}</div>
+                        <div class="stat-label">${cpuSubLabel}</div>
                     </div>
                 </div>
                 <div class="overview-stat">
@@ -505,6 +581,14 @@
                         <div class="stat-label">Avg RAM Usage</div>
                     </div>
                 </div>
+                ${data.avg_swap_usage > 0 ? `
+                <div class="overview-stat">
+                    <i class="fas fa-layer-group"></i>
+                    <div>
+                        <div class="stat-value">${(data.avg_swap_usage || 0).toFixed(1)}%</div>
+                        <div class="stat-label">Avg Swap Usage</div>
+                    </div>
+                </div>` : ''}
                 <div class="overview-stat">
                     <i class="fas fa-users"></i>
                     <div>
@@ -519,6 +603,21 @@
                         <div class="stat-label">Uptime</div>
                     </div>
                 </div>
+                ${data.total_net_rx_bytes ? `
+                <div class="overview-stat">
+                    <i class="fas fa-download"></i>
+                    <div>
+                        <div class="stat-value">${formatBytes(data.total_net_rx_bytes)}</div>
+                        <div class="stat-label">Total RX</div>
+                    </div>
+                </div>
+                <div class="overview-stat">
+                    <i class="fas fa-upload"></i>
+                    <div>
+                        <div class="stat-value">${formatBytes(data.total_net_tx_bytes)}</div>
+                        <div class="stat-label">Total TX</div>
+                    </div>
+                </div>` : ''}
             `;
 
         } catch (error) {
@@ -575,7 +674,7 @@
             const response = await API.getTopUsers();
 
             if (!response.success || !response.data) {
-                tableBody.innerHTML = '<tr><td colspan="9" class="text-center">No user data available</td></tr>';
+                tableBody.innerHTML = '<tr><td colspan="11" class="text-center">No user data available</td></tr>';
                 return;
             }
 
@@ -616,7 +715,7 @@
         if (!tableBody) return;
 
         if (users.length === 0) {
-            tableBody.innerHTML = '<tr><td colspan="9" class="text-center">No users found</td></tr>';
+            tableBody.innerHTML = '<tr><td colspan="11" class="text-center">No users found</td></tr>';
             return;
         }
 
@@ -625,6 +724,8 @@
             const memVal = parseFloat(user.mem || 0);
             const cpuClass = cpuVal > 50 ? 'high' : cpuVal > 20 ? 'medium' : 'low';
             const memClass = memVal > 50 ? 'high' : memVal > 20 ? 'medium' : 'low';
+            const ioRead = user.io_read_bytes ? formatBytes(user.io_read_bytes) : '—';
+            const ioWrite = user.io_write_bytes ? formatBytes(user.io_write_bytes) : '—';
 
             return `
                 <tr>
@@ -636,6 +737,8 @@
                     <td class="cell-numeric">${parseFloat(user.disk || 0).toFixed(2)} GB</td>
                     <td class="cell-numeric">${user.process_count || 0}</td>
                     <td>${escapeHtml(user.top_process || 'N/A')}</td>
+                    <td class="cell-numeric">${ioRead}</td>
+                    <td class="cell-numeric">${ioWrite}</td>
                     <td>${formatUserTimestamp(user.last_login)}</td>
                 </tr>
             `;
@@ -685,7 +788,7 @@
         try {
             const date = new Date(timestamp);
             return date.toLocaleString('en-US', {
-                month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
             });
         } catch {
             return 'N/A';
@@ -765,16 +868,33 @@
                 return date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit' });
             });
 
+            // Use actual CPU utilization if available, else fall back to load
+            const hasCpuUsage = data.some(d => d.cpu_usage_percent != null);
             ChartManager.createLineChart('cpu-chart', {
                 labels,
-                datasets: [{
+                datasets: hasCpuUsage ? [
+                    {
+                        label: 'CPU Utilization %',
+                        data: data.map(d => d.cpu_usage_percent != null ? parseFloat(d.cpu_usage_percent) : null),
+                        borderColor: '#003DA5',
+                        backgroundColor: 'rgba(0, 61, 165, 0.1)',
+                        tension: 0.4, fill: true
+                    },
+                    {
+                        label: 'CPU Load (5min)',
+                        data: data.map(d => parseFloat(d.cpu_load_5min || 0)),
+                        borderColor: '#A0B8E0',
+                        backgroundColor: 'rgba(160, 184, 224, 0.05)',
+                        tension: 0.4, fill: false, borderDash: [4, 4]
+                    }
+                ] : [{
                     label: 'CPU Load (5min)',
                     data: data.map(d => parseFloat(d.cpu_load_5min || 0)),
                     borderColor: '#003DA5',
                     backgroundColor: 'rgba(0, 61, 165, 0.1)',
                     tension: 0.4, fill: true
                 }]
-            });
+            }, hasCpuUsage ? { scales: { y: { min: 0, max: 100, title: { display: true, text: 'CPU %' } } } } : {});
 
             ChartManager.createLineChart('memory-chart', {
                 labels,
@@ -808,6 +928,45 @@
                     tension: 0.4, fill: true
                 }]
             });
+
+            // Network throughput chart (bytes → MB for readability)
+            const hasNetData = data.some(d => d.net_rx_bytes || d.net_tx_bytes);
+            if (hasNetData && document.getElementById('network-throughput-chart')) {
+                ChartManager.createLineChart('network-throughput-chart', {
+                    labels,
+                    datasets: [
+                        {
+                            label: 'RX (cumulative MB)',
+                            data: data.map(d => ((parseInt(d.net_rx_bytes) || 0) / 1048576).toFixed(2)),
+                            borderColor: '#00A9CE',
+                            backgroundColor: 'rgba(0, 169, 206, 0.1)',
+                            tension: 0.4, fill: true
+                        },
+                        {
+                            label: 'TX (cumulative MB)',
+                            data: data.map(d => ((parseInt(d.net_tx_bytes) || 0) / 1048576).toFixed(2)),
+                            borderColor: '#78D64B',
+                            backgroundColor: 'rgba(120, 214, 75, 0.1)',
+                            tension: 0.4, fill: true
+                        }
+                    ]
+                }, { scales: { y: { title: { display: true, text: 'Megabytes' } } } });
+            }
+
+            // Swap usage chart
+            const hasSwapData = data.some(d => d.swap_percentage > 0);
+            if (hasSwapData && document.getElementById('swap-chart')) {
+                ChartManager.createLineChart('swap-chart', {
+                    labels,
+                    datasets: [{
+                        label: 'Swap Usage %',
+                        data: data.map(d => parseFloat(d.swap_percentage || 0)),
+                        borderColor: '#E31E24',
+                        backgroundColor: 'rgba(227, 30, 36, 0.1)',
+                        tension: 0.4, fill: true
+                    }]
+                }, { scales: { y: { min: 0, max: 100, title: { display: true, text: '%' } } } });
+            }
 
             ChartManager.createLineChart('users-chart', {
                 labels,
@@ -958,6 +1117,25 @@
                                     <span class="metric-value">${server.logged_users || 0}</span>
                                 </div>
                             </div>
+                            ${server.net_rx_bytes ? `
+                            <div class="metric-item" style="margin-top: var(--spacing-sm);">
+                                <div class="metric-icon-bg" style="background: rgba(0,169,206,0.15);">
+                                    <i class="fas fa-download" style="color:#00A9CE;"></i>
+                                </div>
+                                <div class="metric-content">
+                                    <span class="metric-label">RX (cumulative)</span>
+                                    <span class="metric-value">${formatBytes(server.net_rx_bytes)}</span>
+                                </div>
+                            </div>
+                            <div class="metric-item" style="margin-top: var(--spacing-sm);">
+                                <div class="metric-icon-bg" style="background: rgba(120,214,75,0.15);">
+                                    <i class="fas fa-upload" style="color:#78D64B;"></i>
+                                </div>
+                                <div class="metric-content">
+                                    <span class="metric-label">TX (cumulative)</span>
+                                    <span class="metric-value">${formatBytes(server.net_tx_bytes)}</span>
+                                </div>
+                            </div>` : ''}
                         </div>
                     </div>
                 `).join('');
