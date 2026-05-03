@@ -123,6 +123,7 @@ Project setup, testing, troubleshooting, and general reference documentation.
 | [QUICK_REFERENCE.md](Project-Overview/QUICK_REFERENCE.md) | Quick commands & tips | Daily reference |
 | [AUTO_START.md](Project-Overview/AUTO_START.md) | **✨ CONSOLIDATED** Auto-start configuration | Setting up production auto-start |
 | [TROUBLESHOOTING.md](Project-Overview/TROUBLESHOOTING.md) | **✨ NEW** Common issues & solutions | When things go wrong |
+| [SSH_KEY_MIGRATION.md](Project-Overview/SSH_KEY_MIGRATION.md) | **📋 PLANNED** SSH key auth migration + user tutorial | Replacing password auth with SSH keys |
 | [TESTING_CHECKLIST.md](Project-Overview/TESTING_CHECKLIST.md) | Pre-deployment testing | Before releases |
 | [UV_MIGRATION_FIXES_APPLIED.md](Project-Overview/UV_MIGRATION_FIXES_APPLIED.md) | UV migration changes | Understanding UV setup |
 | [UV_MIGRATION_TODO.md](Project-Overview/UV_MIGRATION_TODO.md) | UV migration TODOs | Pending tasks |
