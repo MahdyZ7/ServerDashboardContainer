@@ -18,6 +18,19 @@ FORECAST_HORIZON_DAYS = 30
 
 SEVERITY_ORDER = {"critical": 0, "warning": 1, "info": 2}
 
+# Network filesystems are shared between servers: report each export once.
+REMOTE_FSTYPES = {"nfs", "nfs4", "cifs", "smbfs", "smb3", "lustre", "gpfs", "fuse.sshfs", "ceph", "glusterfs"}
+INODE_WARNING = 90
+INODE_CRITICAL = 95
+# Share of the last minute in which all non-idle tasks were stalled (PSI "full")
+PRESSURE_WARNING = 10
+# Device busy for this share of the collection interval
+DISK_UTIL_WARNING = 80
+# Interface errors per collection interval worth investigating
+NIC_ERRORS_WARNING = 10
+# Unreaped processes worth chasing (each holds a PID slot)
+ZOMBIE_INFO = 100
+
 _SIZE_UNITS = {"K": 1 / (1024 * 1024), "M": 1 / 1024, "G": 1, "T": 1024, "P": 1024 * 1024}
 
 
@@ -59,6 +72,10 @@ def build_attention_items(
     users_by_server: Dict[str, List[Dict[str, Any]]],
     thresholds: Dict[str, float],
     now: datetime,
+    filesystems_by_server: Optional[Dict[str, List[Dict[str, Any]]]] = None,
+    disk_io_by_server: Optional[Dict[str, List[Dict[str, Any]]]] = None,
+    network_by_server: Optional[Dict[str, List[Dict[str, Any]]]] = None,
+    services_by_server: Optional[Dict[str, List[Dict[str, Any]]]] = None,
 ) -> List[Dict[str, Any]]:
     """
     Produce a ranked list of issues, each with a concrete next step.
@@ -67,6 +84,8 @@ def build_attention_items(
     disk_growth     server -> disk growth in percentage points per day (14-day trend)
     users_by_server server -> top_users rows
     thresholds      PERFORMANCE_THRESHOLDS from flask_config
+    *_by_server     latest per-mount / per-device / per-interface rows (optional);
+                    with mounts, fill levels are judged per mount, not on the total
     """
     items: List[Dict[str, Any]] = []
 
@@ -80,6 +99,8 @@ def build_attention_items(
             "action": action,
             "metric": metric,
         })
+
+    shared_mounts: Dict[str, Dict[str, Any]] = {}
 
     for s in servers:
         name = s["server_name"]
@@ -104,22 +125,98 @@ def build_attention_items(
         cleanup = (f"Ask the largest users to archive or clean up: {disk_users}."
                    if disk_users else "Identify large directories and archive or clean up.")
 
-        if disk >= thresholds["disk_critical"]:
-            add("critical", "disk", name, f"{name} disk is {disk:.0f}% full",
-                f"{s.get('disk_used', '?')} of {s.get('disk_total', '?')} used"
-                + (f"; full in about {days_to_full:.0f} days at the current rate." if days_to_full else "."),
-                cleanup, disk_percentage=disk, days_to_full=days_to_full)
-        elif disk >= thresholds["disk_warning"] or (days_to_full is not None and days_to_full <= FORECAST_HORIZON_DAYS):
-            add("warning", "disk", name, f"{name} disk is {disk:.0f}% full",
-                (f"Growing {growth:.2f} points/day — full in about {days_to_full:.0f} days."
-                 if days_to_full else f"{s.get('disk_used', '?')} of {s.get('disk_total', '?')} used; no growth trend."),
-                cleanup, disk_percentage=disk, days_to_full=days_to_full)
-        elif days_to_full is not None:
-            add("info", "disk", name, f"{name} disk filling steadily",
-                f"{disk:.0f}% full, growing {growth:.2f} points/day — full in about {days_to_full:.0f} days.",
-                "No action yet; plan capacity before it crosses "
-                f"{thresholds['disk_warning']:.0f}%.",
-                disk_percentage=disk, days_to_full=days_to_full)
+        mounts = (filesystems_by_server or {}).get(name)
+        if mounts:
+            mount_alerts = 0
+            for m in mounts:
+                if (m.get("fstype") or "") in REMOTE_FSTYPES:
+                    entry = shared_mounts.setdefault(m.get("source") or m["mount_point"], dict(m, servers=[]))
+                    entry["servers"].append(name)
+                    continue
+                mount_alerts += _mount_items(add, name, m, users, thresholds)
+            if days_to_full is not None and not mount_alerts:
+                soon = days_to_full <= FORECAST_HORIZON_DAYS
+                add("warning" if soon else "info", "disk", name,
+                    f"{name} disk filling steadily",
+                    f"Local disks {disk:.0f}% full in total, growing {growth:.2f} points/day "
+                    f"— full in about {days_to_full:.0f} days.",
+                    cleanup if soon else "No action yet; plan capacity before it crosses "
+                    f"{thresholds['disk_warning']:.0f}%.",
+                    disk_percentage=disk, days_to_full=days_to_full)
+        else:
+            if disk >= thresholds["disk_critical"]:
+                add("critical", "disk", name, f"{name} disk is {disk:.0f}% full",
+                    f"{s.get('disk_used', '?')} of {s.get('disk_total', '?')} used"
+                    + (f"; full in about {days_to_full:.0f} days at the current rate." if days_to_full else "."),
+                    cleanup, disk_percentage=disk, days_to_full=days_to_full)
+            elif disk >= thresholds["disk_warning"] or (days_to_full is not None and days_to_full <= FORECAST_HORIZON_DAYS):
+                add("warning", "disk", name, f"{name} disk is {disk:.0f}% full",
+                    (f"Growing {growth:.2f} points/day — full in about {days_to_full:.0f} days."
+                     if days_to_full else f"{s.get('disk_used', '?')} of {s.get('disk_total', '?')} used; no growth trend."),
+                    cleanup, disk_percentage=disk, days_to_full=days_to_full)
+            elif days_to_full is not None:
+                add("info", "disk", name, f"{name} disk filling steadily",
+                    f"{disk:.0f}% full, growing {growth:.2f} points/day — full in about {days_to_full:.0f} days.",
+                    "No action yet; plan capacity before it crosses "
+                    f"{thresholds['disk_warning']:.0f}%.",
+                    disk_percentage=disk, days_to_full=days_to_full)
+
+        # Resource stalls (Linux PSI; absent on older kernels)
+        mem_stall = s.get("psi_memory_full_avg60")
+        if mem_stall is not None and _num(mem_stall) >= PRESSURE_WARNING:
+            add("warning", "memory", name, f"{name} jobs are stalling on memory",
+                f"All running tasks were stalled waiting for memory {_num(mem_stall):.0f}% of the last minute.",
+                "Find the job driving memory pressure and move it to a host with more free RAM.",
+                psi_memory_full=_num(mem_stall))
+        io_stall = s.get("psi_io_full_avg60")
+        if io_stall is not None and _num(io_stall) >= PRESSURE_WARNING:
+            add("warning", "io", name, f"{name} jobs are stalling on storage",
+                f"All running tasks were stalled waiting for I/O {_num(io_stall):.0f}% of the last minute.",
+                "Check which users have the highest I/O rates and whether a disk is saturated.",
+                psi_io_full=_num(io_stall))
+
+        for dev in (disk_io_by_server or {}).get(name, []):
+            util = dev.get("util_percent")
+            if util is not None and _num(util) >= DISK_UTIL_WARNING:
+                label = dev.get("name") or dev["device"]
+                await_ms = dev.get("await_ms")
+                add("warning", "io", name, f"{name} disk {label} is saturated",
+                    f"Busy {_num(util):.0f}% of the last collection interval"
+                    + (f", {_num(await_ms):.0f} ms per request." if await_ms is not None else "."),
+                    "Spread heavy I/O jobs across servers or move scratch data to a faster disk.",
+                    device=label, util_percent=_num(util))
+
+        services = (services_by_server or {}).get(name, [])
+        for svc in services:
+            if svc.get("monitored") and svc.get("state") in ("inactive", "failed"):
+                add("warning", "service", name, f"{svc['service']} is not running on {name}",
+                    f"The service is {svc['state']}.",
+                    f"Check it with systemctl status {svc['service']} (service {svc['service']} status "
+                    "on RHEL 6) and restart it if it should be running.",
+                    service=svc["service"], state=svc["state"])
+        other_failed = sorted(svc["service"] for svc in services
+                              if not svc.get("monitored") and svc.get("state") == "failed")
+        if other_failed:
+            add("info", "service", name,
+                f"{len(other_failed)} failed system unit{'s' if len(other_failed) > 1 else ''} on {name}",
+                ", ".join(other_failed[:6]) + ("…" if len(other_failed) > 6 else "") + ".",
+                "Review with systemctl --failed; reset units that are not needed (systemctl reset-failed).",
+                units=other_failed)
+
+        zombies = _num(s.get("procs_zombie"))
+        if zombies >= ZOMBIE_INFO:
+            add("info", "processes", name, f"{name} has {zombies:.0f} zombie processes",
+                "Exited processes whose parent has not collected them; harmless in small numbers.",
+                "Find the parents: ps -eo ppid=,stat= | awk '$2 ~ /^Z/ {print $1}' | sort | uniq -c | sort -rn | head",
+                zombies=zombies)
+
+        for nic in (network_by_server or {}).get(name, []):
+            errors = _num(nic.get("rx_errors_delta")) + _num(nic.get("tx_errors_delta"))
+            if errors >= NIC_ERRORS_WARNING:
+                add("warning", "network", name, f"{name} {nic['interface']} has network errors",
+                    f"{errors:.0f} receive/transmit errors since the previous collection.",
+                    "Check the cable, switch port and NIC (ethtool -S) for faults.",
+                    interface=nic["interface"], errors=errors)
 
         # Memory pressure
         ram = _num(s.get("ram_percentage"))
@@ -151,8 +248,60 @@ def build_attention_items(
                 "Steer new jobs to a less busy server (see Where to run).",
                 load_per_cpu=round(ratio, 2))
 
+    # Each network export once, listing the servers that mount it
+    for entry in shared_mounts.values():
+        servers_list = sorted(set(entry["servers"]))
+        _mount_items(add, servers_list[0], entry, [], thresholds,
+                     shared_on=servers_list)
+
     items.sort(key=lambda i: (SEVERITY_ORDER[i["severity"]], i["server"]))
     return items
+
+
+def _mount_items(add, server: str, m: Dict[str, Any], users: List[Dict[str, Any]],
+                 thresholds: Dict[str, float], shared_on: Optional[List[str]] = None) -> int:
+    """Add fill-level and inode items for one mount; returns how many were added."""
+    mount = m["mount_point"]
+    where = f"Shared {mount}" if shared_on else f"{server} {mount}"
+    on = f" (mounted on {', '.join(shared_on)})" if shared_on else ""
+    added = 0
+
+    use = m.get("use_percent")
+    if use is not None and _num(use) >= thresholds["disk_warning"]:
+        use = _num(use)
+        free = m.get("avail_bytes")
+        free_text = f"{_num(free) / 1024 ** 3:.0f} GiB free" if free is not None else "little space left"
+        add("critical" if use >= thresholds["disk_critical"] else "warning", "disk", server,
+            f"{where} is {use:.0f}% full",
+            f"{free_text} on {m.get('source') or mount}{on}.",
+            _mount_action(mount, users, bool(shared_on)),
+            mount_point=mount, use_percent=use)
+        added += 1
+
+    inodes = m.get("inode_percent")
+    if inodes is not None and _num(inodes) >= INODE_WARNING:
+        add("critical" if _num(inodes) >= INODE_CRITICAL else "warning", "disk", server,
+            f"{where} is running out of inodes",
+            f"{_num(inodes):.0f}% of inodes used{on}; new files will fail even with free space.",
+            "Find directories with huge numbers of small files (find <dir> -xdev -type f | "
+            "cut -d/ -f2-3 | sort | uniq -c | sort -n) and archive them.",
+            mount_point=mount, inode_percent=_num(inodes))
+        added += 1
+    return added
+
+
+def _mount_action(mount: str, users: List[Dict[str, Any]], shared: bool) -> str:
+    if shared:
+        return "Ask the storage administrator to extend the export, or archive old project data."
+    if mount == "/boot":
+        return "Remove old kernels (dnf remove --oldinstallonly, or package-cleanup --oldkernels on RHEL 7)."
+    if mount.startswith(("/home", "/eda_work")):
+        names = _names(users, "disk", " GB")
+        if names:
+            return f"Ask the largest users to archive or clean up: {names}."
+    if mount == "/":
+        return "Check /var, /tmp and /opt for large files (du -xh / --max-depth=2 | sort -h)."
+    return f"Find the largest directories (du -xh {mount} --max-depth=2 | sort -h) and archive or clean up."
 
 
 def rank_placement(servers: List[Dict[str, Any]], now: datetime) -> List[Dict[str, Any]]:
@@ -160,7 +309,7 @@ def rank_placement(servers: List[Dict[str, Any]], now: datetime) -> List[Dict[st
     Rank servers by spare capacity for a new job.
 
     Free cores use the 5-minute load average rather than cpu_usage_percent,
-    which the collector currently reports as a since-boot average. The score
+    which is a short instantaneous sample and too noisy for placement. The score
     (0-100) weighs free cores and free RAM equally, relative to the server
     with the most of each.
     """
@@ -203,3 +352,92 @@ def rank_placement(servers: List[Dict[str, Any]], now: datetime) -> List[Dict[st
         best_ram = max(candidates, key=lambda r: r["free_ram_gb"] or 0)
         best_ram["best_for"] = "both" if best_ram.get("best_for") == "cpu" else "memory"
     return ranked
+
+
+# License snapshots are taken every 5 minutes; four missed queries is stale.
+LICENSE_STALE_MINUTES = 20
+LICENSE_BUSY_RATIO = 0.8
+
+
+def format_held(start_at: Optional[datetime], now: datetime) -> Optional[str]:
+    """'3 h' / '2 d' since a checkout started, or None if the start is unknown."""
+    minutes = minutes_since(start_at, now)
+    if minutes is None or minutes < 0:
+        return None
+    if minutes < 60:
+        return f"{minutes:.0f} min"
+    if minutes < 48 * 60:
+        return f"{minutes / 60:.0f} h"
+    return f"{minutes / 1440:.0f} d"
+
+
+def build_license_items(
+    snapshots: List[Dict[str, Any]],
+    features: List[Dict[str, Any]],
+    checkouts: List[Dict[str, Any]],
+    now: datetime,
+) -> List[Dict[str, Any]]:
+    """
+    License issues with a suggested next step.
+
+    snapshots  latest license_snapshots row per vendor ("all" = the whole query failed)
+    features   license_features rows with licenses in use
+    checkouts  checkouts from the latest successful snapshot per vendor
+    """
+    items: List[Dict[str, Any]] = []
+
+    def add(severity, server, title, detail, action, **metric):
+        items.append({"severity": severity, "category": "license", "server": server,
+                      "title": title, "detail": detail, "action": action, "metric": metric})
+
+    for snap in snapshots:
+        vendor = snap["vendor"]
+        label = "Licenses" if vendor == "all" else vendor.title()
+        subject = "License usage" if vendor == "all" else f"{label} license usage"
+        age = minutes_since(snap.get("timestamp"), now)
+        if snap["status"] == "failed":
+            add("warning", label, f"{subject} cannot be read",
+                f"The last query failed: {snap.get('error') or 'no details'}.",
+                "Check that LICENSE_QUERY_SERVER reaches the license server (lmutil lmstat -c <port@host>). "
+                "Figures shown are from the last successful query, not zero.",
+                minutes_since_report=round(age) if age is not None else None)
+        elif age is not None and age > LICENSE_STALE_MINUTES:
+            add("warning", label, f"{subject} is out of date",
+                f"Last queried {age:.0f} min ago.",
+                "Check the licenses job in the DataCollection logs (make logs-DataCollection).",
+                minutes_since_report=round(age))
+        elif snap["status"] == "partial":
+            add("info", label, f"{subject} is incomplete",
+                snap.get("error") or "Some features reported errors.",
+                "Ask the license administrator why lmstat reports these errors; "
+                "usage for the affected features is unknown, not zero.")
+
+    holders: Dict[tuple, List[Dict[str, Any]]] = {}
+    for c in checkouts:
+        holders.setdefault((c["vendor"], c["feature"]), []).append(c)
+
+    for f in features:
+        issued, in_use = _num(f.get("issued")), _num(f.get("in_use"))
+        if issued <= 0:
+            continue
+        held = sorted(holders.get((f["vendor"], f["feature"]), []),
+                      key=lambda c: c.get("start_at") or now)
+        who = ", ".join(
+            f"{c['username']}" + (f" on {c['server_name'] or c['client_host']}" if (c.get('server_name') or c.get('client_host')) else "")
+            + (f" ({format_held(c.get('start_at'), now)})" if format_held(c.get("start_at"), now) else "")
+            for c in held[:4])
+        vendor = f["vendor"].title()
+        if in_use >= issued:
+            add("warning", vendor, f"All {issued:.0f} {f['feature']} licenses are in use",
+                f"Held by {who}." if who else "No checkout details reported.",
+                "New jobs needing this feature will wait or fail. Ask holders who are no longer "
+                "using the tool to exit it" + (f" — longest held: {held[0]['username']}." if held else "."),
+                feature=f["feature"], in_use=in_use, issued=issued)
+        elif in_use / issued >= LICENSE_BUSY_RATIO:
+            add("info", vendor, f"{f['feature']}: {in_use:.0f} of {issued:.0f} licenses in use",
+                f"Held by {who}." if who else "",
+                "No action yet; expect waits if more users start this tool.",
+                feature=f["feature"], in_use=in_use, issued=issued)
+
+    items.sort(key=lambda i: (SEVERITY_ORDER[i["severity"]], i["server"]))
+    return items

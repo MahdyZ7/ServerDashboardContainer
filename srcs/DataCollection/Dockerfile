@@ -27,12 +27,12 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen
 
 # Copy application files
-COPY BashGetInfo.sh TopUsers.sh mini_monitering.sh UserInfo.sh LicenseUsage.sh start-cron.sh ./
+COPY BashGetInfo.sh TopUsers.sh mini_monitering.sh LicenseUsage.sh start-cron.sh run-collection.sh ./
 COPY *.py ./
 COPY crontab /etc/cron.d/datacollection-crontab
 
 # Set permissions and configure cron in one layer
-RUN chmod +x BashGetInfo.sh TopUsers.sh start-cron.sh && \
+RUN chmod +x BashGetInfo.sh TopUsers.sh start-cron.sh run-collection.sh && \
     mkdir -p /var/log && \
     chmod 0644 /etc/cron.d/datacollection-crontab && \
     crontab /etc/cron.d/datacollection-crontab

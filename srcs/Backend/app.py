@@ -5,18 +5,20 @@ Khalifa University Server Monitoring Dashboard
 Combines API backend and Frontend dashboard in one application
 Following Single Responsibility Principle and KU Brand Guidelines 2020
 """
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, jsonify, request
 from flask_cors import CORS
 import psycopg2
 import logging
 import os
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
+from decimal import Decimal
 import requests
 
 from flask_config import Config, KU_COLORS, DASHBOARD_CONFIG, FONTS, PERFORMANCE_THRESHOLDS
 from blueprints.dashboard import dashboard_bp
-from utils.insights import build_attention_items, rank_placement
+from utils.insights import (SEVERITY_ORDER, build_attention_items, build_license_items,
+                            format_held, rank_placement)
 
 # Load environment variables
 load_dotenv(".env")
@@ -59,6 +61,15 @@ def create_app(config_class=Config):
 
     # Register dashboard blueprint
     app.register_blueprint(dashboard_bp)
+
+    # Static files are cached for a year in production, so version every
+    # url_for('static', ...) by file mtime: a changed file gets a new URL.
+    @app.url_defaults
+    def static_cache_buster(endpoint, values):
+        if endpoint == "static" and "filename" in values:
+            path = os.path.join(app.static_folder, values["filename"])
+            if os.path.isfile(path):
+                values["v"] = int(os.stat(path).st_mtime)
 
     # Inject global template variables
     @app.context_processor
@@ -217,7 +228,8 @@ def create_app(config_class=Config):
 
             query = """
             SELECT server_name, username, cpu, mem, disk, process_count,
-                   top_process, last_login, full_name, timestamp
+                   top_process, last_login, full_name, timestamp,
+                   rss_kb, io_read_bps, io_write_bps, disk_collected_at
             FROM top_users
             ORDER BY server_name, cpu DESC
             """
@@ -226,12 +238,32 @@ def create_app(config_class=Config):
             columns = [desc[0] for desc in cursor.description]
             users = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
+            # Licenses each account holds, from the latest successful license
+            # snapshot. A checkout from an unmonitored host goes on every row of
+            # that user (with its client host); otherwise on the matching server.
+            _, _, checkouts = _current_licenses(cursor)
+            now = datetime.now()
+            held = {}
+            for c in checkouts:
+                minutes = (now - c["start_at"]).total_seconds() / 60 if c["start_at"] else None
+                held.setdefault(c["username"].lower(), []).append({
+                    "feature": c["feature"], "vendor": c["vendor"], "server_name": c["server_name"],
+                    "client_host": c["client_host"], "licenses": c["licenses"],
+                    "start_at": c["start_at"].isoformat() if c["start_at"] else None,
+                    "start_raw": c["start_raw"],
+                    "held": format_held(c["start_at"], now),
+                    "held_minutes": round(minutes) if minutes is not None else None,
+                })
+
             # Convert datetime objects to ISO format strings
             for user in users:
-                if "timestamp" in user and user["timestamp"]:
-                    user["timestamp"] = user["timestamp"].isoformat()
-                if "last_login" in user and user["last_login"]:
-                    user["last_login"] = user["last_login"].isoformat()
+                for key in ("timestamp", "last_login", "disk_collected_at"):
+                    if user.get(key):
+                        user[key] = user[key].isoformat()
+                user["licenses"] = [
+                    lic for lic in held.get((user["username"] or "").lower(), [])
+                    if lic["server_name"] in (None, user["server_name"])
+                ]
 
             return jsonify({"success": True, "data": users, "count": len(users)})
         except Exception as e:
@@ -548,6 +580,60 @@ def create_app(config_class=Config):
         columns = [desc[0] for desc in cursor.description]
         return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
+    # Rows from one collection run share a timestamp (one transaction), so the
+    # latest run per server is the rows at that server's newest timestamp.
+    DETAIL_TABLES = {"filesystems": "server_filesystems", "disk-io": "server_disk_io",
+                     "network": "server_network", "services": "server_services"}
+
+    def _latest_detail_rows(cursor, table, server_name=None):
+        return _fetch_dicts(cursor, f"""
+            SELECT d.* FROM {table} d
+            JOIN (SELECT server_name, MAX(timestamp) AS ts FROM {table}
+                  WHERE timestamp > NOW() - INTERVAL '1 day'
+                  {"AND server_name = %s" if server_name else ""}
+                  GROUP BY server_name) latest
+              ON d.server_name = latest.server_name AND d.timestamp = latest.ts
+            ORDER BY d.server_name, d.id
+        """, (server_name,) if server_name else None)
+
+    def _group_by_server(rows):
+        grouped = {}
+        for row in rows:
+            grouped.setdefault(row["server_name"], []).append(row)
+        return grouped
+
+    def _current_licenses(cursor):
+        """Latest snapshot per vendor, features in use, and checkouts from each
+        vendor's latest successful snapshot (a failed query keeps the last good data)."""
+        snapshots = _fetch_dicts(cursor, """
+            SELECT DISTINCT ON (s.vendor) s.*,
+                   (SELECT MAX(timestamp) FROM license_snapshots ok
+                    WHERE ok.vendor = s.vendor AND ok.status <> 'failed') AS last_ok_at
+            FROM license_snapshots s
+            ORDER BY s.vendor, s.timestamp DESC
+        """)
+        # A whole-query failure ("all") only matters if newer than every vendor snapshot
+        vendor_times = [x["timestamp"] for x in snapshots if x["vendor"] != "all"]
+        snapshots = [x for x in snapshots
+                     if x["vendor"] != "all" or not vendor_times or x["timestamp"] > max(vendor_times)]
+        features = _fetch_dicts(cursor, """
+            SELECT vendor, endpoint, feature, issued, in_use, version, expiry, observed_at
+            FROM license_features WHERE in_use > 0
+            ORDER BY in_use::float / NULLIF(issued, 0) DESC NULLS LAST, in_use DESC, feature
+        """)
+        checkouts = _fetch_dicts(cursor, """
+            SELECT c.* FROM license_checkouts c
+            JOIN (SELECT DISTINCT ON (vendor) id FROM license_snapshots
+                  WHERE status <> 'failed' ORDER BY vendor, timestamp DESC) latest
+              ON c.snapshot_id = latest.id
+            ORDER BY c.feature, c.start_at NULLS LAST
+        """)
+        return snapshots, features, checkouts
+
+    def _jsonable(row):
+        return {k: float(v) if isinstance(v, Decimal) else v.isoformat() if isinstance(v, datetime) else v
+                for k, v in row.items()}
+
     @app.route("/api/insights/attention", methods=["GET"])
     def get_attention_items():
         """Ranked list of issues that need an admin, each with a suggested action."""
@@ -574,8 +660,18 @@ def create_app(config_class=Config):
             for row in _fetch_dicts(cursor, "SELECT server_name, username, cpu, mem, disk FROM top_users"):
                 users_by_server.setdefault(row["server_name"], []).append(row)
 
+            details = {key: _group_by_server(_latest_detail_rows(cursor, table))
+                       for key, table in DETAIL_TABLES.items()}
+
             now = datetime.now()
-            items = build_attention_items(servers, disk_growth, users_by_server, PERFORMANCE_THRESHOLDS, now)
+            items = build_attention_items(
+                servers, disk_growth, users_by_server, PERFORMANCE_THRESHOLDS, now,
+                filesystems_by_server=details["filesystems"],
+                disk_io_by_server=details["disk-io"],
+                network_by_server=details["network"],
+                services_by_server=details["services"],
+            ) + build_license_items(*_current_licenses(cursor), now)
+            items.sort(key=lambda i: (SEVERITY_ORDER[i["severity"]], i["server"]))
             return jsonify({
                 "success": True,
                 "data": items,
@@ -635,9 +731,15 @@ def create_app(config_class=Config):
                 for key in ("last_login", "timestamp"):
                     row[key] = row[key].isoformat() if row[key] else None
 
+            _, _, checkouts = _current_licenses(cursor)
+            now = datetime.now()
+            licenses = [dict(_jsonable(c), held=format_held(c["start_at"], now))
+                        for c in checkouts if c["username"].lower() == username.lower()]
+
             return jsonify({
                 "success": True,
                 "data": {
+                    "licenses": licenses,
                     "username": rows[0]["username"],
                     "full_name": next((r["full_name"] for r in rows if r["full_name"] and r["full_name"] != "N/A"), None),
                     "servers": rows,
@@ -647,6 +749,139 @@ def create_app(config_class=Config):
             })
         except Exception as e:
             logger.error(f"Error fetching footprint for {username}: {e}", exc_info=True)
+            return jsonify({"success": False, "error": str(e)}), 500
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+
+    @app.route("/api/servers/<server_name>/<any(filesystems, 'disk-io', network, services):detail>", methods=["GET"])
+    def get_server_detail(server_name, detail):
+        """Latest per-mount, per-device or per-interface rows for one server.
+
+        Disk I/O and network rates are averages since the previous collection run.
+        """
+        conn = None
+        cursor = None
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            rows = [_jsonable(r) for r in _latest_detail_rows(cursor, DETAIL_TABLES[detail], server_name)]
+            return jsonify({
+                "success": True,
+                "data": rows,
+                "server_name": server_name,
+                "collected_at": rows[0]["timestamp"] if rows else None,
+                "count": len(rows),
+            })
+        except Exception as e:
+            logger.error(f"Error fetching {detail} for {server_name}: {e}", exc_info=True)
+            return jsonify({"success": False, "error": str(e)}), 500
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+
+    @app.route("/api/users/<username>/history", methods=["GET"])
+    @app.route("/api/users/<username>/history/<int:hours>", methods=["GET"])
+    def get_user_history(username, hours=24):
+        """When and where an account was active (CPU, memory or I/O above the
+        collector's history thresholds), newest first. Up to 90 days."""
+        hours = max(1, min(hours, 90 * 24))
+        conn = None
+        cursor = None
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            rows = _fetch_dicts(cursor, """
+                SELECT timestamp, server_name, username, cpu, mem, rss_kb, process_count,
+                       top_process, io_read_bps, io_write_bps
+                FROM top_users_history
+                WHERE LOWER(username) = LOWER(%s) AND timestamp > NOW() - %s * INTERVAL '1 hour'
+                ORDER BY timestamp DESC
+            """, (username, hours))
+            return jsonify({
+                "success": True,
+                "data": [_jsonable(r) for r in rows],
+                "username": username,
+                "hours": hours,
+                "count": len(rows),
+            })
+        except Exception as e:
+            logger.error(f"Error fetching history for {username}: {e}", exc_info=True)
+            return jsonify({"success": False, "error": str(e)}), 500
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+
+    @app.route("/api/licenses/summary", methods=["GET"])
+    def get_license_summary():
+        """Per-vendor query status plus every feature currently in use, with holders.
+
+        A vendor whose latest query failed keeps its last successful figures and is
+        flagged; its usage is unknown, not zero.
+        """
+        conn = None
+        cursor = None
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            snapshots, features, checkouts = _current_licenses(cursor)
+            now = datetime.now()
+            holders = {}
+            for c in checkouts:
+                holders.setdefault((c["vendor"], c["feature"]), []).append(
+                    dict(_jsonable(c), held=format_held(c["start_at"], now)))
+            vendors = []
+            for snap in snapshots:
+                row = _jsonable(snap)
+                age = (now - snap["timestamp"]).total_seconds() / 60
+                row["minutes_since_query"] = round(age)
+                row["stale"] = snap["status"] == "failed" or age > 20
+                vendors.append(row)
+            return jsonify({
+                "success": True,
+                "data": {
+                    "vendors": vendors,
+                    "features": [dict(_jsonable(f), holders=holders.get((f["vendor"], f["feature"]), []))
+                                 for f in features],
+                    "checkout_count": len(checkouts),
+                },
+            })
+        except Exception as e:
+            logger.error(f"Error building license summary: {e}", exc_info=True)
+            return jsonify({"success": False, "error": str(e)}), 500
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+
+    @app.route("/api/licenses/history/<path:feature>", methods=["GET"])
+    def get_license_history(feature):
+        """In-use count over time for one feature (?hours=24, ?vendor=). Times with no
+        row and a successful snapshot mean zero in use."""
+        hours = max(1, min(request.args.get("hours", 24, type=int), 90 * 24))
+        vendor = request.args.get("vendor")
+        conn = None
+        cursor = None
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            rows = _fetch_dicts(cursor, """
+                SELECT timestamp, vendor, feature, issued, in_use FROM license_usage_history
+                WHERE feature = %s AND (%s::text IS NULL OR vendor = %s)
+                  AND timestamp > NOW() - %s * INTERVAL '1 hour'
+                ORDER BY timestamp
+            """, (feature, vendor, vendor, hours))
+            return jsonify({"success": True, "data": [_jsonable(r) for r in rows],
+                            "feature": feature, "hours": hours, "count": len(rows)})
+        except Exception as e:
+            logger.error(f"Error fetching license history for {feature}: {e}", exc_info=True)
             return jsonify({"success": False, "error": str(e)}), 500
         finally:
             if cursor:

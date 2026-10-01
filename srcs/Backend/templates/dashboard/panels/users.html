@@ -46,40 +46,28 @@
             </select>
         </div>
 
-        <div class="sort-group">
-            <label for="sort-by">Sort by</label>
-            <select id="sort-by">
-                <option value="cpu">CPU usage</option>
-                <option value="mem">Memory usage</option>
-                <option value="disk">Disk usage</option>
-                <option value="username">Username</option>
-            </select>
-        </div>
-
         <span class="table-result-count" id="users-result-count" aria-live="polite"></span>
     </div>
 
     <!-- Users Table -->
     <div class="table-wrapper" role="region" aria-label="User data table" tabindex="0">
-        <table id="users-table" class="data-table" aria-label="User activity data">
+        <table id="users-table" class="data-table data-table--compact" aria-label="User activity data">
             <thead>
                 <tr>
-                    <th scope="col">Server</th>
-                    <th scope="col">Username</th>
-                    <th scope="col">Full name</th>
-                    <th scope="col" style="min-width:140px">CPU</th>
-                    <th scope="col" style="min-width:140px">Memory</th>
-                    <th scope="col" class="col-numeric">Disk</th>
-                    <th scope="col" class="col-numeric">Procs</th>
-                    <th scope="col">Top process</th>
-                    <th scope="col" class="col-numeric">I/O read</th>
-                    <th scope="col" class="col-numeric">I/O write</th>
-                    <th scope="col">Last login</th>
+                    <th scope="col" aria-sort="none"><button type="button" class="th-sort" data-sort="server_name" data-type="text">Server</button></th>
+                    <th scope="col" aria-sort="none"><button type="button" class="th-sort" data-sort="username" data-type="text">User</button></th>
+                    <th scope="col" aria-sort="descending"><button type="button" class="th-sort" data-sort="cpu" data-type="number">CPU</button></th>
+                    <th scope="col" aria-sort="none"><button type="button" class="th-sort" data-sort="mem" data-type="number">Memory</button></th>
+                    <th scope="col" class="col-numeric" aria-sort="none"><button type="button" class="th-sort" data-sort="disk" data-type="number">Disk</button></th>
+                    <th scope="col" class="col-numeric" aria-sort="none"><button type="button" class="th-sort" data-sort="process_count" data-type="number">Procs</button></th>
+                    <th scope="col" aria-sort="none"><button type="button" class="th-sort" data-sort="top_process" data-type="text">Top process</button></th>
+                    <th scope="col" aria-sort="none"><button type="button" class="th-sort" data-sort="licenses" data-type="number">Licenses</button></th>
+                    <th scope="col" aria-sort="none"><button type="button" class="th-sort" data-sort="last_login" data-type="text">Last login</button></th>
                 </tr>
             </thead>
             <tbody id="users-table-body">
                 <tr>
-                    <td colspan="11" class="table-loading">
+                    <td colspan="9" class="table-loading">
                         <div class="spinner"></div>
                         <p>Loading user data…</p>
                     </td>
@@ -90,6 +78,44 @@
 
     <!-- Pagination -->
     <div class="pagination" id="users-pagination" role="navigation" aria-label="Table pagination"></div>
+
+    <!-- EDA license pools -->
+    <section class="licenses" aria-labelledby="licenses-heading">
+        <h3 class="section-title" id="licenses-heading"><span class="kicker">03.2</span>EDA licenses in use</h3>
+        <div class="license-vendors" id="license-vendors" aria-live="polite"></div>
+        <div class="table-wrapper" role="region" aria-label="License features in use" tabindex="0">
+            <table class="data-table" aria-label="License features in use">
+                <thead>
+                    <tr>
+                        <th scope="col">Feature</th>
+                        <th scope="col">Vendor</th>
+                        <th scope="col" style="min-width:160px">In use</th>
+                        <th scope="col">Held by</th>
+                    </tr>
+                </thead>
+                <tbody id="licenses-table-body">
+                    <tr><td colspan="4" class="table-loading"><div class="spinner"></div><p>Loading licenses…</p></td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="action-note">Snapshot of served licenses every 5 minutes. A checkout shows who holds a seat, not whether the tool is busy.</p>
+    </section>
+
+    <!-- User detail drawer (opened from a username in the table) -->
+    <div class="drawer-backdrop" id="user-drawer-backdrop" hidden></div>
+    <aside class="drawer" id="user-drawer" role="dialog" aria-modal="true" aria-labelledby="user-drawer-title" hidden>
+        <header class="drawer-head">
+            <div>
+                <p class="kicker">User detail</p>
+                <h3 id="user-drawer-title"></h3>
+                <p class="drawer-sub" id="user-drawer-sub"></p>
+            </div>
+            <button type="button" class="btn btn-secondary drawer-close" id="user-drawer-close" aria-label="Close user detail">
+                <i class="fas fa-times" aria-hidden="true"></i>
+            </button>
+        </header>
+        <div class="drawer-body" id="user-drawer-body"></div>
+    </aside>
 </section>
 
 <script>

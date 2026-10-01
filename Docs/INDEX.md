@@ -18,11 +18,10 @@ There is no active Nginx service and no active `srcs/Frontend/` Dash app in the 
 
 ```
 Docs/
-├── Schema-System/           # Schema-driven architecture
+├── Schema-System/           # Superseded schema-driven plan (history)
 ├── Monitoring-Analysis/     # System analysis & monitoring improvements
 ├── Frontend-Improvements/   # Frontend refactoring documentation
 ├── Project-Overview/        # Project setup, testing, & troubleshooting
-└── generated/              # Auto-generated docs from schema
 ```
 
 ## 🚀 Quick Start
@@ -33,36 +32,17 @@ Docs/
 2. [`../README.md`](../README.md) - Getting started & setup
 3. [`Project-Overview/CODE_REVIEW_FIX_PLAN.md`](Project-Overview/CODE_REVIEW_FIX_PLAN.md) - Current prioritized fix plan
 4. [`Project-Overview/AUTO_START.md`](Project-Overview/AUTO_START.md) - Auto-start on boot setup
-5. [`Schema-System/SCHEMA_HOWTO.md`](Schema-System/SCHEMA_HOWTO.md) - Daily workflow if using the schema system
 
 ## 📚 Documentation Categories
 
-### 1. Schema-Driven System
+### 1. Schema-Driven System (superseded)
 
-**Location:** `Docs/Schema-System/`
+**Location:** `Docs/Schema-System/` — kept for history only.
 
-The schema-driven architecture reduces adding metrics from 10+ files to 1 file!
-
-| Document | Description | When to Use |
-|----------|-------------|-------------|
-| [SCHEMA_HOWTO.md](Schema-System/SCHEMA_HOWTO.md) | **START HERE** - Daily usage guide | Every time you add a metric |
-| [SCHEMA_REFACTORING_SUMMARY.md](Schema-System/SCHEMA_REFACTORING_SUMMARY.md) | Overview & benefits | Understanding the system |
-| [SCHEMA_DRIVEN_REFACTORING_PLAN.md](Schema-System/SCHEMA_DRIVEN_REFACTORING_PLAN.md) | Complete technical specification | Deep dive into architecture |
-| [SCHEMA_MIGRATION_GUIDE.md](Schema-System/SCHEMA_MIGRATION_GUIDE.md) | Step-by-step migration guide | Integrating with existing code |
-
-**Key Features:**
-- ✅ Single YAML schema drives everything
-- ✅ Auto-generates SQL, Python, TypeScript, validators, parsers, docs
-- ✅ 85% faster metric addition (15-30 min vs 2-4 hours)
-- ✅ Zero synchronization bugs
-
-**Current caveat:** generated schema docs and generated migrations may not match the runtime schema until the schema cleanup in `Project-Overview/CODE_REVIEW_FIX_PLAN.md` is completed.
-
-**Quick Command:**
-```bash
-cd schema/generators
-uv run python generate_all.py  # Generate all code from schema
-```
+The YAML schema and its generators were removed on 2026-10-01: nothing used them at
+runtime and they had drifted from the real tables. Tables and migrations are defined in
+`init_db()` in `srcs/DataCollection/backend.py`; the collector review and fix status are in
+`srcs/DataCollection/REVIEW.md`.
 
 ---
 
@@ -145,22 +125,6 @@ Project setup, testing, troubleshooting, and general reference documentation.
 
 ---
 
-### 5. Generated Documentation
-
-**Location:** `Docs/generated/`
-
-Auto-generated documentation from schema (updated when you run `generate_all.py`).
-
-| Document | Description | Auto-Updated |
-|----------|-------------|--------------|
-| [DATABASE_SCHEMA.md](generated/DATABASE_SCHEMA.md) | Database tables & columns | ✅ Yes |
-| [API_DOCUMENTATION.md](generated/API_DOCUMENTATION.md) | API endpoints reference | ✅ Yes |
-| [QUICK_REFERENCE.md](generated/QUICK_REFERENCE.md) | Field formats & validation | ✅ Yes |
-
-**Note:** These files are auto-generated. Do not edit manually!
-
----
-
 ## 🎯 Common Tasks
 
 ### I want to add a new metric
@@ -184,9 +148,6 @@ Auto-generated documentation from schema (updated when you run `generate_all.py`
 ### I want to set up auto-start
 → Read: [`Project-Overview/AUTO_START.md`](Project-Overview/AUTO_START.md)
 
-### I want to migrate to schema-driven system
-→ Read: [`Schema-System/SCHEMA_MIGRATION_GUIDE.md`](Schema-System/SCHEMA_MIGRATION_GUIDE.md)
-
 ### I want to test before deployment
 → Read: [`Project-Overview/TESTING_CHECKLIST.md`](Project-Overview/TESTING_CHECKLIST.md)
 
@@ -202,8 +163,7 @@ Auto-generated documentation from schema (updated when you run `generate_all.py`
 | Root README | Updated to current three-service Flask stack |
 | Project Overview | Contains setup, troubleshooting, auto-start, SSH migration, and current fix plan |
 | Frontend Improvements | Historical and current UI/UX references for Flask static dashboard |
-| Schema System | Useful but needs reconciliation with active runtime schema |
-| Generated Docs | Treat as generated reference, not guaranteed runtime truth until schema cleanup |
+| Schema System | Superseded; generator and generated docs removed (2026-10-01) |
 
 ## Recent Changes
 
@@ -218,7 +178,6 @@ Auto-generated documentation from schema (updated when you run `generate_all.py`
 
 ### Updating Documentation
 
-- **Schema docs** - Auto-updated when running `generate_all.py`
 - **Manual docs** - Update as features change
 - **This index** - Update when adding new categories
 
@@ -244,8 +203,7 @@ Auto-generated documentation from schema (updated when you run `generate_all.py`
 1. Check this index for relevant documentation
 2. Read [`../CLAUDE.md`](../CLAUDE.md) for project context
 3. Check [`Project-Overview/TROUBLESHOOTING.md`](Project-Overview/TROUBLESHOOTING.md) for common issues
-4. Review generated docs for latest API/schema info
-5. Check specific category for detailed guides
+4. Check specific category for detailed guides
 
 ---
 
