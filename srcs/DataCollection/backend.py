@@ -6,6 +6,7 @@ from typing import Dict, List
 import os
 from dotenv import load_dotenv
 import time
+from parsers import DISK_NOT_COLLECTED, ParseError, parse_monitoring_data, parse_top_users
 
 RED = "\033[0;31m"
 GREEN = "\033[0;32m"
@@ -25,6 +26,15 @@ data_retention_days: int = 90  # 3 months data retention
 retention_cleanup_interval: int = 7 * int(
     60 * 24 / data_collection_interval
 )  # Run cleanup weekly (only used in continuous mode)
+
+# Deadlines for one remote script run (SSH connect is separately limited to 10 s)
+METRICS_TIMEOUT_SECONDS: int = 90
+TOP_USERS_TIMEOUT_SECONDS: int = 300
+# Disk scans are low priority and limited per account on the remote side
+DISK_SCAN_TIMEOUT_PER_USER: int = int(os.getenv("DISK_SCAN_TIMEOUT_PER_USER", "900"))
+DISK_SCAN_TIMEOUT_SECONDS: int = int(os.getenv("DISK_SCAN_TIMEOUT_SECONDS", str(4 * 3600)))
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Database configuration
 DB_CONFIG = {
@@ -52,38 +62,50 @@ def init_db():
 				disk_used VARCHAR(30),
 				disk_total VARCHAR(30),
 				disk_percentage INT,
-				cpu_load_1min DECIMAL(5,2),
-				cpu_load_5min DECIMAL(5,2),
-				cpu_load_15min DECIMAL(5,2),
+				cpu_load_1min NUMERIC(8,2),
+				cpu_load_5min NUMERIC(8,2),
+				cpu_load_15min NUMERIC(8,2),
 				last_boot VARCHAR(255),
 				tcp_connections INT,
 				logged_users INT,
 				active_vnc_users INT,
 				active_ssh_users INT,
-				cpu_usage_percent DECIMAL(5,2) DEFAULT NULL,
+				cpu_usage_percent NUMERIC(5,2) DEFAULT NULL,
 				swap_used_mb INT DEFAULT 0,
 				swap_total_mb INT DEFAULT 0,
 				swap_percentage INT DEFAULT 0,
 				net_rx_bytes BIGINT DEFAULT 0,
-				net_tx_bytes BIGINT DEFAULT 0
+				net_tx_bytes BIGINT DEFAULT 0,
+				cpu_iowait_percent NUMERIC(5,2),
+				cpu_steal_percent NUMERIC(5,2),
+				ram_available_mb INT,
+				net_interface VARCHAR(64)
 		)
 	"""
 
+    # cpu is percent of ONE logical CPU (400 = four cores busy), measured over a
+    # short sample. disk is allocated GiB, NULL when unknown; disk_collected_at
+    # records when it was last measured. timestamp is the last observation.
     create_table_query_2 = """
 		CREATE TABLE IF NOT EXISTS top_users (
 			id BIGSERIAL PRIMARY KEY,
 			timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 			server_name VARCHAR(255),
 			username VARCHAR(255),
-			cpu DECIMAL(5,2),
-			mem DECIMAL(5,2),
-			disk DECIMAL(5,2) DEFAULT 0,
+			cpu NUMERIC(9,2),
+			mem NUMERIC(7,2),
+			disk NUMERIC(12,2),
 			process_count INT DEFAULT 0,
 			top_process VARCHAR(255) DEFAULT NULL,
 			last_login TIMESTAMP DEFAULT NULL,
 			full_name VARCHAR(255) DEFAULT NULL,
-			io_read_bytes BIGINT DEFAULT 0,
-			io_write_bytes BIGINT DEFAULT 0,
+			io_read_bytes BIGINT,
+			io_write_bytes BIGINT,
+			uid BIGINT,
+			rss_kb BIGINT,
+			io_read_bps BIGINT,
+			io_write_bps BIGINT,
+			disk_collected_at TIMESTAMP,
 			UNIQUE (server_name, username)
 		)
 	"""
@@ -96,11 +118,36 @@ def init_db():
         "ALTER TABLE server_metrics ADD COLUMN IF NOT EXISTS swap_percentage INT DEFAULT 0",
         "ALTER TABLE server_metrics ADD COLUMN IF NOT EXISTS net_rx_bytes BIGINT DEFAULT 0",
         "ALTER TABLE server_metrics ADD COLUMN IF NOT EXISTS net_tx_bytes BIGINT DEFAULT 0",
+        "ALTER TABLE server_metrics ADD COLUMN IF NOT EXISTS cpu_iowait_percent NUMERIC(5,2)",
+        "ALTER TABLE server_metrics ADD COLUMN IF NOT EXISTS cpu_steal_percent NUMERIC(5,2)",
+        "ALTER TABLE server_metrics ADD COLUMN IF NOT EXISTS ram_available_mb INT",
+        "ALTER TABLE server_metrics ADD COLUMN IF NOT EXISTS net_interface VARCHAR(64)",
         "ALTER TABLE top_users ADD COLUMN IF NOT EXISTS io_read_bytes BIGINT DEFAULT 0",
         "ALTER TABLE top_users ADD COLUMN IF NOT EXISTS io_write_bytes BIGINT DEFAULT 0",
+        "ALTER TABLE top_users ADD COLUMN IF NOT EXISTS uid BIGINT",
+        "ALTER TABLE top_users ADD COLUMN IF NOT EXISTS rss_kb BIGINT",
+        "ALTER TABLE top_users ADD COLUMN IF NOT EXISTS io_read_bps BIGINT",
+        "ALTER TABLE top_users ADD COLUMN IF NOT EXISTS io_write_bps BIGINT",
+        "ALTER TABLE top_users ADD COLUMN IF NOT EXISTS disk_collected_at TIMESTAMP",
+        # Unknown readings are NULL, not 0
+        "ALTER TABLE top_users ALTER COLUMN disk DROP DEFAULT",
+        "ALTER TABLE top_users ALTER COLUMN io_read_bytes DROP DEFAULT",
+        "ALTER TABLE top_users ALTER COLUMN io_write_bytes DROP DEFAULT",
+    ]
+
+    # Widen numeric columns that overflowed at 999.99 (table, column, precision)
+    widen_columns = [
+        ("server_metrics", "cpu_load_1min", 8),
+        ("server_metrics", "cpu_load_5min", 8),
+        ("server_metrics", "cpu_load_15min", 8),
+        ("top_users", "cpu", 9),
+        ("top_users", "mem", 7),
+        ("top_users", "disk", 12),
     ]
 
     with psycopg2.connect(**DB_CONFIG) as conn:
+        # Autocommit so one failed migration cannot abort the ones after it
+        conn.autocommit = True
         with conn.cursor() as cursor:
             logger.info("Initializing database tables")
             cursor.execute(create_table_query)
@@ -110,7 +157,18 @@ def init_db():
                     cursor.execute(migration)
                 except Exception as e:
                     logger.warning(f"Migration skipped: {e}")
-            conn.commit()
+            for table, column, precision in widen_columns:
+                cursor.execute(
+                    "SELECT numeric_precision FROM information_schema.columns "
+                    "WHERE table_name = %s AND column_name = %s",
+                    (table, column),
+                )
+                row = cursor.fetchone()
+                if row and row[0] is not None and row[0] < precision:
+                    logger.info(f"Widening {table}.{column} to NUMERIC({precision},2)")
+                    cursor.execute(
+                        f"ALTER TABLE {table} ALTER COLUMN {column} TYPE NUMERIC({precision},2)"
+                    )
 
 
 # Configure logging
@@ -124,197 +182,70 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def server_online(server: Dict) -> bool:
-    """Check if the server is online by pinging it."""
+class CollectionError(Exception):
+    """A remote script failed. The message never contains credentials."""
+
+
+# Exit statuses from BashGetInfo.sh (ssh / sshpass)
+SSH_EXIT_REASONS = {
+    255: "SSH connection failed (host unreachable, refused or timed out)",
+    5: "authentication failed (wrong password)",
+    6: "host key verification failed",
+}
+
+
+def run_remote_script(server: Dict, script: str, args: List[str], timeout: int) -> str:
+    """Run a local script on the server over SSH and return its stdout.
+
+    Credentials are passed through the environment so they never appear in the
+    process list, in exception text or in logs.
+    """
+    env = dict(os.environ)
+    env.pop("SSHPASS", None)
+    env.pop("SSH_KEY_FILE", None)
+    if server.get("key_file"):
+        env["SSH_KEY_FILE"] = server["key_file"]
+    elif server.get("password"):
+        env["SSHPASS"] = server["password"]
+
+    command = [
+        os.path.join(SCRIPT_DIR, "BashGetInfo.sh"),
+        server["ip"],
+        server["username"],
+        os.path.join(SCRIPT_DIR, script),
+        *args,
+    ]
+    logger.debug(f"Running {script} on {server['name']}")
     try:
-        logger.debug(
-            f"Checking connectivity to server {server['name']} ({server['ip']})"
-        )
-        command_string = ["ping", "-c", "1", "-w", "5", server["ip"]]
-        subprocess.run(command_string, capture_output=True, text=True, check=True)
-        logger.debug(f"Server {server['name']} is online")
-        return True
-    except subprocess.CalledProcessError as e:
-        logger.error(
-            f"Server {server['name']} ({server['ip']}) is offline - ping failed: {e}"
-        )
-        return False
-
-
-def run_monitoring_script(server: Dict) -> str:
-    """Execute the bash monitoring script and return its output."""
-    try:
-        logger.debug(f"Running monitoring script for server {server['name']}")
-        # Get the directory of the current script
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        script_path = os.path.join(current_dir, "BashGetInfo.sh")
-        command_string = [
-            script_path,
-            server["ip"],
-            server["username"],
-            server["password"],
-            "mini_monitering.sh",
-            "--line-format",
-        ]
-        # Make sure the script is executable
-        os.chmod(script_path, 0o755)
-
-        # Run the script
         result = subprocess.run(
-            command_string, capture_output=True, text=True, check=True
+            command, capture_output=True, text=True, env=env, timeout=timeout
         )
-        logger.debug(f"Successfully retrieved monitoring data for {server['name']}")
-        return result.stdout.strip()
-    except subprocess.CalledProcessError as e:
-        logger.error(f"Failed to run monitoring script for {server['name']}: {e}")
-        if e.stderr:
-            logger.error(f"Script stderr: {e.stderr}")
-        raise
+    except subprocess.TimeoutExpired:
+        raise CollectionError(f"{script} on {server['name']} timed out after {timeout}s") from None
+
+    if result.returncode != 0:
+        reason = SSH_EXIT_REASONS.get(result.returncode, f"exit status {result.returncode}")
+        # Login banners can be long; the last lines carry the actual error
+        stderr_tail = " | ".join(result.stderr.strip().splitlines()[-3:])
+        raise CollectionError(f"{script} on {server['name']}: {reason}. stderr: {stderr_tail}")
+    return result.stdout
+
+
+def run_monitoring_script(server: Dict) -> Dict:
+    """Collect host metrics from one server."""
+    output = run_remote_script(server, "mini_monitering.sh", ["--kv"], METRICS_TIMEOUT_SECONDS)
+    return parse_monitoring_data(output)
 
 
 def get_top_users(server: Dict, get_storage_usage: bool = False) -> Dict:
-    """Get the top CPU and memory users on the server."""
-    try:
-        logger.debug(
-            f"Getting top users for server {server['name']} (disk usage: {get_storage_usage})"
-        )
-        # Get the directory of the current script
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        script_path = os.path.join(current_dir, "BashGetInfo.sh")
-        command_string = [
-            script_path,
-            server["ip"],
-            server["username"],
-            server["password"],
-            "TopUsers.sh",
-            "--no-headers",
-        ]
-        if get_storage_usage:
-            command_string.append("--collect-disk")
-        # Make sure the script is executable
-        os.chmod(script_path, 0o755)
-
-        # Run the script
-        result = subprocess.run(
-            command_string, capture_output=True, text=True, check=True
-        )
-        logger.debug(f"Successfully retrieved top users data for {server['name']}")
-        return parse_top_users(result.stdout)
-    except subprocess.CalledProcessError as e:
-        logger.error(f"Failed to get top users for {server['name']}: {e}")
-        if e.stderr:
-            logger.error(f"TopUsers script stderr: {e.stderr}")
-        raise
-
-
-def parse_top_users(data: str) -> Dict:
-    """Parse the top users data from the monitoring script into a dictionary."""
-    try:
-        top_users = []
-        for line in data.splitlines():
-            if not line or line.strip() == "":
-                continue
-            parts = line.split()
-            if len(parts) < 8:
-                continue
-            user, cpu, mem, disk, procs, top_proc, last_login, full_name = parts[:8]
-            # New I/O fields (columns 9 and 10, index 8 and 9)
-            io_read_bytes = int(parts[8]) if len(parts) > 8 else 0
-            io_write_bytes = int(parts[9]) if len(parts) > 9 else 0
-            top_users.append(
-                {
-                    "user": user,
-                    "cpu": float(cpu),
-                    "mem": float(mem),
-                    "disk": float(disk) if disk != "nan" and disk != "OFF" else 0,
-                    "process_count": int(procs),
-                    "top_process": top_proc if top_proc != "nan" else None,
-                    "last_login": last_login,
-                    "full_name": full_name if full_name != "nan" else None,
-                    "io_read_bytes": io_read_bytes,
-                    "io_write_bytes": io_write_bytes,
-                }
-            )
-        return {"top_users": top_users}
-    except Exception as e:
-        logger.error(f"Failed to parse top users data: {e}")
-        logger.debug(f"Raw data that failed to parse: {data}")
-        raise
-
-
-def parse_monitoring_data(data: str) -> Dict:
-    """Parse the CSV output from the monitoring script into a dictionary."""
-    try:
-        parts = data.split(",")
-
-        # Original 16 fields
-        (
-            arch,
-            os_info,
-            pcpu,
-            vcpu,
-            ram_ratio,
-            ram_perc,
-            disk_ratio,
-            disk_perc,
-            cpu_load_1min,
-            cpu_load_5min,
-            cpu_load_15min,
-            last_boot,
-            tcp,
-            users,
-            active_vnc_users,
-            active_ssh_users,
-        ) = parts[:16]
-
-        # New high-priority metric fields (fields 17-21, index 16-20)
-        cpu_usage_percent = float(parts[16]) if len(parts) > 16 else None
-        swap_used_mb = int(parts[17]) if len(parts) > 17 else 0
-        swap_total_mb = int(parts[18]) if len(parts) > 18 else 0
-        swap_percentage = int(parts[19]) if len(parts) > 19 else 0
-        net_rx_bytes = int(parts[20]) if len(parts) > 20 else 0
-        net_tx_bytes = int(parts[21]) if len(parts) > 21 else 0
-
-        # Parse RAM information
-        ram_used, ram_total = ram_ratio.split("/")
-
-        # Parse disk information
-        disk_used, disk_total = disk_ratio.split("/")
-
-        # Remove '%' from percentage values and convert to int
-        disk_perc = int(disk_perc.strip("%"))
-        ram_perc = int(ram_perc)
-
-        return {
-            "architecture": arch,
-            "operating_system": os_info,
-            "physical_cpus": int(pcpu),
-            "virtual_cpus": int(vcpu),
-            "ram_used": ram_used,
-            "ram_total": ram_total,
-            "ram_percentage": ram_perc,
-            "disk_used": disk_used,
-            "disk_total": disk_total,
-            "disk_percentage": disk_perc,
-            "cpu_load_1min": cpu_load_1min,
-            "cpu_load_5min": cpu_load_5min,
-            "cpu_load_15min": cpu_load_15min,
-            "last_boot": last_boot,
-            "tcp_connections": int(tcp),
-            "logged_users": int(users),
-            "active_vnc_users": int(active_vnc_users),
-            "active_ssh_users": int(active_ssh_users),
-            "cpu_usage_percent": cpu_usage_percent,
-            "swap_used_mb": swap_used_mb,
-            "swap_total_mb": swap_total_mb,
-            "swap_percentage": swap_percentage,
-            "net_rx_bytes": net_rx_bytes,
-            "net_tx_bytes": net_tx_bytes,
-        }
-    except Exception as e:
-        logger.error(f"Failed to parse monitoring data: {e}")
-        logger.debug(f"Raw monitoring data that failed to parse: {data}")
-        raise
+    """Collect per-account usage from one server, optionally with disk scans."""
+    args = ["--no-headers"]
+    timeout = TOP_USERS_TIMEOUT_SECONDS
+    if get_storage_usage:
+        args += ["--collect-disk", "--disk-timeout", str(DISK_SCAN_TIMEOUT_PER_USER)]
+        timeout = DISK_SCAN_TIMEOUT_SECONDS
+    output = run_remote_script(server, "TopUsers.sh", args, timeout)
+    return parse_top_users(output)
 
 
 def store_metrics(metrics: Dict):
@@ -326,14 +257,16 @@ def store_metrics(metrics: Dict):
 		disk_percentage, cpu_load_1min, cpu_load_5min, cpu_load_15min,
 		last_boot, tcp_connections, logged_users, active_vnc_users, active_ssh_users,
 		cpu_usage_percent, swap_used_mb, swap_total_mb, swap_percentage,
-		net_rx_bytes, net_tx_bytes
+		net_rx_bytes, net_tx_bytes,
+		cpu_iowait_percent, cpu_steal_percent, ram_available_mb, net_interface
 	) VALUES (
 		%(server_name)s, %(architecture)s, %(operating_system)s, %(physical_cpus)s, %(virtual_cpus)s,
 		%(ram_used)s, %(ram_total)s, %(ram_percentage)s, %(disk_used)s, %(disk_total)s,
 		%(disk_percentage)s, %(cpu_load_1min)s, %(cpu_load_5min)s, %(cpu_load_15min)s,
 		%(last_boot)s, %(tcp_connections)s, %(logged_users)s, %(active_vnc_users)s, %(active_ssh_users)s,
 		%(cpu_usage_percent)s, %(swap_used_mb)s, %(swap_total_mb)s, %(swap_percentage)s,
-		%(net_rx_bytes)s, %(net_tx_bytes)s
+		%(net_rx_bytes)s, %(net_tx_bytes)s,
+		%(cpu_iowait_percent)s, %(cpu_steal_percent)s, %(ram_available_mb)s, %(net_interface)s
 	)
 	"""
 
@@ -353,46 +286,47 @@ def store_metrics(metrics: Dict):
 
 
 def store_top_users(server_name: str, top_users_dict: Dict):
-    """Store the top users data in the PostgreSQL database."""
+    """Store the top users data in the PostgreSQL database.
+
+    Every write refreshes `timestamp` (last observation). Disk is only replaced
+    when this run measured it, so a skipped or timed-out scan keeps the old value.
+    """
     top_users: List[Dict] = top_users_dict.get("top_users", [])
     usernames = [user["user"] for user in top_users]
+    upsert_query = """
+		INSERT INTO top_users (server_name, username, uid, cpu, mem, rss_kb, disk, disk_collected_at,
+			process_count, top_process, last_login, full_name,
+			io_read_bytes, io_write_bytes, io_read_bps, io_write_bps, timestamp)
+		VALUES (%(server_name)s, %(user)s, %(uid)s, %(cpu)s, %(mem)s, %(rss_kb)s, %(disk)s,
+			CASE WHEN %(disk_collected)s THEN CURRENT_TIMESTAMP END,
+			%(process_count)s, %(top_process)s, %(last_login)s, %(full_name)s,
+			%(io_read_bytes)s, %(io_write_bytes)s, %(io_read_bps)s, %(io_write_bps)s, CURRENT_TIMESTAMP)
+		ON CONFLICT (server_name, username) DO UPDATE SET
+			uid = EXCLUDED.uid,
+			cpu = EXCLUDED.cpu,
+			mem = EXCLUDED.mem,
+			rss_kb = EXCLUDED.rss_kb,
+			disk = CASE WHEN %(disk_collected)s THEN EXCLUDED.disk ELSE top_users.disk END,
+			disk_collected_at = COALESCE(EXCLUDED.disk_collected_at, top_users.disk_collected_at),
+			process_count = EXCLUDED.process_count,
+			top_process = EXCLUDED.top_process,
+			last_login = EXCLUDED.last_login,
+			full_name = EXCLUDED.full_name,
+			io_read_bytes = EXCLUDED.io_read_bytes,
+			io_write_bytes = EXCLUDED.io_write_bytes,
+			io_read_bps = EXCLUDED.io_read_bps,
+			io_write_bps = EXCLUDED.io_write_bps,
+			timestamp = EXCLUDED.timestamp
+	"""
     try:
         with psycopg2.connect(**DB_CONFIG) as conn:
             with conn.cursor() as cursor:
                 for user in top_users:
-                    user["server_name"] = server_name
-                    if user["last_login"] == "--":
-                        user["last_login"] = None
-                    if user["disk"] == 0:
-                        insert_query = """
-							INSERT INTO top_users (server_name, username, cpu, mem, disk, process_count, top_process, last_login, full_name, io_read_bytes, io_write_bytes)
-							VALUES (%(server_name)s, %(user)s, %(cpu)s, %(mem)s, %(disk)s, %(process_count)s, %(top_process)s, %(last_login)s, %(full_name)s, %(io_read_bytes)s, %(io_write_bytes)s)
-							ON CONFLICT (server_name, username) DO UPDATE SET
-								cpu = EXCLUDED.cpu,
-								mem = EXCLUDED.mem,
-								process_count = EXCLUDED.process_count,
-								top_process = EXCLUDED.top_process,
-								last_login = EXCLUDED.last_login,
-								full_name = EXCLUDED.full_name,
-								io_read_bytes = EXCLUDED.io_read_bytes,
-								io_write_bytes = EXCLUDED.io_write_bytes
-						"""
-                    else:
-                        insert_query = """
-							INSERT INTO top_users (server_name, username, cpu, mem, disk, process_count, top_process, last_login, full_name, io_read_bytes, io_write_bytes)
-							VALUES (%(server_name)s, %(user)s, %(cpu)s, %(mem)s, %(disk)s, %(process_count)s, %(top_process)s, %(last_login)s, %(full_name)s, %(io_read_bytes)s, %(io_write_bytes)s)
-							ON CONFLICT (server_name, username) DO UPDATE SET
-								cpu = EXCLUDED.cpu,
-								mem = EXCLUDED.mem,
-								disk = EXCLUDED.disk,
-								process_count = EXCLUDED.process_count,
-								top_process = EXCLUDED.top_process,
-								last_login = EXCLUDED.last_login,
-								full_name = EXCLUDED.full_name,
-								io_read_bytes = EXCLUDED.io_read_bytes,
-								io_write_bytes = EXCLUDED.io_write_bytes
-						"""
-                    cursor.execute(insert_query, user)
+                    row = dict(user, server_name=server_name)
+                    row["disk_collected"] = user["disk"] is not DISK_NOT_COLLECTED
+                    if not row["disk_collected"]:
+                        row["disk"] = None
+                    cursor.execute(upsert_query, row)
                 # Remove users not in the current top_users list
                 if usernames:
                     delete_query = f"""
@@ -424,6 +358,7 @@ def readServerList() -> List[Dict]:
                 "ip": os.getenv(f"SERVER{i}_IP"),
                 "username": os.getenv(f"SERVER{i}_USERNAME"),
                 "password": os.getenv(f"SERVER{i}_PASSWORD"),
+                "key_file": os.getenv(f"SERVER{i}_KEY_FILE"),
             }
         )
     return servers
@@ -500,30 +435,30 @@ def run_single_collection_cycle(collect_disk_usage=False, run_cleanup=False):
             except Exception as e:
                 logger.error(f"Data retention cleanup failed: {e}")
 
-        # Collect data from all servers
+        # Collect data from all servers. Host metrics and per-user data are
+        # stored independently so a slow or failing user scan keeps host data.
         success_count = 0
         for server in server_list:
-            if not server_online(server):
-                logger.warning(f"Server {server['name']} is offline, skipping")
+            try:
+                metrics = run_monitoring_script(server)
+                metrics["server_name"] = server["name"]
+                store_metrics(metrics)
+                success_count += 1
+            except (CollectionError, ParseError) as e:
+                logger.error(f"Host metrics failed for {server['name']}: {e}")
+                continue  # unreachable or broken: skip the per-user run as well
+            except Exception as e:
+                logger.error(f"Error storing host metrics for {server['name']}: {e}", exc_info=True)
                 continue
 
             try:
-                # Run monitoring script and get output
-                monitoring_output = run_monitoring_script(server)
                 top_users = get_top_users(server, collect_disk_usage)
-
-                # Parse the monitoring data
-                metrics = parse_monitoring_data(monitoring_output)
-                metrics["server_name"] = server["name"]
-
-                # Store in database
-                store_metrics(metrics)
                 store_top_users(server["name"], top_users)
                 logger.info(f"Successfully collected data for {server['name']}")
-                success_count += 1
+            except (CollectionError, ParseError) as e:
+                logger.error(f"Per-user data failed for {server['name']}: {e}")
             except Exception as e:
-                logger.error(f"Error processing server {server['name']}: {e}")
-                continue
+                logger.error(f"Error storing per-user data for {server['name']}: {e}", exc_info=True)
 
         logger.info(
             f"Collection cycle completed. Successfully processed {success_count}/{len(server_list)} servers."

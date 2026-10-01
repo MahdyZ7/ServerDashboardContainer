@@ -26,7 +26,7 @@ The system uses Docker Compose to orchestrate **three services**:
 
 ### Database Schema
 - `server_metrics`: System metrics (CPU, RAM, disk usage, connections, users)
-- `top_users`: Per-user resource consumption data
+- `top_users`: Per-user resource consumption data (one row per server+user; `cpu` is percent of ONE logical CPU over a short sample, so 400 = four cores; `disk` NULL = unknown)
 
 ## Dashboard Architecture (Unified Flask App)
 
@@ -159,6 +159,7 @@ Create `.env` file with:
 - `SERVER{1-7}_HOST`: Server IP addresses
 - `SERVER{1-7}_USERNAME`: SSH usernames
 - `SERVER{1-7}_PASSWORD`: SSH passwords
+- `SERVER{1-7}_KEY_FILE`: optional SSH private key path (used instead of the password; see `Docs/Project-Overview/SSH_KEY_MIGRATION.md`)
 - `DEBUG`: Set to "True" for debug mode
 
 ### Dashboard Configuration

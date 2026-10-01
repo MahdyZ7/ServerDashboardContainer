@@ -5,6 +5,26 @@ answer “who is making this server busy right now?” Fix measurement semantics
 failure reporting before adding more columns. Findings below refer to the scripts
 as reviewed; only the license helper and Dockerfile packaging change are implemented.
 
+## Fix status — 2026-10-01
+
+Implementation step 1 and parts of steps 2–3 are done and were verified against the live
+servers (RHEL 6.6 → 9.8). Tests: `python3 -m unittest discover -s srcs/DataCollection/tests -v`.
+
+| Finding | Status |
+| --- | --- |
+| Since-boot CPU in `mini_monitering.sh` | **Fixed.** Two explicit `/proc/stat` samples; busy, iowait and steal reported separately (new `cpu_iowait_percent`, `cpu_steal_percent`); guest not double-counted; no sample → NULL, never a fallback. Memory now uses `MemAvailable` (`ram_available_mb`). |
+| Lifetime `ps %CPU` per user | **Fixed** in `TopUsers.sh`: per-process tick deltas keyed by (pid, start time), summed by numeric UID. Unit: percent of one logical CPU. `UserInfo.sh` (unused) still uses `ps`. |
+| `DECIMAL(5,2)` overflow | **Fixed.** `top_users.cpu` → `NUMERIC(9,2)`, `mem` → `(7,2)`, `disk` → `(12,2)`, load averages → `(8,2)`; guarded migrations. |
+| Cumulative / silently-zero I/O | **Fixed.** New `io_read_bps` / `io_write_bps` interval rates; I/O is NULL when none of an account's processes is readable. `io_*_bytes` remains the live-process cumulative total. Coverage is still partial without root. |
+| Account discovery by shell | **Fixed.** Union of process-owner UIDs, login-shell accounts and logged-in users; names resolved with `getent passwd UID`. |
+| Password on command line / in logs | **Fixed.** Password goes through `SSHPASS` (`sshpass -e`); errors never include the command. `SERVER{n}_KEY_FILE` is supported (BatchMode). SSH connect/keepalive limits and Python deadlines added; absolute script paths; remote args quoted. |
+| `top_users.timestamp` never refreshed | **Fixed.** Every upsert sets the observation time. |
+| Disk sentinel 0 | **Fixed.** Disk is NULL when unknown; `disk_collected_at` added. Not-collected/timed-out scans keep the old value. |
+| Disk scan roots | **Partly fixed.** Home from passwd (not `/home/$user`), null-safe paths, allocated size (`du -k`), `nice`/`ionice`, per-account timeout, unreadable roots reported unknown. Quotas not used. |
+| Fragile parsing | **Fixed.** Versioned output: `key=value` for host metrics, `#format=2` + TSV for users, `LC_ALL=C`, exact UID matching, field-count validation, ISO login times. |
+| Cron overlap / env quoting / ICMP gate | **Fixed.** `run-collection.sh` (NUL-safe env load + `flock` per job); SSH tried directly; per-user failures no longer discard host metrics; weekly cleanup no longer collides with the 15-min run. Needs an image rebuild to take effect. |
+| Per-mount disk, network deltas, SSH/VNC sessions, PSI, history, license integration | **Open** (steps 3–4). |
+
 ## Findings, in priority order
 
 | Priority | Location | Finding and recommended change |
