@@ -625,6 +625,10 @@
                     <span>Performance rating</span>
                     <span class="performance-badge ${performance.class}">${performance.rating}</span>
                 </footer>
+                <button type="button" class="btn btn-secondary btn-block machine-detail-link"
+                        data-machine="${escapeHtml(server.server_name)}">
+                    Mounts, disks, network &amp; services
+                </button>
             </article>
         `;
     }
@@ -740,6 +744,154 @@
     /**
      * Load enhanced server cards
      */
+    /**
+     * Machine detail (Server Details 02.2): health, mounts, disks and network
+     * for one server, from its latest collection run.
+     */
+    let machineMetrics = {};
+    let machineDetailBound = false;
+
+    function setupMachineDetail(servers) {
+        const select = document.getElementById('machine-select');
+        if (!select) return;
+        machineMetrics = Object.fromEntries(servers.map(s => [s.server_name, s]));
+        const current = select.value;
+        select.innerHTML = servers.map(s =>
+            `<option value="${escapeHtml(s.server_name)}">${escapeHtml(s.server_name)}</option>`).join('');
+        if (current && machineMetrics[current]) select.value = current;
+
+        if (!machineDetailBound) {
+            machineDetailBound = true;
+            select.addEventListener('change', () => loadMachineDetail(select.value));
+            document.getElementById('enhanced-server-cards')?.addEventListener('click', event => {
+                const btn = event.target.closest('.machine-detail-link');
+                if (!btn) return;
+                select.value = btn.dataset.machine;
+                loadMachineDetail(btn.dataset.machine);
+                document.getElementById('machine-detail-heading')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            });
+        }
+        if (select.value) loadMachineDetail(select.value);
+    }
+
+    function rate(bps) {
+        return bps == null ? '—' : `${formatBytes(bps)}/s`;
+    }
+
+    function usageBar(pct, label) {
+        const p = Math.min(100, Math.max(0, pct || 0));
+        const tone = p >= 95 ? 'danger' : p >= 85 ? 'warning' : 'good';
+        return `<div class="cell-bar">
+            <div class="bar-track"><div class="bar-fill ${tone}" style="width:${p}%"></div></div>
+            <span class="bar-label">${label}</span>
+        </div>`;
+    }
+
+    async function loadMachineDetail(serverName) {
+        const body = document.getElementById('machine-detail-body');
+        const stamp = document.getElementById('machine-collected');
+        if (!body || !serverName) return;
+        body.innerHTML = '<div class="spinner" style="margin: 1rem 0;"></div>';
+
+        let fs, io, net, svc;
+        try {
+            [fs, io, net, svc] = await Promise.all(['filesystems', 'disk-io', 'network', 'services']
+                .map(detail => API.getServerDetail(serverName, detail)));
+        } catch (error) {
+            console.error('Error loading machine detail:', error);
+            body.innerHTML = `<div class="empty-state"><p>Failed to load details for ${escapeHtml(serverName)}.</p>
+                <button class="btn btn-secondary" onclick="loadMachineDetail('${escapeHtml(serverName).replace(/'/g, "\\'")}')">
+                <i class="fas fa-sync-alt"></i> Retry</button></div>`;
+            return;
+        }
+        const m = machineMetrics[serverName] || {};
+        if (stamp) stamp.textContent = fs.collected_at ? `Collected ${formatUserTimestamp(fs.collected_at)}` : '';
+
+        const psi = ['psi_cpu_some_avg60', 'psi_memory_full_avg60', 'psi_io_full_avg60'];
+        const pressure = psi.every(k => m[k] == null)
+            ? '<span class="cell-muted">Not available (kernel without PSI, or booted without psi=1)</span>'
+            : `CPU ${m.psi_cpu_some_avg60 ?? '—'}% · memory ${m.psi_memory_full_avg60 ?? '—'}% · I/O ${m.psi_io_full_avg60 ?? '—'}% of the last minute stalled`;
+
+        const services = svc.data.length ? svc.data.map(s => {
+            const tone = s.state === 'active' ? '' : s.state === 'missing' ? 'status-offline' : 'status-warning';
+            const note = s.monitored ? '' : ' (unit)';
+            return `<span class="status-badge ${tone}"><span class="status-dot"></span>${escapeHtml(s.service)}${note}: ${escapeHtml(s.state)}</span>`;
+        }).join('') : '<span class="cell-muted">No service data yet.</span>';
+
+        const fsRows = fs.data.map(f => {
+            const inode = f.inode_percent != null ? `${f.inode_percent.toFixed(0)}%` : '—';
+            return `<tr>
+                <td><strong>${escapeHtml(f.mount_point)}</strong>
+                    <span class="cell-subline" title="${escapeHtml(f.source || '')}">${escapeHtml(f.source || '')}</span></td>
+                <td>${escapeHtml(f.fstype || '—')}</td>
+                <td>${usageBar(f.use_percent, f.use_percent != null ? `${f.use_percent.toFixed(0)}%` : '—')}</td>
+                <td class="cell-numeric">${f.avail_bytes != null ? formatBytes(f.avail_bytes) : '—'}</td>
+                <td class="cell-numeric">${f.size_bytes != null ? formatBytes(f.size_bytes) : '—'}</td>
+                <td class="cell-numeric">${inode}</td>
+            </tr>`;
+        }).join('');
+
+        // Devices that have never done any I/O since boot are hidden
+        const active = io.data.filter(d => (d.reads || 0) + (d.writes || 0) > 0)
+            .sort((a, b) => (b.util_percent ?? -1) - (a.util_percent ?? -1));
+        const idle = io.data.length - active.length;
+        const ioRows = active.map(d => `<tr>
+                <td><strong>${escapeHtml(d.name || d.device)}</strong>
+                    ${d.name && d.name !== d.device ? `<span class="cell-subline">${escapeHtml(d.device)}</span>` : ''}</td>
+                <td class="cell-numeric">${rate(d.read_bps)}</td>
+                <td class="cell-numeric">${rate(d.write_bps)}</td>
+                <td class="cell-numeric">${d.read_iops != null ? (d.read_iops + d.write_iops).toFixed(1) : '—'}</td>
+                <td>${d.util_percent != null ? usageBar(d.util_percent, `${d.util_percent.toFixed(0)}%`) : '<span class="cell-muted">—</span>'}</td>
+                <td class="cell-numeric">${d.await_ms != null ? `${d.await_ms.toFixed(1)} ms` : '—'}</td>
+            </tr>`).join('');
+
+        const netRows = net.data.map(n => {
+            const problems = (n.rx_errors_delta || 0) + (n.tx_errors_delta || 0);
+            const drops = (n.rx_dropped_delta || 0) + (n.tx_dropped_delta || 0);
+            return `<tr>
+                <td><strong>${escapeHtml(n.interface)}</strong></td>
+                <td class="cell-numeric">${rate(n.rx_bps)}</td>
+                <td class="cell-numeric">${rate(n.tx_bps)}</td>
+                <td class="cell-numeric ${problems ? 'text-warn' : ''}">${n.rx_errors_delta == null ? '—' : problems}</td>
+                <td class="cell-numeric">${n.rx_dropped_delta == null ? '—' : drops}</td>
+            </tr>`;
+        }).join('');
+
+        const table = (caption, head, rows, empty) => `
+            <div class="table-wrapper">
+                <table class="data-table data-table--compact">
+                    <caption class="machine-caption">${caption}</caption>
+                    <thead><tr>${head.map(([h, cls]) => `<th scope="col"${cls ? ` class="${cls}"` : ''}>${h}</th>`).join('')}</tr></thead>
+                    <tbody>${rows || `<tr><td colspan="${head.length}" class="table-empty">${empty}</td></tr>`}</tbody>
+                </table>
+            </div>`;
+
+        body.innerHTML = `
+            <div class="machine-health">
+                <div class="fig"><span class="fig-value">${m.procs_running ?? '—'}</span><span class="fig-label">Running tasks</span></div>
+                <div class="fig"><span class="fig-value">${m.procs_blocked ?? '—'}</span><span class="fig-label">Waiting on I/O</span></div>
+                <div class="fig"><span class="fig-value">${m.procs_zombie ?? '—'}</span><span class="fig-label">Zombie processes</span></div>
+                <div class="machine-health-wide">
+                    <span class="fig-label">Services</span>
+                    <div class="machine-services">${services}</div>
+                    <span class="fig-label">Pressure stalls</span>
+                    <div>${pressure}</div>
+                </div>
+            </div>
+            ${table('Filesystems', [['Mount'], ['Type'], ['Used'], ['Free', 'col-numeric'], ['Size', 'col-numeric'], ['Inodes', 'col-numeric']],
+                    fsRows, 'No filesystem data yet.')}
+            <div class="machine-grid">
+                ${table('Disks', [['Device'], ['Read', 'col-numeric'], ['Write', 'col-numeric'], ['IOPS', 'col-numeric'], ['Busy'], ['Wait', 'col-numeric']],
+                        ioRows, 'No disk data yet.')}
+                ${table('Network', [['Interface'], ['In', 'col-numeric'], ['Out', 'col-numeric'], ['Errors', 'col-numeric'], ['Drops', 'col-numeric']],
+                        netRows, 'No network data yet.')}
+            </div>
+            <p class="action-note">Disk and network rates are averages since the previous collection (normally 15 minutes); errors and drops are counts in that interval.
+            ${idle ? `${idle} device${idle > 1 ? 's' : ''} with no I/O since boot hidden.` : ''}</p>`;
+    }
+
+    window.loadMachineDetail = loadMachineDetail;
+
     async function loadEnhancedServerCards() {
         const container = document.getElementById('enhanced-server-cards');
         if (!container) return;
@@ -750,6 +902,7 @@
 
             // Use detailed cards for server details tab
             container.innerHTML = response.data.map((server, i) => renderDetailedServerCard(server, i)).join('');
+            setupMachineDetail(response.data);
         } catch (error) {
             console.error('Error loading enhanced server cards:', error);
             container.innerHTML = `
@@ -881,6 +1034,40 @@
 
     window.loadLicenses = loadLicenses;
 
+    /**
+     * Licenses grouped under a vendor subheading; one line per feature (and
+     * client host), seats summed, longest hold shown.
+     */
+    function renderLicenseGroups(licenses) {
+        // Grouped under a vendor subheading; one line per feature (and client
+        // host), seats summed, longest hold shown
+        const byVendor = new Map();
+        (licenses || []).forEach(l => {
+            if (!byVendor.has(l.vendor)) byVendor.set(l.vendor, new Map());
+            const features = byVendor.get(l.vendor);
+            const key = `${l.feature}|${l.client_host}`;
+            const g = features.get(key);
+            if (!g) { features.set(key, { ...l, licenses: l.licenses || 1 }); return; }
+            g.licenses += l.licenses || 1;
+            if ((l.held_minutes || 0) > (g.held_minutes || 0)) {
+                Object.assign(g, { held: l.held, held_minutes: l.held_minutes, start_raw: l.start_raw });
+            }
+        });
+        return [...byVendor.entries()]
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([vendor, features]) => `
+                <div class="license-group">
+                    <span class="license-vendor">${escapeHtml(vendor)}</span>
+                    ${[...features.values()].map(l => {
+                        const seats = l.licenses > 1 ? ` ×${l.licenses}` : '';
+                        const from = l.server_name ? '' : ` <span class="cell-muted">from ${escapeHtml(l.client_host || '?')}</span>`;
+                        const held = escapeHtml(l.held || l.start_raw || '—');
+                        return `<span class="license-chip" title="Checked out ${escapeHtml(l.start_raw || 'at an unknown time')}">`
+                            + `${escapeHtml(l.feature)}${seats}${from} <span class="cell-muted">· ${held}</span></span>`;
+                    }).join('')}
+                </div>`).join('') || '<span class="cell-muted">—</span>';
+    }
+
     function renderUsersTable(users) {
         const tableBody = document.getElementById('users-table-body');
         if (!tableBody) return;
@@ -900,33 +1087,7 @@
             const cpuClass = cpuVal > 90 ? 'danger' : cpuVal > 70 ? 'warning' : 'good';
             const memClass = memVal > 90 ? 'danger' : memVal > 70 ? 'warning' : 'good';
             // Licenses held from this server: feature, extra seats, how long
-            // Grouped under a vendor subheading; one line per feature (and client
-            // host), seats summed, longest hold shown
-            const byVendor = new Map();
-            (user.licenses || []).forEach(l => {
-                if (!byVendor.has(l.vendor)) byVendor.set(l.vendor, new Map());
-                const features = byVendor.get(l.vendor);
-                const key = `${l.feature}|${l.client_host}`;
-                const g = features.get(key);
-                if (!g) { features.set(key, { ...l, licenses: l.licenses || 1 }); return; }
-                g.licenses += l.licenses || 1;
-                if ((l.held_minutes || 0) > (g.held_minutes || 0)) {
-                    Object.assign(g, { held: l.held, held_minutes: l.held_minutes, start_raw: l.start_raw });
-                }
-            });
-            const licenses = [...byVendor.entries()]
-                .sort(([a], [b]) => a.localeCompare(b))
-                .map(([vendor, features]) => `
-                    <div class="license-group">
-                        <span class="license-vendor">${escapeHtml(vendor)}</span>
-                        ${[...features.values()].map(l => {
-                            const seats = l.licenses > 1 ? ` ×${l.licenses}` : '';
-                            const from = l.server_name ? '' : ` <span class="cell-muted">from ${escapeHtml(l.client_host || '?')}</span>`;
-                            const held = escapeHtml(l.held || l.start_raw || '—');
-                            return `<span class="license-chip" title="Checked out ${escapeHtml(l.start_raw || 'at an unknown time')}">`
-                                + `${escapeHtml(l.feature)}${seats}${from} <span class="cell-muted">· ${held}</span></span>`;
-                        }).join('')}
-                    </div>`).join('') || '<span class="cell-muted">—</span>';
+            const licenses = renderLicenseGroups(user.licenses);
 
             // Inline mini-bar for CPU
             const cpuBar = `<div class="cell-bar">
@@ -944,7 +1105,8 @@
                 <tr>
                     <td class="cell-server">${escapeHtml(user.server_name || 'N/A')}</td>
                     <td class="cell-user">
-                        <strong>${escapeHtml(user.username || 'N/A')}</strong>
+                        <button type="button" class="user-link" data-user="${escapeHtml(user.username || '')}"
+                                aria-label="Show detail for ${escapeHtml(user.username || '')}">${escapeHtml(user.username || 'N/A')}</button>
                         ${user.full_name && user.full_name !== 'N/A' ? `<span class="cell-subline" title="${escapeHtml(user.full_name)}">${escapeHtml(user.full_name)}</span>` : ''}
                     </td>
                     <td>${cpuBar}</td>
@@ -1046,6 +1208,15 @@
     function bindUserTableControls() {
         if (userFiltersBound) return;
         userFiltersBound = true;
+        document.getElementById('users-table-body')?.addEventListener('click', event => {
+            const link = event.target.closest('.user-link');
+            if (link) openUserDetail(link.dataset.user, link);
+        });
+        document.getElementById('user-drawer-close')?.addEventListener('click', closeUserDetail);
+        document.getElementById('user-drawer-backdrop')?.addEventListener('click', closeUserDetail);
+        document.addEventListener('keydown', event => {
+            if (event.key === 'Escape' && !document.getElementById('user-drawer')?.hidden) closeUserDetail();
+        });
         document.getElementById('user-search')?.addEventListener('input', applyUserFilters);
         document.getElementById('server-filter')?.addEventListener('change', applyUserFilters);
         document.querySelectorAll('#users-table .th-sort').forEach(btn => {
@@ -1060,6 +1231,173 @@
                 applyUserFilters();
             });
         });
+    }
+
+    /**
+     * User detail drawer: one account across all servers, its licenses and
+     * its recorded activity over time.
+     */
+    let drawerTrigger = null;
+    let drawerUser = null;
+    const HISTORY_RANGES = [[24, '24 h'], [24 * 7, '7 days'], [24 * 30, '30 days']];
+    const SERIES_COLORS = ['blue', 'purple', 'cyan', 'green', 'orange', 'red'];
+
+    function closeUserDetail() {
+        const drawer = document.getElementById('user-drawer');
+        if (!drawer || drawer.hidden) return;
+        drawer.hidden = true;
+        document.getElementById('user-drawer-backdrop').hidden = true;
+        document.body.classList.remove('drawer-open');
+        ChartManager.destroyChart('user-history-chart');
+        drawerUser = null;
+        drawerTrigger?.focus();
+    }
+
+    function openUserDetail(username, trigger) {
+        const drawer = document.getElementById('user-drawer');
+        if (!drawer || !username) return;
+        // Tab panels animate with transforms, which would trap position: fixed
+        // inside the panel; host the drawer on <body> instead
+        if (drawer.parentElement !== document.body) {
+            document.body.append(document.getElementById('user-drawer-backdrop'), drawer);
+        }
+        drawerTrigger = trigger || null;
+        drawerUser = username;
+
+        const rows = allUsersCache.filter(u => (u.username || '').toLowerCase() === username.toLowerCase());
+        const fullName = rows.map(r => r.full_name).find(n => n && n !== 'N/A');
+        document.getElementById('user-drawer-title').textContent = username;
+        document.getElementById('user-drawer-sub').textContent = fullName || '';
+
+        const sum = key => rows.reduce((n, r) => n + (parseFloat(r[key]) || 0), 0);
+        const cores = sum('cpu') / 100;
+        const rssGb = sum('rss_kb') / 1048576;
+        const disk = rows.some(r => r.disk != null) ? sum('disk') : null;
+        const licenses = rows.flatMap(r => r.licenses || [])
+            // a checkout from an unmonitored host is attached to every row; count it once
+            .filter((l, i, all) => all.findIndex(x => x.feature === l.feature && x.client_host === l.client_host
+                && x.start_at === l.start_at && x.vendor === l.vendor) === i);
+        const seats = licenses.reduce((n, l) => n + (l.licenses || 1), 0);
+
+        const serverRows = [...rows].sort((a, b) => (b.cpu || 0) - (a.cpu || 0)).map(r => {
+            const c = parseFloat(r.cpu || 0);
+            return `<tr>
+                <td class="cell-server">${escapeHtml(r.server_name)}</td>
+                <td class="cell-numeric">${c >= 100 ? `${(c / 100).toFixed(1)} cores` : `${c.toFixed(1)}%`}</td>
+                <td class="cell-numeric">${r.rss_kb != null ? formatBytes(r.rss_kb * 1024) : '—'}</td>
+                <td class="cell-numeric">${r.disk == null ? '—' : `${parseFloat(r.disk).toFixed(1)} GB`}</td>
+                <td class="cell-numeric">${r.process_count || 0}</td>
+                <td class="cell-truncate" title="${escapeHtml(r.top_process || '')}">${escapeHtml(r.top_process || '—')}</td>
+                <td class="cell-muted cell-date" title="${escapeHtml(formatUserTimestamp(r.last_login))}">${formatUserDate(r.last_login)}</td>
+            </tr>`;
+        }).join('');
+
+        document.getElementById('user-drawer-body').innerHTML = `
+            <div class="drawer-figures">
+                <div class="fig"><span class="fig-value">${cores.toFixed(1)}</span><span class="fig-label">CPU cores now</span></div>
+                <div class="fig"><span class="fig-value">${rssGb.toFixed(1)}<small> GB</small></span><span class="fig-label">Memory (RSS)</span></div>
+                <div class="fig"><span class="fig-value">${disk == null ? '—' : disk.toFixed(1)}${disk == null ? '' : '<small> GB</small>'}</span><span class="fig-label">Disk</span></div>
+                <div class="fig"><span class="fig-value">${seats}</span><span class="fig-label">Licenses held</span></div>
+            </div>
+
+            <h4 class="drawer-section">On each server</h4>
+            <div class="table-wrapper">
+                <table class="data-table data-table--compact">
+                    <thead><tr>
+                        <th scope="col">Server</th><th scope="col" class="col-numeric">CPU</th>
+                        <th scope="col" class="col-numeric">Memory</th><th scope="col" class="col-numeric">Disk</th>
+                        <th scope="col" class="col-numeric">Procs</th><th scope="col">Top process</th><th scope="col">Last login</th>
+                    </tr></thead>
+                    <tbody>${serverRows || '<tr><td colspan="7" class="table-empty">No current records.</td></tr>'}</tbody>
+                </table>
+            </div>
+
+            <h4 class="drawer-section">Licenses held</h4>
+            <div class="drawer-licenses">${renderLicenseGroups(licenses)}</div>
+
+            <h4 class="drawer-section">Activity history</h4>
+            <div class="history-ranges" role="group" aria-label="History range">
+                ${HISTORY_RANGES.map(([h, label], i) => `<button type="button" class="btn btn-secondary btn-sm" data-hours="${h}" aria-pressed="${i === 0}">${label}</button>`).join('')}
+            </div>
+            <div class="chart-wrapper drawer-chart"><canvas id="user-history-chart" aria-label="CPU cores used over time per server"></canvas></div>
+            <p class="action-note" id="user-history-note"></p>
+            <div id="user-history-procs"></div>`;
+
+        document.querySelectorAll('#user-drawer .history-ranges button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('#user-drawer .history-ranges button')
+                    .forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
+                loadUserHistory(username, parseInt(btn.dataset.hours, 10));
+            });
+        });
+
+        drawer.hidden = false;
+        document.getElementById('user-drawer-backdrop').hidden = false;
+        document.body.classList.add('drawer-open');
+        document.getElementById('user-drawer-close').focus();
+        loadUserHistory(username, HISTORY_RANGES[0][0]);
+    }
+
+    async function loadUserHistory(username, hours) {
+        const note = document.getElementById('user-history-note');
+        const procs = document.getElementById('user-history-procs');
+        let response;
+        try {
+            response = await API.getUserHistory(username, hours);
+        } catch (error) {
+            if (note) note.textContent = 'Failed to load activity history.';
+            return;
+        }
+        if (drawerUser !== username) return;  // drawer closed or switched meanwhile
+        const rows = response.data.slice().reverse();  // oldest first
+
+        if (!rows.length) {
+            ChartManager.destroyChart('user-history-chart');
+            note.textContent = 'No recorded activity in this period: the account stayed below 5% of a core, 1 GB of memory and 1 MB/s of I/O.';
+            procs.innerHTML = '';
+            return;
+        }
+
+        // One series per server; x positions are the collection times
+        const times = [...new Set(rows.map(r => r.timestamp))];
+        const servers = [...new Set(rows.map(r => r.server_name))];
+        const byKey = new Map(rows.map(r => [`${r.server_name}|${r.timestamp}`, r]));
+        const labels = times.map(t => {
+            const d = new Date(t);
+            return hours <= 24
+                ? d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+                : d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        });
+        ChartManager.createLineChart('user-history-chart', {
+            labels,
+            datasets: servers.map((server, i) => ({
+                label: server,
+                data: times.map(t => {
+                    const r = byKey.get(`${server}|${t}`);
+                    return r ? +(r.cpu / 100).toFixed(2) : null;
+                }),
+                colorKey: SERIES_COLORS[i % SERIES_COLORS.length],
+                fill: servers.length === 1,
+                spanGaps: false,
+                pointRadius: 2,
+            })),
+        }, {
+            scales: { y: { beginAtZero: true, title: { display: true, text: 'CPU cores' } } },
+            plugins: { tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y} cores` } } },
+        });
+
+        note.textContent = `${rows.length} active sample${rows.length > 1 ? 's' : ''}. Gaps mean the account was idle `
+            + '(below 5% of a core, 1 GB of memory and 1 MB/s of I/O) or the server was not reachable.';
+
+        // Which programs kept the account busy
+        const counts = new Map();
+        rows.forEach(r => { if (r.top_process) counts.set(r.top_process, (counts.get(r.top_process) || 0) + 1); });
+        const top = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6);
+        procs.innerHTML = top.length ? `
+            <h4 class="drawer-section">Busiest programs in this period</h4>
+            <ul class="history-procs">${top.map(([name, n]) =>
+                `<li><span>${escapeHtml(name)}</span><span class="cell-muted">${n} sample${n > 1 ? 's' : ''}</span></li>`).join('')}
+            </ul>` : '';
     }
 
     function setupUserTableFilters(users) {

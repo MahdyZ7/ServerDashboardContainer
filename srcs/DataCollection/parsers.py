@@ -64,6 +64,7 @@ SERVER_METRIC_TYPES = {
     "net_tx_bytes": _int,
     "procs_running": _int,
     "procs_blocked": _int,
+    "procs_zombie": _int,
     "psi_cpu_some_avg60": _float,
     "psi_memory_some_avg60": _float,
     "psi_memory_full_avg60": _float,
@@ -80,9 +81,11 @@ RECORD_TYPES = {
                               "sectors_written", "ms_writing", "ms_doing_io"]),
     "net": ("network", ["interface", "rx_bytes", "tx_bytes", "rx_packets", "tx_packets",
                         "rx_errors", "tx_errors", "rx_dropped", "tx_dropped"]),
+    # monitored: 1 = requested service, 0 = some other failed systemd unit
+    "svc": ("services", ["service", "state", "monitored"]),
 }
 # Columns besides the first that hold text rather than numbers
-TEXT_COLUMNS = {"fstype", "source", "name"}
+TEXT_COLUMNS = {"fstype", "source", "name", "state"}
 
 
 def parse_monitoring_data(data: str) -> Dict:

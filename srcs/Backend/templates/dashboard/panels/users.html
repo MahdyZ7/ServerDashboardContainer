@@ -100,6 +100,22 @@
         </div>
         <p class="action-note">Snapshot of served licenses every 5 minutes. A checkout shows who holds a seat, not whether the tool is busy.</p>
     </section>
+
+    <!-- User detail drawer (opened from a username in the table) -->
+    <div class="drawer-backdrop" id="user-drawer-backdrop" hidden></div>
+    <aside class="drawer" id="user-drawer" role="dialog" aria-modal="true" aria-labelledby="user-drawer-title" hidden>
+        <header class="drawer-head">
+            <div>
+                <p class="kicker">User detail</p>
+                <h3 id="user-drawer-title"></h3>
+                <p class="drawer-sub" id="user-drawer-sub"></p>
+            </div>
+            <button type="button" class="btn btn-secondary drawer-close" id="user-drawer-close" aria-label="Close user detail">
+                <i class="fas fa-times" aria-hidden="true"></i>
+            </button>
+        </header>
+        <div class="drawer-body" id="user-drawer-body"></div>
+    </aside>
 </section>
 
 <script>

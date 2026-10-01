@@ -583,7 +583,7 @@ def create_app(config_class=Config):
     # Rows from one collection run share a timestamp (one transaction), so the
     # latest run per server is the rows at that server's newest timestamp.
     DETAIL_TABLES = {"filesystems": "server_filesystems", "disk-io": "server_disk_io",
-                     "network": "server_network"}
+                     "network": "server_network", "services": "server_services"}
 
     def _latest_detail_rows(cursor, table, server_name=None):
         return _fetch_dicts(cursor, f"""
@@ -669,6 +669,7 @@ def create_app(config_class=Config):
                 filesystems_by_server=details["filesystems"],
                 disk_io_by_server=details["disk-io"],
                 network_by_server=details["network"],
+                services_by_server=details["services"],
             ) + build_license_items(*_current_licenses(cursor), now)
             items.sort(key=lambda i: (SEVERITY_ORDER[i["severity"]], i["server"]))
             return jsonify({
@@ -755,7 +756,7 @@ def create_app(config_class=Config):
             if conn:
                 conn.close()
 
-    @app.route("/api/servers/<server_name>/<any(filesystems, 'disk-io', network):detail>", methods=["GET"])
+    @app.route("/api/servers/<server_name>/<any(filesystems, 'disk-io', network, services):detail>", methods=["GET"])
     def get_server_detail(server_name, detail):
         """Latest per-mount, per-device or per-interface rows for one server.
 

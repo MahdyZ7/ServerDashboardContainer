@@ -28,6 +28,8 @@ PRESSURE_WARNING = 10
 DISK_UTIL_WARNING = 80
 # Interface errors per collection interval worth investigating
 NIC_ERRORS_WARNING = 10
+# Unreaped processes worth chasing (each holds a PID slot)
+ZOMBIE_INFO = 100
 
 _SIZE_UNITS = {"K": 1 / (1024 * 1024), "M": 1 / 1024, "G": 1, "T": 1024, "P": 1024 * 1024}
 
@@ -73,6 +75,7 @@ def build_attention_items(
     filesystems_by_server: Optional[Dict[str, List[Dict[str, Any]]]] = None,
     disk_io_by_server: Optional[Dict[str, List[Dict[str, Any]]]] = None,
     network_by_server: Optional[Dict[str, List[Dict[str, Any]]]] = None,
+    services_by_server: Optional[Dict[str, List[Dict[str, Any]]]] = None,
 ) -> List[Dict[str, Any]]:
     """
     Produce a ranked list of issues, each with a concrete next step.
@@ -182,6 +185,30 @@ def build_attention_items(
                     + (f", {_num(await_ms):.0f} ms per request." if await_ms is not None else "."),
                     "Spread heavy I/O jobs across servers or move scratch data to a faster disk.",
                     device=label, util_percent=_num(util))
+
+        services = (services_by_server or {}).get(name, [])
+        for svc in services:
+            if svc.get("monitored") and svc.get("state") in ("inactive", "failed"):
+                add("warning", "service", name, f"{svc['service']} is not running on {name}",
+                    f"The service is {svc['state']}.",
+                    f"Check it with systemctl status {svc['service']} (service {svc['service']} status "
+                    "on RHEL 6) and restart it if it should be running.",
+                    service=svc["service"], state=svc["state"])
+        other_failed = sorted(svc["service"] for svc in services
+                              if not svc.get("monitored") and svc.get("state") == "failed")
+        if other_failed:
+            add("info", "service", name,
+                f"{len(other_failed)} failed system unit{'s' if len(other_failed) > 1 else ''} on {name}",
+                ", ".join(other_failed[:6]) + ("…" if len(other_failed) > 6 else "") + ".",
+                "Review with systemctl --failed; reset units that are not needed (systemctl reset-failed).",
+                units=other_failed)
+
+        zombies = _num(s.get("procs_zombie"))
+        if zombies >= ZOMBIE_INFO:
+            add("info", "processes", name, f"{name} has {zombies:.0f} zombie processes",
+                "Exited processes whose parent has not collected them; harmless in small numbers.",
+                "Find the parents: ps -eo ppid=,stat= | awk '$2 ~ /^Z/ {print $1}' | sort | uniq -c | sort -rn | head",
+                zombies=zombies)
 
         for nic in (network_by_server or {}).get(name, []):
             errors = _num(nic.get("rx_errors_delta")) + _num(nic.get("tx_errors_delta"))

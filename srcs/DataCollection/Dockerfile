@@ -27,7 +27,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen
 
 # Copy application files
-COPY BashGetInfo.sh TopUsers.sh mini_monitering.sh UserInfo.sh LicenseUsage.sh start-cron.sh run-collection.sh ./
+COPY BashGetInfo.sh TopUsers.sh mini_monitering.sh LicenseUsage.sh start-cron.sh run-collection.sh ./
 COPY *.py ./
 COPY crontab /etc/cron.d/datacollection-crontab
 

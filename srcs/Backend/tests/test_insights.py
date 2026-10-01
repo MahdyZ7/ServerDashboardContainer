@@ -179,3 +179,17 @@ def test_busy_but_not_full_is_info_and_unissued_ignored():
                 {"vendor": "synopsys", "feature": "Odd", "issued": 0, "in_use": 1}]
     items = build_license_items([snap("synopsys")], features, [], NOW)
     assert [(i["severity"], i["title"]) for i in items] == [("info", "VCS: 8 of 10 licenses in use")]
+
+
+def test_stopped_service_and_failed_units_and_zombies():
+    svcs = {"a": [{"service": "sshd", "state": "failed", "monitored": True},
+                  {"service": "crond", "state": "active", "monitored": True},
+                  {"service": "autofs", "state": "missing", "monitored": True},
+                  {"service": "insights-client", "state": "failed", "monitored": False}]}
+    items = build_attention_items([server("a", procs_zombie=250)], {}, {}, THRESHOLDS, NOW,
+                                  services_by_server=svcs)
+    assert sorted((i["severity"], i["title"]) for i in items) == [
+        ("info", "1 failed system unit on a"),
+        ("info", "a has 250 zombie processes"),
+        ("warning", "sshd is not running on a"),
+    ]

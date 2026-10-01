@@ -1,3 +1,5 @@
+> **Superseded (2026-10-01).** The schema generator (`schema/`), its generated code and docs were removed: nothing used them at runtime and they had drifted from the real tables. The source of truth is `init_db()` in `srcs/DataCollection/backend.py` (tables and guarded migrations). Kept for history only.
+
 # Schema-Driven Architecture Refactoring Plan
 
 ## Executive Summary

@@ -56,6 +56,16 @@ class HostMetricsTests(unittest.TestCase):
         self.assertFalse([d for d in metrics["block_devices"] if d["device"].startswith("loop")])
         self.assertFalse([n for n in metrics["network"] if n["interface"] == "lo"])
         self.assertIsNotNone(metrics["procs_running"])
+        self.assertIsNotNone(metrics["procs_zombie"])
+
+    def test_services_report_state_and_missing(self):
+        metrics = parse_monitoring_data(run_script("mini_monitering.sh", "--kv", "--services", "sshd no-such-svc"))
+        states = {s["service"]: s for s in metrics["services"]}
+        self.assertEqual(states["no-such-svc"]["state"], "missing")
+        self.assertEqual(states["no-such-svc"]["monitored"], 1)
+        self.assertIn(states["sshd"]["state"], ("active", "inactive", "failed"))
+        self.assertTrue(all(s["monitored"] == 0 for name, s in states.items()
+                            if name not in ("sshd", "no-such-svc")))
 
     def test_records_parse_mount_with_spaces_and_unknown_inodes(self):
         metrics = parse_monitoring_data(

@@ -13,7 +13,7 @@ servers (RHEL 6.6 → 9.8). Tests: `python3 -m unittest discover -s srcs/DataCol
 | Finding | Status |
 | --- | --- |
 | Since-boot CPU in `mini_monitering.sh` | **Fixed.** Two explicit `/proc/stat` samples; busy, iowait and steal reported separately (new `cpu_iowait_percent`, `cpu_steal_percent`); guest not double-counted; no sample → NULL, never a fallback. Memory now uses `MemAvailable` (`ram_available_mb`). |
-| Lifetime `ps %CPU` per user | **Fixed** in `TopUsers.sh`: per-process tick deltas keyed by (pid, start time), summed by numeric UID. Unit: percent of one logical CPU. `UserInfo.sh` (unused) still uses `ps`. |
+| Lifetime `ps %CPU` per user | **Fixed** in `TopUsers.sh`: per-process tick deltas keyed by (pid, start time), summed by numeric UID. Unit: percent of one logical CPU. `UserInfo.sh` has been removed. |
 | `DECIMAL(5,2)` overflow | **Fixed.** `top_users.cpu` → `NUMERIC(9,2)`, `mem` → `(7,2)`, `disk` → `(12,2)`, load averages → `(8,2)`; guarded migrations. |
 | Cumulative / silently-zero I/O | **Fixed.** New `io_read_bps` / `io_write_bps` interval rates; I/O is NULL when none of an account's processes is readable. `io_*_bytes` remains the live-process cumulative total. Coverage is still partial without root. |
 | Account discovery by shell | **Fixed.** Union of process-owner UIDs, login-shell accounts and logged-in users; names resolved with `getent passwd UID`. |
@@ -31,6 +31,8 @@ servers (RHEL 6.6 → 9.8). Tests: `python3 -m unittest discover -s srcs/DataCol
 | No per-user history | **Added.** `top_users_history`: rows where an account used ≥ 5 % of a CPU, ≥ 1 GiB RSS or ≥ 1 MiB/s I/O. API: `/api/users/<name>/history/<hours>`. |
 | License integration | **Done.** Every 5 min `LicenseUsage.sh` runs over SSH on `LICENSE_QUERY_SERVER` (vendor tools stay on the EDA host). `license_parser.py` (tested on an anonymised capture) gives per-vendor status ok/partial/failed; a failed query never overwrites the last good figures. Tables: `license_snapshots`, `license_features` (current), `license_usage_history` (in-use only), `license_checkouts` (owner, client host matched to a monitored server, display, raw + resolved start). API `/api/licenses/summary`, `/api/licenses/history/<feature>`; footprint lists a user's checkouts; insights flag exhausted pools, failed/stale/incomplete queries. Cadence currently reports 239 of 257 features as "unsupported by licensed server" — shown as incomplete, still for the license administrator. |
 | Host and per-user samples are taken seconds apart in separate SSH sessions | **Open.** A bursty job can appear in one and not the other. |
+| RECOMMENDATIONS medium priority: process states, service health | **Added.** `procs_zombie`; `server_services` with the state of `MONITORED_SERVICES` (default `sshd crond`) plus any other failed systemd unit (`service … status` on RHEL 6). Insights warn on a stopped monitored service and list other failed units. |
+| Unused schema generator / `UserInfo.sh` | **Removed.** `schema/`, generated parsers/models/migrations/docs and the lifetime-CPU `UserInfo.sh` were deleted; `init_db()` in `backend.py` is the schema source of truth. |
 
 ## Findings, in priority order
 

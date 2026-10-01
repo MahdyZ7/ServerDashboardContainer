@@ -31,7 +31,10 @@ HISTORY_MIN_RSS_KB: int = 1024 * 1024  # 1 GiB
 HISTORY_MIN_IO_BPS: int = 1024 * 1024  # 1 MiB/s
 RETENTION_TABLES = ["server_metrics", "top_users", "top_users_history",
                     "server_filesystems", "server_disk_io", "server_network",
-                    "license_snapshots", "license_usage_history", "license_checkouts"]
+                    "license_snapshots", "license_usage_history", "license_checkouts",
+                    "server_services"]
+# Services whose state is checked on every server (space separated)
+MONITORED_SERVICES: str = os.getenv("MONITORED_SERVICES", "sshd crond")
 LICENSE_TIMEOUT_SECONDS: int = 90
 retention_cleanup_interval: int = 7 * int(
     60 * 24 / data_collection_interval
@@ -95,6 +98,7 @@ def init_db():
 				net_interface VARCHAR(64),
 				procs_running INT,
 				procs_blocked INT,
+				procs_zombie INT,
 				psi_cpu_some_avg60 NUMERIC(6,2),
 				psi_memory_some_avg60 NUMERIC(6,2),
 				psi_memory_full_avg60 NUMERIC(6,2),
@@ -144,6 +148,7 @@ def init_db():
         "ALTER TABLE server_metrics ADD COLUMN IF NOT EXISTS net_interface VARCHAR(64)",
         "ALTER TABLE server_metrics ADD COLUMN IF NOT EXISTS procs_running INT",
         "ALTER TABLE server_metrics ADD COLUMN IF NOT EXISTS procs_blocked INT",
+        "ALTER TABLE server_metrics ADD COLUMN IF NOT EXISTS procs_zombie INT",
         "ALTER TABLE server_metrics ADD COLUMN IF NOT EXISTS psi_cpu_some_avg60 NUMERIC(6,2)",
         "ALTER TABLE server_metrics ADD COLUMN IF NOT EXISTS psi_memory_some_avg60 NUMERIC(6,2)",
         "ALTER TABLE server_metrics ADD COLUMN IF NOT EXISTS psi_memory_full_avg60 NUMERIC(6,2)",
@@ -229,6 +234,17 @@ def init_db():
 			io_read_bps BIGINT,
 			io_write_bps BIGINT
 		)""",
+        # monitored = requested via MONITORED_SERVICES; otherwise another failed unit
+        """
+		CREATE TABLE IF NOT EXISTS server_services (
+			id BIGSERIAL PRIMARY KEY,
+			timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			server_name VARCHAR(255),
+			service VARCHAR(255),
+			state VARCHAR(16),
+			monitored BOOLEAN
+		)""",
+        "CREATE INDEX IF NOT EXISTS idx_server_services_server_time ON server_services (server_name, timestamp)",
         "CREATE INDEX IF NOT EXISTS idx_server_metrics_server_time ON server_metrics (server_name, timestamp)",
         "CREATE INDEX IF NOT EXISTS idx_server_filesystems_server_time ON server_filesystems (server_name, timestamp)",
         "CREATE INDEX IF NOT EXISTS idx_server_disk_io_device_time ON server_disk_io (server_name, device, timestamp)",
@@ -413,7 +429,8 @@ def run_remote_script(server: Dict, script: str, args: List[str], timeout: int,
 
 def run_monitoring_script(server: Dict) -> Dict:
     """Collect host metrics from one server."""
-    output = run_remote_script(server, "mini_monitering.sh", ["--kv"], METRICS_TIMEOUT_SECONDS)
+    output = run_remote_script(server, "mini_monitering.sh", ["--kv", "--services", MONITORED_SERVICES],
+                               METRICS_TIMEOUT_SECONDS)
     return parse_monitoring_data(output)
 
 
@@ -439,7 +456,7 @@ def store_metrics(metrics: Dict):
 		cpu_usage_percent, swap_used_mb, swap_total_mb, swap_percentage,
 		net_rx_bytes, net_tx_bytes,
 		cpu_iowait_percent, cpu_steal_percent, ram_available_mb, net_interface,
-		procs_running, procs_blocked, psi_cpu_some_avg60, psi_memory_some_avg60,
+		procs_running, procs_blocked, procs_zombie, psi_cpu_some_avg60, psi_memory_some_avg60,
 		psi_memory_full_avg60, psi_io_some_avg60, psi_io_full_avg60
 	) VALUES (
 		%(server_name)s, %(architecture)s, %(operating_system)s, %(physical_cpus)s, %(virtual_cpus)s,
@@ -449,7 +466,7 @@ def store_metrics(metrics: Dict):
 		%(cpu_usage_percent)s, %(swap_used_mb)s, %(swap_total_mb)s, %(swap_percentage)s,
 		%(net_rx_bytes)s, %(net_tx_bytes)s,
 		%(cpu_iowait_percent)s, %(cpu_steal_percent)s, %(ram_available_mb)s, %(net_interface)s,
-		%(procs_running)s, %(procs_blocked)s, %(psi_cpu_some_avg60)s, %(psi_memory_some_avg60)s,
+		%(procs_running)s, %(procs_blocked)s, %(procs_zombie)s, %(psi_cpu_some_avg60)s, %(psi_memory_some_avg60)s,
 		%(psi_memory_full_avg60)s, %(psi_io_some_avg60)s, %(psi_io_full_avg60)s
 	)
 	"""
@@ -459,6 +476,11 @@ def store_metrics(metrics: Dict):
             with conn.cursor() as cursor:
                 cursor.execute(insert_query, metrics)
                 store_filesystems(cursor, metrics["server_name"], metrics.get("filesystems", []))
+                for svc in metrics.get("services", []):
+                    cursor.execute(
+                        "INSERT INTO server_services (server_name, service, state, monitored) VALUES (%s, %s, %s, %s)",
+                        (metrics["server_name"], svc["service"], svc["state"], bool(svc["monitored"])),
+                    )
                 store_counter_rows(cursor, metrics["server_name"], "server_disk_io", "device",
                                    ["name"], DISK_COUNTERS, disk_rates, metrics.get("block_devices", []))
                 store_counter_rows(cursor, metrics["server_name"], "server_network", "interface",

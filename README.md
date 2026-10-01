@@ -58,19 +58,13 @@ DataCollection container
 │   ├── Frontend-Improvements/
 │   ├── Monitoring-Analysis/
 │   ├── Project-Overview/
-│   ├── Schema-System/
-│   └── generated/
-├── schema/
-│   ├── metrics_schema.yaml
-│   └── generators/
+│   └── Schema-System/      # superseded, history only
 └── srcs/
     ├── Backend/
     │   ├── app.py
     │   ├── api.py
     │   ├── flask_config.py
     │   ├── blueprints/
-    │   ├── generated/
-    │   ├── migrations/
     │   ├── static/
     │   ├── templates/
     │   └── utils/
@@ -78,7 +72,8 @@ DataCollection container
         ├── backend.py
         ├── BashGetInfo.sh
         ├── TopUsers.sh
-        ├── UserInfo.sh
+        ├── LicenseUsage.sh
+        ├── run-collection.sh
         ├── mini_monitering.sh
         ├── crontab
         └── start-cron.sh
@@ -187,14 +182,11 @@ Start with:
 - `Docs/Project-Overview/CODE_REVIEW_FIX_PLAN.md`
 - `Docs/Project-Overview/SSH_KEY_MIGRATION.md`
 - `Docs/Project-Overview/TROUBLESHOOTING.md`
-- `Docs/Schema-System/SCHEMA_HOWTO.md`
 
-Generated docs under `Docs/generated/` may not match the active runtime schema until the schema/migration cleanup work is completed.
+The database schema and its migrations are defined in `init_db()` in `srcs/DataCollection/backend.py`.
 
 ## Known Gaps
 
-- No test directory is currently present in the repository.
-- Generated SQL migration files do not fully match the active schema created by `srcs/DataCollection/backend.py`.
 - The active Compose stack has no Nginx container and no separate Dash frontend container.
 - Several historical docs describe older or planned architecture. Treat this README and `Docs/INDEX.md` as the current entry points.
 

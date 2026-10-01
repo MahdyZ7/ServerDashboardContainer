@@ -3,16 +3,21 @@
 #   --kv               machine output: one key=value per line (format_version=2);
 #                      an empty value means "not measured", never zero
 #   --sample-seconds N CPU sampling window (default 1)
+#   --services "a b"   services to report (default "sshd crond"); state is active,
+#                      inactive, failed or missing (not installed). Other failed
+#                      systemd units are reported too, flagged as not monitored.
 # Diagnostics go to stderr; stdout carries only the report.
 
 export LC_ALL=C
 
 kv=false
 SAMPLE_SECONDS=1
+SERVICES="sshd crond"
 while [ $# -ne 0 ]; do
 	case "$1" in
 		--kv) kv=true ;;
 		--sample-seconds) SAMPLE_SECONDS="$2"; shift ;;
+		--services) SERVICES="$2"; shift ;;
 	esac
 	shift
 done
@@ -80,6 +85,41 @@ USER_LOG=$(who | awk '{print $1}' | sort -u | wc -l)
 ACTIVE_VNC=$(ps -C Xvnc -o user= 2>/dev/null | sort -u | grep -c .)
 ACTIVE_SSH=$(who | awk '$NF ~ /^\(/ && $NF !~ /^\(:/ {print $1}' | sort -u | grep -c .)
 read -r PROCS_RUNNING PROCS_BLOCKED < <(awk '/^procs_running/ {r=$2} /^procs_blocked/ {b=$2} END {print r, b}' /proc/stat)
+# Zombies: exited children their parent has not reaped
+PROCS_ZOMBIE=$(ps -e -o stat= 2>/dev/null | grep -c '^Z')
+
+# Service health. systemd hosts use systemctl; RHEL 6 uses init scripts
+# (service status: 0 running, 1-2 dead with pid/lock file, 3 stopped).
+service_state() {
+	local name="$1" out load active
+	if [ -d /run/systemd/system ]; then
+		out=$(systemctl show -p LoadState -p ActiveState "$name.service" 2>/dev/null)
+		load=$(echo "$out" | sed -n 's/^LoadState=//p')
+		active=$(echo "$out" | sed -n 's/^ActiveState=//p')
+		if [ "$load" = "not-found" ] || [ -z "$load" ]; then echo missing
+		elif [ "$active" = "active" ] || [ "$active" = "reloading" ] || [ "$active" = "activating" ]; then echo active
+		elif [ "$active" = "failed" ]; then echo failed
+		else echo inactive
+		fi
+	elif [ -x "/etc/init.d/$name" ]; then
+		"/etc/init.d/$name" status >/dev/null 2>&1 </dev/null
+		case $? in
+			0) echo active ;;
+			1|2) echo failed ;;
+			*) echo inactive ;;
+		esac
+	else
+		echo missing
+	fi
+}
+SERVICE_LINES=$(for name in $SERVICES; do printf 'svc=%s\t%s\t1\n' "$name" "$(service_state "$name")"; done
+	# Any other failed systemd unit is worth knowing about too
+	if [ -d /run/systemd/system ]; then
+		systemctl list-units --state=failed --no-legend --plain 2>/dev/null </dev/null | awk '{print $1}' |
+			sed 's/\.service$//' | while read -r unit; do
+				case " $SERVICES " in *" $unit "*) ;; *) printf 'svc=%s\tfailed\t0\n' "$unit" ;; esac
+			done
+	fi)
 
 # Pressure stall information: share of the last 60 s that tasks waited on a
 # resource. Empty when the kernel lacks PSI (before 4.20, or booted without psi=1).
@@ -186,6 +226,7 @@ if $kv; then
 		echo "net_tx_bytes=$NET_TX_BYTES"
 		echo "procs_running=$PROCS_RUNNING"
 		echo "procs_blocked=$PROCS_BLOCKED"
+		echo "procs_zombie=$PROCS_ZOMBIE"
 		echo "psi_cpu_some_avg60=$PSI_CPU_SOME"
 		echo "psi_memory_some_avg60=$PSI_MEM_SOME"
 		echo "psi_memory_full_avg60=$PSI_MEM_FULL"
@@ -194,6 +235,7 @@ if $kv; then
 		[ -n "$FILESYSTEMS" ] && echo "$FILESYSTEMS"
 		[ -n "$BLOCK_DEVICES" ] && echo "$BLOCK_DEVICES"
 		[ -n "$NETWORK" ] && echo "$NETWORK"
+		[ -n "$SERVICE_LINES" ] && echo "$SERVICE_LINES"
 	}
 else
 	printf "%-25s: %s\n" "Architecture" "${ARCH}"
@@ -210,7 +252,8 @@ else
 	printf "%-25s: %s\n" "User Logins" "${USER_LOG}"
 	printf "%-25s: %s\n" "VNC Users" "${ACTIVE_VNC}"
 	printf "%-25s: %s\n" "SSH Users" "${ACTIVE_SSH}"
-	printf "%-25s: %s running, %s blocked\n" "Tasks" "${PROCS_RUNNING}" "${PROCS_BLOCKED}"
+	printf "%-25s: %s running, %s blocked, %s zombie\n" "Tasks" "${PROCS_RUNNING}" "${PROCS_BLOCKED}" "${PROCS_ZOMBIE}"
+	printf "%s\n" "${SERVICE_LINES}" | awk -F'\t' 'NF {sub("svc=", "", $1); printf "%-25s: %s\n", "Service " $1, $2}'
 	printf "%-25s: cpu %s, memory %s/%s, io %s/%s (some/full, %% of 60 s)\n" "Pressure" \
 		"${PSI_CPU_SOME:-n/a}" "${PSI_MEM_SOME:-n/a}" "${PSI_MEM_FULL:-n/a}" "${PSI_IO_SOME:-n/a}" "${PSI_IO_FULL:-n/a}"
 	printf "%s\n" "${FILESYSTEMS}" | awk -F'\t' 'NF {sub("fs=", "", $1); printf "%-25s: %s %s, %.0f%% used\n", "Filesystem " $1, $2, $3, ($4 > 0 ? $5 / $4 * 100 : 0)}'
