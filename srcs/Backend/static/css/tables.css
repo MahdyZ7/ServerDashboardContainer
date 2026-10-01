@@ -1,7 +1,6 @@
 /**
- * Table Styles
- * Professional tables with alternating rows, value badges
- * Mobile-First Responsive Design with horizontal scroll
+ * Table Styles — Readable, Data-Forward Design
+ * Clear hierarchy, strong contrast, scannable rows
  */
 
 /* ========================================
@@ -13,12 +12,16 @@
     gap: var(--spacing-md);
     margin-bottom: var(--spacing-lg);
     align-items: center;
+    padding: var(--spacing-md);
+    background: var(--bg-secondary);
+    border-radius: var(--border-radius-sm);
+    border: 1px solid var(--border-color);
 }
 
 .search-box {
     position: relative;
     flex: 1;
-    min-width: 200px;
+    min-width: 220px;
 }
 
 .search-box i {
@@ -27,19 +30,21 @@
     top: 50%;
     transform: translateY(-50%);
     color: var(--text-muted);
-    font-size: 0.875rem;
+    font-size: 0.8125rem;
+    pointer-events: none;
 }
 
 .search-box input {
     width: 100%;
-    padding: 0.625rem 0.875rem 0.625rem 2.5rem;
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius-sm);
+    padding: 0.6rem 0.875rem 0.6rem 2.5rem;
+    border: 1.5px solid var(--border-color);
+    border-radius: var(--border-radius-xs);
     font-size: 0.875rem;
     font-family: var(--font-family);
     background: var(--card-bg);
     color: var(--text-primary);
     transition: all var(--transition-fast);
+    line-height: 1.4;
 }
 
 .search-box input::placeholder {
@@ -49,7 +54,8 @@
 .search-box input:focus {
     outline: none;
     border-color: var(--ku-primary);
-    box-shadow: 0 0 0 3px rgba(0, 61, 165, 0.1);
+    box-shadow: 0 0 0 3px rgba(0, 61, 165, 0.12);
+    background: var(--bg-primary);
 }
 
 .filter-group,
@@ -61,18 +67,20 @@
 
 .filter-group label,
 .sort-group label {
-    font-size: 0.8125rem;
+    font-size: 0.75rem;
     color: var(--text-secondary);
     white-space: nowrap;
-    font-weight: var(--font-weight-medium);
+    font-weight: var(--font-weight-semibold);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
 }
 
 .filter-group select,
 .sort-group select {
-    padding: 0.625rem 2.25rem 0.625rem 0.875rem;
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius-sm);
-    font-size: 0.875rem;
+    padding: 0.6rem 2.25rem 0.6rem 0.875rem;
+    border: 1.5px solid var(--border-color);
+    border-radius: var(--border-radius-xs);
+    font-size: 0.8125rem;
     font-family: var(--font-family);
     background: var(--card-bg);
     color: var(--text-primary);
@@ -88,10 +96,18 @@
 .sort-group select:focus {
     outline: none;
     border-color: var(--ku-primary);
-    box-shadow: 0 0 0 3px rgba(0, 61, 165, 0.1);
+    box-shadow: 0 0 0 3px rgba(0, 61, 165, 0.12);
 }
 
-/* Mobile adjustments */
+.table-result-count {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+    margin-left: auto;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Mobile */
 @media (max-width: 639px) {
     .table-controls {
         flex-direction: column;
@@ -108,16 +124,27 @@
     .sort-group {
         justify-content: space-between;
     }
+
+    .table-result-count {
+        margin-left: 0;
+        text-align: center;
+    }
 }
 
 /* ========================================
-   Data Table
+   Data Table — Core Layout
    ======================================== */
 .table-wrapper {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     border-radius: var(--border-radius-sm);
     border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-sm);
+    /* Subtle scroll indicator on right edge */
+    background:
+        linear-gradient(to right, var(--card-bg) 30%, transparent),
+        linear-gradient(to right, transparent, var(--bg-secondary) 70%) 100% 0 / 40px 100% no-repeat,
+        var(--card-bg);
 }
 
 .data-table {
@@ -125,82 +152,229 @@
     border-collapse: collapse;
     background: var(--card-bg);
     font-size: 0.875rem;
+    /* Minimum width ensures columns don't collapse */
+    min-width: 640px;
 }
 
+/* ========================================
+   Table Head — High Contrast, Clear Labels
+   ======================================== */
 .data-table thead {
-    background: var(--bg-tertiary);
     position: sticky;
     top: 0;
-    z-index: 1;
+    z-index: 2;
 }
 
 .data-table th {
     padding: 0.875rem 1rem;
     text-align: left;
-    font-weight: var(--font-weight-semibold);
-    font-size: 0.75rem;
-    color: var(--text-secondary);
+    font-weight: var(--font-weight-bold);
+    font-size: 0.6875rem;
+    color: var(--ku-primary);
     white-space: nowrap;
+    background: var(--bg-tertiary);
     border-bottom: 2px solid var(--ku-primary);
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.07em;
+    /* Sortable column hint */
+    user-select: none;
 }
 
+.data-table th[data-sortable] {
+    cursor: pointer;
+}
+
+.data-table th[data-sortable]:hover {
+    background: rgba(0, 61, 165, 0.06);
+    color: var(--ku-primary-dark);
+}
+
+.data-table th.sort-asc::after {
+    content: " ↑";
+    opacity: 0.7;
+    font-size: 0.6rem;
+}
+
+.data-table th.sort-desc::after {
+    content: " ↓";
+    opacity: 0.7;
+    font-size: 0.6rem;
+}
+
+/* Numeric columns right-align */
+.data-table th.col-numeric {
+    text-align: right;
+}
+
+/* ========================================
+   Table Body — Readable Rows
+   ======================================== */
 .data-table td {
-    padding: 0.75rem 1rem;
+    padding: 0.8125rem 1rem;
     border-bottom: 1px solid var(--border-color);
     color: var(--text-primary);
+    vertical-align: middle;
+    line-height: 1.4;
 }
 
 .data-table tbody tr {
     transition: background-color var(--transition-fast);
 }
 
-/* Alternating row colors */
+/* Stripe every other row with a very light tint for scannability */
 .data-table tbody tr:nth-child(even) {
     background: var(--bg-secondary);
 }
 
 .data-table tbody tr:hover {
-    background: var(--hover-bg);
+    background: rgba(0, 61, 165, 0.045);
+}
+
+/* Active / selected row */
+.data-table tbody tr.row-selected {
+    background: rgba(0, 61, 165, 0.08);
+    outline: 2px solid rgba(0, 61, 165, 0.2);
+    outline-offset: -2px;
 }
 
 .data-table tbody tr:last-child td {
     border-bottom: none;
 }
 
+/* Empty state */
+.data-table .table-empty {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--text-muted);
+    font-size: 0.9375rem;
+}
+
+.data-table .table-empty i {
+    display: block;
+    font-size: 2rem;
+    margin-bottom: 0.75rem;
+    opacity: 0.4;
+}
+
 /* ========================================
-   Table Cell Utilities
+   Cell Utilities
    ======================================== */
 .cell-numeric {
     text-align: right;
     font-variant-numeric: tabular-nums;
     font-weight: var(--font-weight-medium);
+    letter-spacing: -0.01em;
 }
 
+/* Server name cell */
+.cell-server {
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+
+.cell-server .server-dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--ku-accent);
+    margin-right: 0.5rem;
+    vertical-align: middle;
+    position: relative;
+    top: -1px;
+}
+
+.cell-server .server-dot.offline {
+    background: var(--ku-danger);
+}
+
+/* Inline mini bar for usage % values */
+.cell-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 110px;
+}
+
+.cell-bar .bar-track {
+    flex: 1;
+    height: 5px;
+    background: var(--border-color);
+    border-radius: 99px;
+    overflow: hidden;
+}
+
+.cell-bar .bar-fill {
+    height: 100%;
+    border-radius: 99px;
+    background: var(--ku-primary);
+    transition: width var(--transition-slow);
+}
+
+.cell-bar .bar-fill.danger  { background: var(--ku-danger); }
+.cell-bar .bar-fill.warning { background: var(--ku-warning); }
+.cell-bar .bar-fill.good    { background: var(--ku-accent); }
+
+.cell-bar .bar-label {
+    font-size: 0.8125rem;
+    font-variant-numeric: tabular-nums;
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-primary);
+    white-space: nowrap;
+    min-width: 3ch;
+    text-align: right;
+}
+
+/* Badge chips */
 .cell-badge {
     display: inline-flex;
     align-items: center;
-    padding: 0.2rem 0.5rem;
-    border-radius: 6px;
-    font-size: 0.75rem;
-    font-weight: var(--font-weight-semibold);
+    gap: 0.3rem;
+    padding: 0.2rem 0.55rem;
+    border-radius: 5px;
+    font-size: 0.6875rem;
+    font-weight: var(--font-weight-bold);
     font-variant-numeric: tabular-nums;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.cell-badge::before {
+    content: '';
+    display: inline-block;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.7;
 }
 
 .cell-badge.high {
-    background: rgba(227, 30, 36, 0.08);
+    background: rgba(227, 30, 36, 0.1);
     color: var(--ku-danger);
+    border: 1px solid rgba(227, 30, 36, 0.18);
 }
 
 .cell-badge.medium {
-    background: rgba(245, 127, 41, 0.08);
+    background: rgba(245, 127, 41, 0.1);
     color: var(--ku-warning);
+    border: 1px solid rgba(245, 127, 41, 0.18);
 }
 
 .cell-badge.low {
-    background: rgba(0, 61, 165, 0.08);
-    color: var(--ku-success);
+    background: rgba(120, 214, 75, 0.1);
+    color: #3a9320;
+    border: 1px solid rgba(120, 214, 75, 0.25);
+}
+
+/* Truncate long text with tooltip */
+.cell-truncate {
+    max-width: 160px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* ========================================
@@ -208,34 +382,52 @@
    ======================================== */
 .pagination {
     display: flex;
-    justify-content: center;
+    justify-content: space-between;
     align-items: center;
-    gap: var(--spacing-xs);
+    gap: var(--spacing-sm);
     margin-top: var(--spacing-lg);
     flex-wrap: wrap;
+    padding: 0 0.25rem;
+}
+
+.pagination-info {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.pagination-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
 }
 
 .pagination-button {
-    padding: 0.4rem 0.75rem;
-    border: 1px solid var(--border-color);
+    min-width: 32px;
+    height: 32px;
+    padding: 0 0.5rem;
+    border: 1.5px solid var(--border-color);
     background: var(--card-bg);
-    color: var(--text-primary);
+    color: var(--text-secondary);
     border-radius: var(--border-radius-xs);
     cursor: pointer;
     transition: all var(--transition-fast);
     font-size: 0.8125rem;
     font-family: var(--font-family);
     font-weight: var(--font-weight-medium);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .pagination-button:hover:not(:disabled) {
-    background: var(--hover-bg);
+    background: var(--bg-secondary);
     border-color: var(--ku-primary);
     color: var(--ku-primary);
 }
 
 .pagination-button:disabled {
-    opacity: 0.4;
+    opacity: 0.35;
     cursor: not-allowed;
 }
 
@@ -243,15 +435,12 @@
     background: var(--ku-primary);
     color: white;
     border-color: var(--ku-primary);
-}
-
-.pagination-info {
-    font-size: 0.8125rem;
-    color: var(--text-secondary);
+    font-weight: var(--font-weight-bold);
+    box-shadow: 0 2px 8px rgba(0, 61, 165, 0.25);
 }
 
 /* ========================================
-   Mobile Table Optimizations
+   Mobile
    ======================================== */
 @media (max-width: 767px) {
     .data-table {
@@ -260,12 +449,58 @@
 
     .data-table th,
     .data-table td {
-        padding: 0.625rem;
+        padding: 0.625rem 0.75rem;
     }
 
-    @media (max-width: 480px) {
-        .table-wrapper {
-            font-size: 0.75rem;
-        }
+    .cell-bar {
+        min-width: 80px;
     }
+
+    .pagination {
+        justify-content: center;
+        flex-direction: column;
+        gap: var(--spacing-sm);
+    }
+}
+
+@media (max-width: 480px) {
+    .table-wrapper {
+        font-size: 0.75rem;
+    }
+
+    .data-table th {
+        font-size: 0.625rem;
+    }
+}
+
+/* ========================================
+   Dark Mode Overrides
+   ======================================== */
+[data-theme="dark"] .table-wrapper {
+    background: var(--card-bg);
+}
+
+[data-theme="dark"] .data-table th {
+    color: #5B9CED;
+    background: var(--bg-tertiary);
+    border-bottom-color: #1E4A8C;
+}
+
+[data-theme="dark"] .data-table tbody tr:nth-child(even) {
+    background: rgba(255, 255, 255, 0.025);
+}
+
+[data-theme="dark"] .data-table tbody tr:hover {
+    background: rgba(91, 156, 237, 0.07);
+}
+
+[data-theme="dark"] .cell-badge.low {
+    background: rgba(120, 214, 75, 0.08);
+    color: #78D64B;
+    border-color: rgba(120, 214, 75, 0.2);
+}
+
+[data-theme="dark"] .table-controls {
+    background: var(--bg-tertiary);
+    border-color: var(--border-color);
 }

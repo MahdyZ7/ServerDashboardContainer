@@ -1,10 +1,20 @@
 # Documentation Index
 
-Welcome to the Server Dashboard Container documentation. All project documentation is organized here by category.
+Welcome to the Server Dashboard Container documentation. This index reflects the current repository layout reviewed on 2026-05-04.
 
----
+## Current Runtime
 
-## 📁 Documentation Structure
+The active Docker Compose stack has three services:
+
+| Service | Container | Source |
+| --- | --- | --- |
+| `postgres` | `postgres` | `docker-compose.yml` |
+| `datacollection` | `DataCollection` | `srcs/DataCollection/` |
+| `dashboard` | `Dashboard` | `srcs/Backend/` |
+
+There is no active Nginx service and no active `srcs/Frontend/` Dash app in the current directory. The dashboard is a unified Flask app with Jinja templates, static CSS/JS, and Chart.js.
+
+## Documentation Structure
 
 ```
 Docs/
@@ -15,18 +25,15 @@ Docs/
 └── generated/              # Auto-generated docs from schema
 ```
 
----
-
 ## 🚀 Quick Start
 
 **New to the project?** Read in this order:
 
 1. [`../CLAUDE.md`](../CLAUDE.md) - Project overview & development guide
 2. [`../README.md`](../README.md) - Getting started & setup
-3. [`Project-Overview/AUTO_START.md`](Project-Overview/AUTO_START.md) - Auto-start on boot setup
-4. [`Schema-System/SCHEMA_HOWTO.md`](Schema-System/SCHEMA_HOWTO.md) - Daily workflow (if using schema system)
-
----
+3. [`Project-Overview/CODE_REVIEW_FIX_PLAN.md`](Project-Overview/CODE_REVIEW_FIX_PLAN.md) - Current prioritized fix plan
+4. [`Project-Overview/AUTO_START.md`](Project-Overview/AUTO_START.md) - Auto-start on boot setup
+5. [`Schema-System/SCHEMA_HOWTO.md`](Schema-System/SCHEMA_HOWTO.md) - Daily workflow if using the schema system
 
 ## 📚 Documentation Categories
 
@@ -48,6 +55,8 @@ The schema-driven architecture reduces adding metrics from 10+ files to 1 file!
 - ✅ Auto-generates SQL, Python, TypeScript, validators, parsers, docs
 - ✅ 85% faster metric addition (15-30 min vs 2-4 hours)
 - ✅ Zero synchronization bugs
+
+**Current caveat:** generated schema docs and generated migrations may not match the runtime schema until the schema cleanup in `Project-Overview/CODE_REVIEW_FIX_PLAN.md` is completed.
 
 **Quick Command:**
 ```bash
@@ -85,7 +94,7 @@ System analysis, architecture documentation, and monitoring improvements.
 
 **Location:** `Docs/Frontend-Improvements/`
 
-Frontend refactoring documentation, improvements, and implementation details.
+Frontend refactoring documentation, improvements, and implementation details for the current Flask/Jinja/static JS dashboard.
 
 | Document | Description | Use Case |
 |----------|-------------|----------|
@@ -103,12 +112,12 @@ Frontend refactoring documentation, improvements, and implementation details.
 
 **Topics Covered:**
 - **UI/UX Enhancements** - Loading states, dark mode, micro-interactions, animations
-- **Mobile Responsiveness** - 320px-4K support, touch optimization, adaptive layouts
-- **Dark Mode** - Complete implementation with high-contrast themes
+- **Mobile Responsiveness** - Touch optimization and adaptive layouts
+- **Dark Mode** - Implementation with high-contrast themes
 - **Accessibility** - Focus states, ARIA labels, keyboard navigation
 - **Component Enhancements** - Tables, cards, graphs with modern design
 - **KU Brand Compliance** - Typography, colors, guidelines
-- **Code Quality** - Error handling, validation, testing (103 tests)
+- **Code Quality** - Error handling, validation, and planned tests
 
 ---
 
@@ -120,6 +129,7 @@ Project setup, testing, troubleshooting, and general reference documentation.
 
 | Document | Description | Use Case |
 |----------|-------------|----------|
+| [CODE_REVIEW_FIX_PLAN.md](Project-Overview/CODE_REVIEW_FIX_PLAN.md) | Prioritized remediation plan from current code review | Planning fixes |
 | [QUICK_REFERENCE.md](Project-Overview/QUICK_REFERENCE.md) | Quick commands & tips | Daily reference |
 | [AUTO_START.md](Project-Overview/AUTO_START.md) | **✨ CONSOLIDATED** Auto-start configuration | Setting up production auto-start |
 | [TROUBLESHOOTING.md](Project-Overview/TROUBLESHOOTING.md) | **✨ NEW** Common issues & solutions | When things go wrong |
@@ -162,6 +172,9 @@ Auto-generated documentation from schema (updated when you run `generate_all.py`
 ### I want to improve the frontend
 → Read: [`Frontend-Improvements/FRONTEND_IMPROVEMENT_PLAN.md`](Frontend-Improvements/FRONTEND_IMPROVEMENT_PLAN.md)
 
+### I want to fix the reviewed issues
+→ Read: [`Project-Overview/CODE_REVIEW_FIX_PLAN.md`](Project-Overview/CODE_REVIEW_FIX_PLAN.md)
+
 ### Something's not working
 → Read: [`Project-Overview/TROUBLESHOOTING.md`](Project-Overview/TROUBLESHOOTING.md)
 
@@ -182,44 +195,22 @@ Auto-generated documentation from schema (updated when you run `generate_all.py`
 
 ---
 
-## 📊 Document Statistics
+## Document Status
 
-| Category | Documents | Status |
-|----------|-----------|--------|
-| Schema System | 4 files | ✅ Organized |
-| Monitoring Analysis | 7 files | ✅ Organized |
-| Frontend Improvements | 11 files | ✅ Consolidated (was 14) |
-| Project Overview | 7 files | ✅ Enhanced |
-| Generated (Auto) | 3 files | ✅ Auto-updated |
-| **Total** | **32 files** | **✅ Clean & Organized** |
+| Category | Status |
+|----------|--------|
+| Root README | Updated to current three-service Flask stack |
+| Project Overview | Contains setup, troubleshooting, auto-start, SSH migration, and current fix plan |
+| Frontend Improvements | Historical and current UI/UX references for Flask static dashboard |
+| Schema System | Useful but needs reconciliation with active runtime schema |
+| Generated Docs | Treat as generated reference, not guaranteed runtime truth until schema cleanup |
 
----
+## Recent Changes
 
-## 🔄 Recent Changes
-
-**2025-12-04 - Documentation Consolidation:**
-- ✅ Consolidated 6 dark mode docs → 1 comprehensive guide
-- ✅ Merged auto-start docs → single unified guide
-- ✅ Created new TROUBLESHOOTING.md with all common issues
-- ✅ Removed 11 temporary/duplicate files
-- ✅ Reorganized Frontend-Improvements folder
-- ✅ Updated this index with clearer navigation
-
-**Removed Files (Consolidated):**
-- `DARK_MODE_CONTRAST_SUMMARY.md` → merged into `DARK_MODE_COMPLETE.md`
-- `DARK_MODE_FIXES_SUMMARY.md` → merged into `DARK_MODE_COMPLETE.md`
-- `DARK_MODE_FIX_COMPLETE.md` → merged into `DARK_MODE_COMPLETE.md`
-- `DARK_MODE_QUICK_REF.md` → merged into `DARK_MODE_COMPLETE.md`
-- `GRAPH_DARK_MODE_FIX.md` → merged into `DARK_MODE_COMPLETE.md`
-- `FINAL_GRAPH_FIX.md` → merged into `DARK_MODE_COMPLETE.md`
-- `AUTO_START_GUIDE.md` → moved to `Project-Overview/AUTO_START.md`
-- `AUTOSTART_QUICK_REFERENCE.md` → merged into `AUTO_START.md`
-- `PORT_CONFLICT_SOLUTION.md` → merged into `TROUBLESHOOTING.md`
-- `PERFORMANCE_FIX_FINAL.md` → merged into `TROUBLESHOOTING.md`
-- `ORGANIZATION_SUMMARY.md` → no longer needed
-- `QUICK_START_NEW_FEATURES.md` → redundant with UI_UX_ENHANCEMENTS_SUMMARY
-- `MINIMAL_IMPROVEMENTS.md` → outdated, covered by other docs
-- `IMPLEMENTATION_COMPLETE_SUMMARY.md` → merged into FRONTEND_IMPROVEMENTS_SUMMARY
+**2026-05-04 - Current-state documentation update:**
+- Added `Project-Overview/CODE_REVIEW_FIX_PLAN.md`.
+- Updated the root README to describe the active Flask/PostgreSQL/DataCollection stack.
+- Updated this index to remove claims about active Nginx, Dash, separate frontend containers, and missing tests.
 
 ---
 
@@ -258,6 +249,6 @@ Auto-generated documentation from schema (updated when you run `generate_all.py`
 
 ---
 
-**Last Updated:** 2025-12-04
-**Documentation Version:** 2.0 (Consolidated)
+**Last Updated:** 2026-05-04
+**Documentation Version:** 2.1 (Current Runtime)
 **Project:** Server Dashboard Container

@@ -216,10 +216,9 @@ The unified dashboard (`srcs/Backend/app.py`) provides REST endpoints at `/api/`
 - `srcs/Backend/static/css/main.css` - Core design system
 - `srcs/Backend/static/js/dashboard.js` - Main dashboard logic
 
-### Legacy Files (kept for rollback)
-- `srcs/Frontend/` - Previous Dash-based frontend (not in use)
-- `srcs/Nginx/` - Previous Nginx proxy config (not in use)
-- `srcs/Backend/api.py` - Standalone API fallback
+### Legacy Files
+- `srcs/Backend/api.py` - Previous standalone Flask API entry point. The Compose stack runs `srcs/Backend/app.py`.
+- `srcs/DataCollection/Dockerfile.old` - Previous DataCollection Dockerfile retained for reference.
 
 ## Code Quality Standards
 

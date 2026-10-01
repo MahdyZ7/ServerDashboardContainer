@@ -693,6 +693,10 @@
             renderUsersTable(users);
             setupUserTableFilters(users);
 
+            // Set initial result count
+            const countEl = document.getElementById('users-result-count');
+            if (countEl) countEl.textContent = `${users.length} user${users.length !== 1 ? 's' : ''}`;
+
         } catch (error) {
             console.error('Error loading user activity:', error);
             if (tableBody) {
@@ -715,31 +719,46 @@
         if (!tableBody) return;
 
         if (users.length === 0) {
-            tableBody.innerHTML = '<tr><td colspan="11" class="text-center">No users found</td></tr>';
+            tableBody.innerHTML = `<tr><td colspan="11" class="table-empty">
+                <i class="fas fa-users-slash"></i>No users found</td></tr>`;
             return;
         }
 
         tableBody.innerHTML = users.map(user => {
-            const cpuVal = parseFloat(user.cpu || 0);
-            const memVal = parseFloat(user.mem || 0);
-            const cpuClass = cpuVal > 50 ? 'high' : cpuVal > 20 ? 'medium' : 'low';
-            const memClass = memVal > 50 ? 'high' : memVal > 20 ? 'medium' : 'low';
-            const ioRead = user.io_read_bytes ? formatBytes(user.io_read_bytes) : '—';
+            const cpuVal = Math.min(100, Math.max(0, parseFloat(user.cpu || 0)));
+            const memVal = Math.min(100, Math.max(0, parseFloat(user.mem || 0)));
+            const cpuClass = cpuVal > 70 ? 'danger' : cpuVal > 40 ? 'warning' : 'good';
+            const memClass = memVal > 70 ? 'danger' : memVal > 40 ? 'warning' : 'good';
+            const ioRead  = user.io_read_bytes  ? formatBytes(user.io_read_bytes)  : '—';
             const ioWrite = user.io_write_bytes ? formatBytes(user.io_write_bytes) : '—';
+
+            // Inline mini-bar for CPU
+            const cpuBar = `<div class="cell-bar">
+                <div class="bar-track"><div class="bar-fill ${cpuClass}" style="width:${cpuVal}%"></div></div>
+                <span class="bar-label">${cpuVal.toFixed(1)}%</span>
+            </div>`;
+
+            // Inline mini-bar for Memory
+            const memBar = `<div class="cell-bar">
+                <div class="bar-track"><div class="bar-fill ${memClass}" style="width:${memVal}%"></div></div>
+                <span class="bar-label">${memVal.toFixed(1)}%</span>
+            </div>`;
 
             return `
                 <tr>
-                    <td>${escapeHtml(user.server_name || 'N/A')}</td>
+                    <td class="cell-server">
+                        <span class="server-dot"></span>${escapeHtml(user.server_name || 'N/A')}
+                    </td>
                     <td><strong>${escapeHtml(user.username || 'N/A')}</strong></td>
-                    <td>${escapeHtml(user.full_name || 'N/A')}</td>
-                    <td class="cell-numeric"><span class="cell-badge ${cpuClass}">${cpuVal.toFixed(1)}%</span></td>
-                    <td class="cell-numeric"><span class="cell-badge ${memClass}">${memVal.toFixed(1)}%</span></td>
-                    <td class="cell-numeric">${parseFloat(user.disk || 0).toFixed(2)} GB</td>
+                    <td class="cell-truncate" title="${escapeHtml(user.full_name || '')}">${escapeHtml(user.full_name || '—')}</td>
+                    <td>${cpuBar}</td>
+                    <td>${memBar}</td>
+                    <td class="cell-numeric">${parseFloat(user.disk || 0).toFixed(1)} GB</td>
                     <td class="cell-numeric">${user.process_count || 0}</td>
-                    <td>${escapeHtml(user.top_process || 'N/A')}</td>
+                    <td class="cell-truncate" title="${escapeHtml(user.top_process || '')}">${escapeHtml(user.top_process || '—')}</td>
                     <td class="cell-numeric">${ioRead}</td>
                     <td class="cell-numeric">${ioWrite}</td>
-                    <td>${formatUserTimestamp(user.last_login)}</td>
+                    <td style="white-space:nowrap;font-size:0.8125rem">${formatUserTimestamp(user.last_login)}</td>
                 </tr>
             `;
         }).join('');
@@ -776,6 +795,16 @@
             }
 
             renderUsersTable(filteredUsers);
+
+            // Update result count
+            const countEl = document.getElementById('users-result-count');
+            if (countEl) {
+                const total = allUsers.length;
+                const shown = filteredUsers.length;
+                countEl.textContent = shown === total
+                    ? `${total} user${total !== 1 ? 's' : ''}`
+                    : `${shown} of ${total} users`;
+            }
         }
 
         if (searchBox) searchBox.addEventListener('input', applyFilters);

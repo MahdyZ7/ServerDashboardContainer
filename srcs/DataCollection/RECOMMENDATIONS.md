@@ -1,5 +1,10 @@
 # Data Collection Improvements
 
+> See [the 2026-09-24 code review](REVIEW.md) for current findings, corrected metric
+> semantics, priorities and the new Cadence/Synopsys license report. The historical
+> suggestions below include stale “missing” labels and since-boot CPU examples
+> that should not be used to measure current utilization.
+
 ## Current Issues & Better Alternatives
 
 ### 1. CPU Utilization (Currently Missing)

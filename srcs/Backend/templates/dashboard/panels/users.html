@@ -37,6 +37,8 @@
                         <option value="username">Username</option>
                     </select>
                 </div>
+
+                <span class="table-result-count" id="users-result-count" aria-live="polite"></span>
             </div>
 
             <!-- Users Table -->
@@ -47,13 +49,13 @@
                             <th scope="col">Server</th>
                             <th scope="col">Username</th>
                             <th scope="col">Full Name</th>
-                            <th scope="col">CPU %</th>
-                            <th scope="col">Memory %</th>
-                            <th scope="col">Disk GB</th>
-                            <th scope="col">Processes</th>
+                            <th scope="col" style="min-width:130px">CPU %</th>
+                            <th scope="col" style="min-width:130px">Memory %</th>
+                            <th scope="col" class="col-numeric">Disk</th>
+                            <th scope="col" class="col-numeric">Procs</th>
                             <th scope="col">Top Process</th>
-                            <th scope="col">I/O Read</th>
-                            <th scope="col">I/O Write</th>
+                            <th scope="col" class="col-numeric">I/O Read</th>
+                            <th scope="col" class="col-numeric">I/O Write</th>
                             <th scope="col">Last Login</th>
                         </tr>
                     </thead>

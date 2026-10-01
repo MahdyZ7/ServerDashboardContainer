@@ -165,6 +165,48 @@
     border-color: var(--border-color);
 }
 
+/* Dark mode — table controls & search */
+[data-theme="dark"] .table-controls {
+    background: var(--bg-tertiary);
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .search-box input,
+[data-theme="dark"] .filter-group select,
+[data-theme="dark"] .sort-group select {
+    background: var(--bg-primary);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+}
+
+/* Dark mode — inline bar cells */
+[data-theme="dark"] .bar-track {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* Dark mode — chart title subtitles */
+[data-theme="dark"] .chart-title-sub {
+    color: var(--text-muted);
+}
+
+/* Dark mode — table header stronger contrast */
+[data-theme="dark"] .data-table th {
+    color: #5B9CED;
+    letter-spacing: 0.07em;
+}
+
+/* Dark mode — cell badges */
+[data-theme="dark"] .cell-badge.low {
+    background: rgba(120, 214, 75, 0.1);
+    color: #78D64B;
+    border-color: rgba(120, 214, 75, 0.2);
+}
+
+/* Dark mode — section titles */
+[data-theme="dark"] .section-title {
+    border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
 /* Dark mode export menu */
 [data-theme="dark"] .export-menu {
     background: var(--card-bg);
