@@ -791,3 +791,14 @@
     border-left: 4px solid var(--idle);
     color: var(--ink-soft);
 }
+
+/* EDA license pools (Users tab) */
+.licenses { margin-top: var(--spacing-xl); }
+.license-vendors {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.5rem;
+    margin: 0 0 1rem;
+}
+.license-holders { line-height: 1.6; }
+.footprint-card .action-note + .table-wrapper { margin-top: var(--spacing-lg); }

@@ -13,3 +13,6 @@ PATH=/usr/local/bin:/usr/bin:/bin
 
 # Run data retention cleanup weekly on Sundays at 23:05 (cleanup only, no collection)
 5 23 * * 0 /app/run-collection.sh cleanup CLEANUP_ONLY=true >> /var/log/datacollection.log 2>&1
+
+# License pool snapshot every 5 minutes (needs LICENSE_QUERY_SERVER; see backend.read_license_config)
+*/5 * * * * /app/run-collection.sh licenses LICENSES_ONLY=true >> /var/log/datacollection.log 2>&1

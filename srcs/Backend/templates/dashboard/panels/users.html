@@ -90,6 +90,28 @@
 
     <!-- Pagination -->
     <div class="pagination" id="users-pagination" role="navigation" aria-label="Table pagination"></div>
+
+    <!-- EDA license pools -->
+    <section class="licenses" aria-labelledby="licenses-heading">
+        <h3 class="section-title" id="licenses-heading"><span class="kicker">03.2</span>EDA licenses in use</h3>
+        <div class="license-vendors" id="license-vendors" aria-live="polite"></div>
+        <div class="table-wrapper" role="region" aria-label="License features in use" tabindex="0">
+            <table class="data-table" aria-label="License features in use">
+                <thead>
+                    <tr>
+                        <th scope="col">Feature</th>
+                        <th scope="col">Vendor</th>
+                        <th scope="col" style="min-width:160px">In use</th>
+                        <th scope="col">Held by</th>
+                    </tr>
+                </thead>
+                <tbody id="licenses-table-body">
+                    <tr><td colspan="4" class="table-loading"><div class="spinner"></div><p>Loading licenses…</p></td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="action-note">Snapshot of served licenses every 5 minutes. A checkout shows who holds a seat, not whether the tool is busy.</p>
+    </section>
 </section>
 
 <script>

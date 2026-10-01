@@ -29,6 +29,7 @@ The system uses Docker Compose to orchestrate **three services**:
 - `top_users`: Per-user resource consumption data (one row per server+user; `cpu` is percent of ONE logical CPU over a short sample, so 400 = four cores; `disk` NULL = unknown)
 - `top_users_history`: Append-only per-user activity (only rows above the activity thresholds in `backend.py`)
 - `server_filesystems`, `server_disk_io`, `server_network`: Per-mount / per-device / per-interface rows for each collection run; I/O and network rates are averages since the previous run (`srcs/DataCollection/rates.py`)
+- `license_snapshots`, `license_features`, `license_usage_history`, `license_checkouts`: EDA license pool status, current per-feature usage, in-use history and checkout owners (parsed by `srcs/DataCollection/license_parser.py`)
 
 ## Dashboard Architecture (Unified Flask App)
 
@@ -162,6 +163,8 @@ Create `.env` file with:
 - `SERVER{1-7}_USERNAME`: SSH usernames
 - `SERVER{1-7}_PASSWORD`: SSH passwords
 - `SERVER{1-7}_KEY_FILE`: optional SSH private key path (used instead of the password; see `Docs/Project-Overview/SSH_KEY_MIGRATION.md`)
+- `LICENSE_QUERY_SERVER`: name of a monitored server with the EDA vendor tools; `LicenseUsage.sh` runs there over SSH every 5 min (unset = license collection off)
+- `LICENSE_CADENCE_SERVER` / `LICENSE_SYNOPSYS_SERVER`: `port@host` license endpoints; `LICENSE_CADENCE_LMUTIL` / `LICENSE_SYNOPSYS_LMUTIL`: absolute `lmutil` paths on that server
 - `DEBUG`: Set to "True" for debug mode
 
 ### Dashboard Configuration
@@ -193,9 +196,11 @@ The unified dashboard (`srcs/Backend/app.py`) provides REST endpoints at `/api/`
 ### Actionable Insights (rules in `utils/insights.py`, tests in `tests/test_insights.py`)
 - `GET /api/insights/attention` - Ranked issues with a suggested next step (offline, per-mount fill and inodes with shared NFS reported once, 14-day fill forecast, memory, swap, CPU oversubscription, pressure stalls, saturated disks, NIC errors); thresholds from `PERFORMANCE_THRESHOLDS`
 - `GET /api/insights/placement` - Servers ranked by free cores (5-min load vs. logical CPUs) and free RAM
-- `GET /api/users/<username>/footprint` - One account's recorded usage across all servers (404 if unknown)
+- `GET /api/users/<username>/footprint` - One account's recorded usage across all servers, plus the licenses it holds (404 if unknown)
 - `GET /api/users/<username>/history/<hours>` - When and where an account was active (default 24 h, max 90 days)
 - `GET /api/servers/<server_name>/filesystems|disk-io|network` - Latest per-mount, per-device or per-interface rows
+- `GET /api/licenses/summary` - Per-vendor query status and features in use with holders
+- `GET /api/licenses/history/<feature>?hours=24&vendor=` - In-use count over time for one feature
 
 ## Common Development Tasks
 

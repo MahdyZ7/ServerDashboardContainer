@@ -325,3 +325,92 @@ def rank_placement(servers: List[Dict[str, Any]], now: datetime) -> List[Dict[st
         best_ram = max(candidates, key=lambda r: r["free_ram_gb"] or 0)
         best_ram["best_for"] = "both" if best_ram.get("best_for") == "cpu" else "memory"
     return ranked
+
+
+# License snapshots are taken every 5 minutes; four missed queries is stale.
+LICENSE_STALE_MINUTES = 20
+LICENSE_BUSY_RATIO = 0.8
+
+
+def format_held(start_at: Optional[datetime], now: datetime) -> Optional[str]:
+    """'3 h' / '2 d' since a checkout started, or None if the start is unknown."""
+    minutes = minutes_since(start_at, now)
+    if minutes is None or minutes < 0:
+        return None
+    if minutes < 60:
+        return f"{minutes:.0f} min"
+    if minutes < 48 * 60:
+        return f"{minutes / 60:.0f} h"
+    return f"{minutes / 1440:.0f} d"
+
+
+def build_license_items(
+    snapshots: List[Dict[str, Any]],
+    features: List[Dict[str, Any]],
+    checkouts: List[Dict[str, Any]],
+    now: datetime,
+) -> List[Dict[str, Any]]:
+    """
+    License issues with a suggested next step.
+
+    snapshots  latest license_snapshots row per vendor ("all" = the whole query failed)
+    features   license_features rows with licenses in use
+    checkouts  checkouts from the latest successful snapshot per vendor
+    """
+    items: List[Dict[str, Any]] = []
+
+    def add(severity, server, title, detail, action, **metric):
+        items.append({"severity": severity, "category": "license", "server": server,
+                      "title": title, "detail": detail, "action": action, "metric": metric})
+
+    for snap in snapshots:
+        vendor = snap["vendor"]
+        label = "Licenses" if vendor == "all" else vendor.title()
+        subject = "License usage" if vendor == "all" else f"{label} license usage"
+        age = minutes_since(snap.get("timestamp"), now)
+        if snap["status"] == "failed":
+            add("warning", label, f"{subject} cannot be read",
+                f"The last query failed: {snap.get('error') or 'no details'}.",
+                "Check that LICENSE_QUERY_SERVER reaches the license server (lmutil lmstat -c <port@host>). "
+                "Figures shown are from the last successful query, not zero.",
+                minutes_since_report=round(age) if age is not None else None)
+        elif age is not None and age > LICENSE_STALE_MINUTES:
+            add("warning", label, f"{subject} is out of date",
+                f"Last queried {age:.0f} min ago.",
+                "Check the licenses job in the DataCollection logs (make logs-DataCollection).",
+                minutes_since_report=round(age))
+        elif snap["status"] == "partial":
+            add("info", label, f"{subject} is incomplete",
+                snap.get("error") or "Some features reported errors.",
+                "Ask the license administrator why lmstat reports these errors; "
+                "usage for the affected features is unknown, not zero.")
+
+    holders: Dict[tuple, List[Dict[str, Any]]] = {}
+    for c in checkouts:
+        holders.setdefault((c["vendor"], c["feature"]), []).append(c)
+
+    for f in features:
+        issued, in_use = _num(f.get("issued")), _num(f.get("in_use"))
+        if issued <= 0:
+            continue
+        held = sorted(holders.get((f["vendor"], f["feature"]), []),
+                      key=lambda c: c.get("start_at") or now)
+        who = ", ".join(
+            f"{c['username']}" + (f" on {c['server_name'] or c['client_host']}" if (c.get('server_name') or c.get('client_host')) else "")
+            + (f" ({format_held(c.get('start_at'), now)})" if format_held(c.get("start_at"), now) else "")
+            for c in held[:4])
+        vendor = f["vendor"].title()
+        if in_use >= issued:
+            add("warning", vendor, f"All {issued:.0f} {f['feature']} licenses are in use",
+                f"Held by {who}." if who else "No checkout details reported.",
+                "New jobs needing this feature will wait or fail. Ask holders who are no longer "
+                "using the tool to exit it" + (f" — longest held: {held[0]['username']}." if held else "."),
+                feature=f["feature"], in_use=in_use, issued=issued)
+        elif in_use / issued >= LICENSE_BUSY_RATIO:
+            add("info", vendor, f"{f['feature']}: {in_use:.0f} of {issued:.0f} licenses in use",
+                f"Held by {who}." if who else "",
+                "No action yet; expect waits if more users start this tool.",
+                feature=f["feature"], in_use=in_use, issued=issued)
+
+    items.sort(key=lambda i: (SEVERITY_ORDER[i["severity"]], i["server"]))
+    return items

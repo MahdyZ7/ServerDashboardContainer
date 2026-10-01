@@ -451,7 +451,27 @@
                         <tbody>${rows}</tbody>
                     </table>
                 </div>
-                <p class="action-note">Disk is measured once a day; "Recorded" is when this account was first seen on that server.</p>
+                <p class="action-note">Disk is measured once a day; "Recorded" is when this account was last observed on that server.</p>
+                ${d.licenses && d.licenses.length ? `
+                <div class="table-wrapper">
+                    <table class="data-table">
+                        <thead><tr>
+                            <th scope="col">License held</th>
+                            <th scope="col">Vendor</th>
+                            <th scope="col">From</th>
+                            <th scope="col">Held for</th>
+                        </tr></thead>
+                        <tbody>${d.licenses.map(l => `
+                            <tr>
+                                <td><strong>${escapeHtml(l.feature)}</strong></td>
+                                <td>${escapeHtml(l.vendor)}</td>
+                                <td class="cell-server">${escapeHtml(l.server_name || l.client_host || '—')}${l.display ? ` <span class="cell-muted">${escapeHtml(l.display)}</span>` : ''}</td>
+                                <td class="cell-muted">${escapeHtml(l.held || l.start_raw || '—')}</td>
+                            </tr>`).join('')}
+                        </tbody>
+                    </table>
+                </div>
+                <p class="action-note">Exit tools you are not using to release their licenses for others.</p>` : ''}
             </div>`;
     }
 
@@ -775,6 +795,7 @@
             renderUsersTable(users);
             setupUserTableFilters(users);
             setupFootprintLookup(users);
+            loadLicenses();
 
             // Set initial result count
             const countEl = document.getElementById('users-result-count');
@@ -796,6 +817,69 @@
             Toast.error('Failed to load user activity');
         }
     }
+
+    /**
+     * EDA license pools: per-vendor query status and features in use with holders
+     */
+    async function loadLicenses() {
+        const vendorsEl = document.getElementById('license-vendors');
+        const body = document.getElementById('licenses-table-body');
+        if (!vendorsEl || !body) return;
+
+        try {
+            const response = await API.getLicenseSummary();
+            const { vendors, features } = response.data;
+
+            vendorsEl.innerHTML = vendors.length ? vendors.map(v => {
+                const tone = v.status === 'failed' || v.stale ? 'status-offline'
+                    : v.status === 'partial' ? 'status-warning' : 'status-online';
+                const name = v.vendor === 'all' ? 'License query' : v.vendor.charAt(0).toUpperCase() + v.vendor.slice(1);
+                const state = v.status === 'failed' ? 'query failed — last good data shown'
+                    : v.stale ? `no update for ${v.minutes_since_query} min`
+                    : v.status === 'partial' ? 'incomplete' : 'up to date';
+                return `<span class="status-badge ${tone}" title="${escapeHtml(v.error || '')}">
+                    <span class="status-dot"></span>${escapeHtml(name)}: ${escapeHtml(state)}</span>`;
+            }).join('') : '<p class="cell-muted">License collection is not configured.</p>';
+
+            if (!features.length) {
+                body.innerHTML = '<tr><td colspan="4" class="table-empty">No licenses checked out right now.</td></tr>';
+                return;
+            }
+            body.innerHTML = features.map(f => {
+                const pct = f.issued ? Math.min(100, f.in_use / f.issued * 100) : 0;
+                const tone = pct >= 100 ? 'danger' : pct >= 80 ? 'warning' : 'good';
+                // One line per person and machine; extra seats shown as ×N
+                const grouped = new Map();
+                f.holders.forEach(h => {
+                    const key = `${h.username}|${h.server_name || h.client_host || ''}`;
+                    const g = grouped.get(key) || { ...h, seats: 0 };
+                    g.seats += h.licenses || 1;
+                    grouped.set(key, g);
+                });
+                const holders = [...grouped.values()].map(h =>
+                    `${escapeHtml(h.username)}${h.seats > 1 ? ` ×${h.seats}` : ''}${h.server_name || h.client_host ? ` <span class="cell-muted">on ${escapeHtml(h.server_name || h.client_host)}</span>` : ''}${h.held ? ` <span class="cell-muted">· ${escapeHtml(h.held)}</span>` : ''}`
+                ).join('<br>');
+                return `
+                    <tr>
+                        <td><strong>${escapeHtml(f.feature)}</strong></td>
+                        <td>${escapeHtml(f.vendor)}</td>
+                        <td><div class="cell-bar">
+                            <div class="bar-track"><div class="bar-fill ${tone}" style="width:${pct}%"></div></div>
+                            <span class="bar-label">${f.in_use} / ${f.issued ?? '?'}</span>
+                        </div></td>
+                        <td class="license-holders">${holders || '—'}</td>
+                    </tr>`;
+            }).join('');
+        } catch (error) {
+            console.error('Error loading licenses:', error);
+            body.innerHTML = `<tr><td colspan="4" class="table-empty">
+                Failed to load license usage.
+                <button class="btn btn-secondary" onclick="loadLicenses()"><i class="fas fa-sync-alt"></i> Retry</button>
+            </td></tr>`;
+        }
+    }
+
+    window.loadLicenses = loadLicenses;
 
     function renderUsersTable(users) {
         const tableBody = document.getElementById('users-table-body');

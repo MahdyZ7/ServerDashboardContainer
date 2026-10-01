@@ -7,7 +7,7 @@ as reviewed; only the license helper and Dockerfile packaging change are impleme
 
 ## Fix status — 2026-10-01
 
-Implementation steps 1–3 are done and were verified against the live
+Implementation steps 1–4 are done and were verified against the live
 servers (RHEL 6.6 → 9.8). Tests: `python3 -m unittest discover -s srcs/DataCollection/tests -v`.
 
 | Finding | Status |
@@ -29,7 +29,7 @@ servers (RHEL 6.6 → 9.8). Tests: `python3 -m unittest discover -s srcs/DataCol
 | SSH/VNC socket counts | **Fixed.** VNC = distinct Xvnc owners, SSH = distinct users with a remote utmp session (no root needed). Per-session detail is still not stored. |
 | Pressure / runnable tasks | **Added.** `psi_*_avg60` (NULL where the kernel lacks PSI — none of the current hosts enable it; boot with `psi=1` on RHEL 8/9) and `procs_running` / `procs_blocked`. |
 | No per-user history | **Added.** `top_users_history`: rows where an account used ≥ 5 % of a CPU, ≥ 1 GiB RSS or ≥ 1 MiB/s I/O. API: `/api/users/<name>/history/<hours>`. |
-| License integration | **Open** (step 4). |
+| License integration | **Done.** Every 5 min `LicenseUsage.sh` runs over SSH on `LICENSE_QUERY_SERVER` (vendor tools stay on the EDA host). `license_parser.py` (tested on an anonymised capture) gives per-vendor status ok/partial/failed; a failed query never overwrites the last good figures. Tables: `license_snapshots`, `license_features` (current), `license_usage_history` (in-use only), `license_checkouts` (owner, client host matched to a monitored server, display, raw + resolved start). API `/api/licenses/summary`, `/api/licenses/history/<feature>`; footprint lists a user's checkouts; insights flag exhausted pools, failed/stale/incomplete queries. Cadence currently reports 239 of 257 features as "unsupported by licensed server" — shown as incomplete, still for the license administrator. |
 | Host and per-user samples are taken seconds apart in separate SSH sessions | **Open.** A bursty job can appear in one and not the other. |
 
 ## Findings, in priority order
@@ -103,7 +103,7 @@ checkout rows, including owner, client host/display and start time when provided
 It supports different vendor binaries, connection and whole-query timeouts, and
 continues to the second vendor when the first fails. Known errors, including
 per-feature errors, produce a nonzero exit code while retaining diagnostic output.
-This is a human-readable CLI report; database/API/dashboard integration is not yet implemented.
+The collector parses this report (see Fix status); it remains usable as a CLI.
 
 With the endpoints confirmed for this installation:
 

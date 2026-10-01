@@ -139,3 +139,43 @@ def test_pressure_saturated_disk_and_nic_errors():
         [s], {}, {}, THRESHOLDS, NOW, disk_io_by_server=io, network_by_server=net))
     assert titles == ["a disk vg-root is saturated", "a eth0 has network errors",
                       "a jobs are stalling on storage"]
+
+
+from utils.insights import build_license_items  # noqa: E402
+
+
+def snap(vendor, status="ok", minutes_ago=3, error=None):
+    return {"vendor": vendor, "status": status, "error": error,
+            "timestamp": NOW - timedelta(minutes=minutes_ago)}
+
+
+def test_license_pool_exhausted_names_longest_holder():
+    features = [{"vendor": "synopsys", "feature": "DC-Expert", "issued": 2, "in_use": 2}]
+    checkouts = [
+        {"vendor": "synopsys", "feature": "DC-Expert", "username": "bob", "server_name": "KSRC2",
+         "client_host": "ksrc2.x", "start_at": NOW - timedelta(hours=3)},
+        {"vendor": "synopsys", "feature": "DC-Expert", "username": "alice", "server_name": None,
+         "client_host": "laptop7", "start_at": NOW - timedelta(days=3)},
+    ]
+    items = build_license_items([snap("synopsys")], features, checkouts, NOW)
+    assert [(i["severity"], i["title"]) for i in items] == [("warning", "All 2 DC-Expert licenses are in use")]
+    assert items[0]["detail"] == "Held by alice on laptop7 (3 d), bob on KSRC2 (3 h)."
+    assert "longest held: alice" in items[0]["action"]
+
+
+def test_license_query_states():
+    items = build_license_items(
+        [snap("all", "failed", error="SSH connection failed"), snap("cadence", "partial", error="239 features report errors"),
+         snap("synopsys", minutes_ago=45)], [], [], NOW)
+    assert sorted((i["severity"], i["title"]) for i in items) == [
+        ("info", "Cadence license usage is incomplete"),
+        ("warning", "License usage cannot be read"),
+        ("warning", "Synopsys license usage is out of date"),
+    ]
+
+
+def test_busy_but_not_full_is_info_and_unissued_ignored():
+    features = [{"vendor": "synopsys", "feature": "VCS", "issued": 10, "in_use": 8},
+                {"vendor": "synopsys", "feature": "Odd", "issued": 0, "in_use": 1}]
+    items = build_license_items([snap("synopsys")], features, [], NOW)
+    assert [(i["severity"], i["title"]) for i in items] == [("info", "VCS: 8 of 10 licenses in use")]

@@ -5,7 +5,7 @@ Khalifa University Server Monitoring Dashboard
 Combines API backend and Frontend dashboard in one application
 Following Single Responsibility Principle and KU Brand Guidelines 2020
 """
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, jsonify, request
 from flask_cors import CORS
 import psycopg2
 import logging
@@ -17,7 +17,8 @@ import requests
 
 from flask_config import Config, KU_COLORS, DASHBOARD_CONFIG, FONTS, PERFORMANCE_THRESHOLDS
 from blueprints.dashboard import dashboard_bp
-from utils.insights import build_attention_items, rank_placement
+from utils.insights import (SEVERITY_ORDER, build_attention_items, build_license_items,
+                            format_held, rank_placement)
 
 # Load environment variables
 load_dotenv(".env")
@@ -60,6 +61,15 @@ def create_app(config_class=Config):
 
     # Register dashboard blueprint
     app.register_blueprint(dashboard_bp)
+
+    # Static files are cached for a year in production, so version every
+    # url_for('static', ...) by file mtime: a changed file gets a new URL.
+    @app.url_defaults
+    def static_cache_buster(endpoint, values):
+        if endpoint == "static" and "filename" in values:
+            path = os.path.join(app.static_folder, values["filename"])
+            if os.path.isfile(path):
+                values["v"] = int(os.stat(path).st_mtime)
 
     # Inject global template variables
     @app.context_processor
@@ -571,6 +581,34 @@ def create_app(config_class=Config):
             grouped.setdefault(row["server_name"], []).append(row)
         return grouped
 
+    def _current_licenses(cursor):
+        """Latest snapshot per vendor, features in use, and checkouts from each
+        vendor's latest successful snapshot (a failed query keeps the last good data)."""
+        snapshots = _fetch_dicts(cursor, """
+            SELECT DISTINCT ON (s.vendor) s.*,
+                   (SELECT MAX(timestamp) FROM license_snapshots ok
+                    WHERE ok.vendor = s.vendor AND ok.status <> 'failed') AS last_ok_at
+            FROM license_snapshots s
+            ORDER BY s.vendor, s.timestamp DESC
+        """)
+        # A whole-query failure ("all") only matters if newer than every vendor snapshot
+        vendor_times = [x["timestamp"] for x in snapshots if x["vendor"] != "all"]
+        snapshots = [x for x in snapshots
+                     if x["vendor"] != "all" or not vendor_times or x["timestamp"] > max(vendor_times)]
+        features = _fetch_dicts(cursor, """
+            SELECT vendor, endpoint, feature, issued, in_use, version, expiry, observed_at
+            FROM license_features WHERE in_use > 0
+            ORDER BY in_use::float / NULLIF(issued, 0) DESC NULLS LAST, in_use DESC, feature
+        """)
+        checkouts = _fetch_dicts(cursor, """
+            SELECT c.* FROM license_checkouts c
+            JOIN (SELECT DISTINCT ON (vendor) id FROM license_snapshots
+                  WHERE status <> 'failed' ORDER BY vendor, timestamp DESC) latest
+              ON c.snapshot_id = latest.id
+            ORDER BY c.feature, c.start_at NULLS LAST
+        """)
+        return snapshots, features, checkouts
+
     def _jsonable(row):
         return {k: float(v) if isinstance(v, Decimal) else v.isoformat() if isinstance(v, datetime) else v
                 for k, v in row.items()}
@@ -610,7 +648,8 @@ def create_app(config_class=Config):
                 filesystems_by_server=details["filesystems"],
                 disk_io_by_server=details["disk-io"],
                 network_by_server=details["network"],
-            )
+            ) + build_license_items(*_current_licenses(cursor), now)
+            items.sort(key=lambda i: (SEVERITY_ORDER[i["severity"]], i["server"]))
             return jsonify({
                 "success": True,
                 "data": items,
@@ -670,9 +709,15 @@ def create_app(config_class=Config):
                 for key in ("last_login", "timestamp"):
                     row[key] = row[key].isoformat() if row[key] else None
 
+            _, _, checkouts = _current_licenses(cursor)
+            now = datetime.now()
+            licenses = [dict(_jsonable(c), held=format_held(c["start_at"], now))
+                        for c in checkouts if c["username"].lower() == username.lower()]
+
             return jsonify({
                 "success": True,
                 "data": {
+                    "licenses": licenses,
                     "username": rows[0]["username"],
                     "full_name": next((r["full_name"] for r in rows if r["full_name"] and r["full_name"] != "N/A"), None),
                     "servers": rows,
@@ -744,6 +789,77 @@ def create_app(config_class=Config):
             })
         except Exception as e:
             logger.error(f"Error fetching history for {username}: {e}", exc_info=True)
+            return jsonify({"success": False, "error": str(e)}), 500
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+
+    @app.route("/api/licenses/summary", methods=["GET"])
+    def get_license_summary():
+        """Per-vendor query status plus every feature currently in use, with holders.
+
+        A vendor whose latest query failed keeps its last successful figures and is
+        flagged; its usage is unknown, not zero.
+        """
+        conn = None
+        cursor = None
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            snapshots, features, checkouts = _current_licenses(cursor)
+            now = datetime.now()
+            holders = {}
+            for c in checkouts:
+                holders.setdefault((c["vendor"], c["feature"]), []).append(
+                    dict(_jsonable(c), held=format_held(c["start_at"], now)))
+            vendors = []
+            for snap in snapshots:
+                row = _jsonable(snap)
+                age = (now - snap["timestamp"]).total_seconds() / 60
+                row["minutes_since_query"] = round(age)
+                row["stale"] = snap["status"] == "failed" or age > 20
+                vendors.append(row)
+            return jsonify({
+                "success": True,
+                "data": {
+                    "vendors": vendors,
+                    "features": [dict(_jsonable(f), holders=holders.get((f["vendor"], f["feature"]), []))
+                                 for f in features],
+                    "checkout_count": len(checkouts),
+                },
+            })
+        except Exception as e:
+            logger.error(f"Error building license summary: {e}", exc_info=True)
+            return jsonify({"success": False, "error": str(e)}), 500
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+
+    @app.route("/api/licenses/history/<path:feature>", methods=["GET"])
+    def get_license_history(feature):
+        """In-use count over time for one feature (?hours=24, ?vendor=). Times with no
+        row and a successful snapshot mean zero in use."""
+        hours = max(1, min(request.args.get("hours", 24, type=int), 90 * 24))
+        vendor = request.args.get("vendor")
+        conn = None
+        cursor = None
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            rows = _fetch_dicts(cursor, """
+                SELECT timestamp, vendor, feature, issued, in_use FROM license_usage_history
+                WHERE feature = %s AND (%s::text IS NULL OR vendor = %s)
+                  AND timestamp > NOW() - %s * INTERVAL '1 hour'
+                ORDER BY timestamp
+            """, (feature, vendor, vendor, hours))
+            return jsonify({"success": True, "data": [_jsonable(r) for r in rows],
+                            "feature": feature, "hours": hours, "count": len(rows)})
+        except Exception as e:
+            logger.error(f"Error fetching license history for {feature}: {e}", exc_info=True)
             return jsonify({"success": False, "error": str(e)}), 500
         finally:
             if cursor:

@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 import time
 from parsers import DISK_NOT_COLLECTED, ParseError, parse_monitoring_data, parse_top_users
 from rates import DISK_COUNTERS, NETWORK_COUNTERS, disk_rates, network_rates
+from license_parser import match_server, parse_license_report
 
 RED = "\033[0;31m"
 GREEN = "\033[0;32m"
@@ -29,7 +30,9 @@ HISTORY_MIN_CPU: float = 5.0  # percent of one CPU
 HISTORY_MIN_RSS_KB: int = 1024 * 1024  # 1 GiB
 HISTORY_MIN_IO_BPS: int = 1024 * 1024  # 1 MiB/s
 RETENTION_TABLES = ["server_metrics", "top_users", "top_users_history",
-                    "server_filesystems", "server_disk_io", "server_network"]
+                    "server_filesystems", "server_disk_io", "server_network",
+                    "license_snapshots", "license_usage_history", "license_checkouts"]
+LICENSE_TIMEOUT_SECONDS: int = 90
 retention_cleanup_interval: int = 7 * int(
     60 * 24 / data_collection_interval
 )  # Run cleanup weekly (only used in continuous mode)
@@ -42,6 +45,9 @@ DISK_SCAN_TIMEOUT_PER_USER: int = int(os.getenv("DISK_SCAN_TIMEOUT_PER_USER", "9
 DISK_SCAN_TIMEOUT_SECONDS: int = int(os.getenv("DISK_SCAN_TIMEOUT_SECONDS", str(4 * 3600)))
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# pg_advisory_lock key serialising init_db across concurrent cron jobs
+SCHEMA_LOCK_ID = 7_301_001
 
 # Database configuration
 DB_CONFIG = {
@@ -231,6 +237,75 @@ def init_db():
         "CREATE INDEX IF NOT EXISTS idx_top_users_history_server_time ON top_users_history (server_name, timestamp)",
     ]
 
+    # License pools are queried once (not per compute server). A failed query
+    # is recorded as a failed snapshot and never overwrites the last good values.
+    detail_tables += [
+        """
+		CREATE TABLE IF NOT EXISTS license_snapshots (
+			id BIGSERIAL PRIMARY KEY,
+			timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			vendor VARCHAR(32),
+			endpoint TEXT,
+			status VARCHAR(16),
+			daemon_status VARCHAR(64),
+			error TEXT,
+			features_total INT,
+			features_counted INT,
+			features_error INT,
+			licenses_in_use INT,
+			query_host VARCHAR(255)
+		)""",
+        # Current state per feature; observed_at = last snapshot that reported it
+        """
+		CREATE TABLE IF NOT EXISTS license_features (
+			vendor VARCHAR(32),
+			endpoint TEXT,
+			feature VARCHAR(255),
+			issued INT,
+			in_use INT,
+			error TEXT,
+			version VARCHAR(64),
+			expiry VARCHAR(32),
+			observed_at TIMESTAMP,
+			PRIMARY KEY (vendor, endpoint, feature)
+		)""",
+        """
+		CREATE TABLE IF NOT EXISTS license_usage_history (
+			id BIGSERIAL PRIMARY KEY,
+			timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			snapshot_id BIGINT REFERENCES license_snapshots(id) ON DELETE CASCADE,
+			vendor VARCHAR(32),
+			feature VARCHAR(255),
+			issued INT,
+			in_use INT
+		)""",
+        # start_raw is lmstat's text (no year); start_at is resolved, NULL if ambiguous.
+        # server_name is the monitored server matching client_host, if any.
+        """
+		CREATE TABLE IF NOT EXISTS license_checkouts (
+			id BIGSERIAL PRIMARY KEY,
+			timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			snapshot_id BIGINT REFERENCES license_snapshots(id) ON DELETE CASCADE,
+			vendor VARCHAR(32),
+			feature VARCHAR(255),
+			username VARCHAR(255),
+			client_host VARCHAR(255),
+			server_name VARCHAR(255),
+			display VARCHAR(255),
+			version VARCHAR(64),
+			server_host VARCHAR(255),
+			server_port INT,
+			handle BIGINT,
+			start_raw VARCHAR(64),
+			start_at TIMESTAMP,
+			licenses INT
+		)""",
+        "CREATE INDEX IF NOT EXISTS idx_license_snapshots_vendor_time ON license_snapshots (vendor, timestamp)",
+        "CREATE INDEX IF NOT EXISTS idx_license_usage_feature_time ON license_usage_history (feature, timestamp)",
+        "CREATE INDEX IF NOT EXISTS idx_license_checkouts_snapshot ON license_checkouts (snapshot_id)",
+        "CREATE INDEX IF NOT EXISTS idx_license_checkouts_user_time ON license_checkouts (username, timestamp)",
+    ]
+
     # Widen numeric columns that overflowed at 999.99 (table, column, precision)
     widen_columns = [
         ("server_metrics", "cpu_load_1min", 8),
@@ -241,10 +316,14 @@ def init_db():
         ("top_users", "disk", 12),
     ]
 
-    with psycopg2.connect(**DB_CONFIG) as conn:
-        # Autocommit so one failed migration cannot abort the ones after it
+    # Not `with conn:` — since psycopg2 2.9 that opens a transaction even in
+    # autocommit mode, and one failed migration would then abort the rest.
+    conn = psycopg2.connect(**DB_CONFIG)
+    try:
         conn.autocommit = True
         with conn.cursor() as cursor:
+            # Jobs start together (metrics + licenses); concurrent DDL deadlocks
+            cursor.execute("SELECT pg_advisory_lock(%s)", (SCHEMA_LOCK_ID,))
             logger.info("Initializing database tables")
             cursor.execute(create_table_query)
             cursor.execute(create_table_query_2)
@@ -267,6 +346,8 @@ def init_db():
                     cursor.execute(
                         f"ALTER TABLE {table} ALTER COLUMN {column} TYPE NUMERIC({precision},2)"
                     )
+    finally:
+        conn.close()  # also releases the advisory lock
 
 
 # Configure logging
@@ -292,7 +373,8 @@ SSH_EXIT_REASONS = {
 }
 
 
-def run_remote_script(server: Dict, script: str, args: List[str], timeout: int) -> str:
+def run_remote_script(server: Dict, script: str, args: List[str], timeout: int,
+                      accept_status=(0,)) -> str:
     """Run a local script on the server over SSH and return its stdout.
 
     Credentials are passed through the environment so they never appear in the
@@ -321,7 +403,7 @@ def run_remote_script(server: Dict, script: str, args: List[str], timeout: int) 
     except subprocess.TimeoutExpired:
         raise CollectionError(f"{script} on {server['name']} timed out after {timeout}s") from None
 
-    if result.returncode != 0:
+    if result.returncode not in accept_status:
         reason = SSH_EXIT_REASONS.get(result.returncode, f"exit status {result.returncode}")
         # Login banners can be long; the last lines carry the actual error
         stderr_tail = " | ".join(result.stderr.strip().splitlines()[-3:])
@@ -498,6 +580,128 @@ def store_top_users(server_name: str, top_users_dict: Dict):
     except Exception as e:
         logger.error(f"Database error storing top users for {server_name}: {e}")
         raise
+
+
+def read_license_config() -> Dict:
+    """License query settings; empty dict when license collection is not configured.
+
+    LICENSE_QUERY_SERVER   name of a monitored server (SERVER{n}_NAME) with the vendor
+                           tools installed; the report runs there over SSH
+    LICENSE_CADENCE_SERVER / LICENSE_SYNOPSYS_SERVER   port@host specs
+    LICENSE_CADENCE_LMUTIL / LICENSE_SYNOPSYS_LMUTIL   absolute lmutil paths on that server
+    """
+    host = os.getenv("LICENSE_QUERY_SERVER")
+    if not host:
+        return {}
+    options = {
+        "--cadence-server": os.getenv("LICENSE_CADENCE_SERVER"),
+        "--synopsys-server": os.getenv("LICENSE_SYNOPSYS_SERVER"),
+        "--cadence-lmutil": os.getenv("LICENSE_CADENCE_LMUTIL"),
+        "--synopsys-lmutil": os.getenv("LICENSE_SYNOPSYS_LMUTIL"),
+    }
+    args = []
+    for option, value in options.items():
+        if value:
+            args += [option, value]
+    return {"host": host, "args": args}
+
+
+def collect_licenses() -> bool:
+    """Query the license servers once and store one snapshot per vendor."""
+    config = read_license_config()
+    if not config:
+        logger.info("License collection not configured (LICENSE_QUERY_SERVER unset); skipping")
+        return True
+    servers = readServerList()
+    query_server = next((s for s in servers if s["name"] == config["host"]), None)
+    if query_server is None:
+        logger.error(f"LICENSE_QUERY_SERVER={config['host']} is not one of the configured servers")
+        return False
+    try:
+        # Exit 1 = a vendor query reported errors; the parser judges each vendor's status
+        report = run_remote_script(query_server, "LicenseUsage.sh", config["args"],
+                                   LICENSE_TIMEOUT_SECONDS, accept_status=(0, 1))
+    except CollectionError as e:
+        logger.error(f"License query failed: {e}")
+        store_failed_license_query(config["host"], str(e))
+        return False
+
+    snapshots = parse_license_report(report)
+    if not snapshots:
+        logger.error("License report contained no vendor sections")
+        store_failed_license_query(config["host"], "report contained no vendor sections")
+        return False
+    store_license_snapshots(snapshots, servers, config["host"])
+    for snap in snapshots:
+        log = logger.info if snap["status"] == "ok" else logger.warning
+        log(f"License {snap['vendor']}: {snap['status']}, "
+            f"{sum(f['in_use'] or 0 for f in snap['features'])} in use, "
+            f"{len(snap['checkouts'])} checkouts" + (f" ({snap['error']})" if snap["error"] else ""))
+    return any(s["status"] != "failed" for s in snapshots)
+
+
+def store_failed_license_query(query_host: str, error: str):
+    with psycopg2.connect(**DB_CONFIG) as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "INSERT INTO license_snapshots (vendor, status, error, query_host) VALUES ('all', 'failed', %s, %s)",
+                (error[:2000], query_host),
+            )
+
+
+def store_license_snapshots(snapshots: List[Dict], servers: List[Dict], query_host: str):
+    with psycopg2.connect(**DB_CONFIG) as conn:
+        with conn.cursor() as cursor:
+            for snap in snapshots:
+                features = snap["features"]
+                cursor.execute("""
+					INSERT INTO license_snapshots (vendor, endpoint, status, daemon_status, error,
+						features_total, features_counted, features_error, licenses_in_use, query_host)
+					VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
+				""", (snap["vendor"], snap["endpoint"], snap["status"], snap["daemon_status"],
+                      snap["error"], len(features),
+                      sum(f["in_use"] is not None for f in features),
+                      sum(bool(f["error"]) for f in features),
+                      sum(f["in_use"] or 0 for f in features), query_host))
+                snapshot_id = cursor.fetchone()[0]
+                if snap["status"] == "failed":
+                    continue  # keep the last good feature state
+
+                for f in features:
+                    cursor.execute("""
+						INSERT INTO license_features (vendor, endpoint, feature, issued, in_use, error,
+							version, expiry, observed_at)
+						VALUES (%(vendor)s, %(endpoint)s, %(feature)s, %(issued)s, %(in_use)s, %(error)s,
+							%(version)s, %(expiry)s, CURRENT_TIMESTAMP)
+						ON CONFLICT (vendor, endpoint, feature) DO UPDATE SET
+							issued = EXCLUDED.issued, in_use = EXCLUDED.in_use, error = EXCLUDED.error,
+							version = COALESCE(EXCLUDED.version, license_features.version),
+							expiry = COALESCE(EXCLUDED.expiry, license_features.expiry),
+							observed_at = EXCLUDED.observed_at
+					""", dict(f, vendor=snap["vendor"], endpoint=snap["endpoint"]))
+                    if f["in_use"]:
+                        cursor.execute("""
+							INSERT INTO license_usage_history (snapshot_id, vendor, feature, issued, in_use)
+							VALUES (%s, %s, %s, %s, %s)
+						""", (snapshot_id, snap["vendor"], f["feature"], f["issued"], f["in_use"]))
+                # Features no longer served by this endpoint
+                cursor.execute("""
+					DELETE FROM license_features WHERE vendor = %s AND endpoint = %s
+					AND observed_at < CURRENT_TIMESTAMP - INTERVAL '7 days'
+				""", (snap["vendor"], snap["endpoint"]))
+
+                for c in snap["checkouts"]:
+                    cursor.execute("""
+						INSERT INTO license_checkouts (snapshot_id, vendor, feature, username, client_host,
+							server_name, display, version, server_host, server_port, handle,
+							start_raw, start_at, licenses)
+						VALUES (%(snapshot_id)s, %(vendor)s, %(feature)s, %(username)s, %(client_host)s,
+							%(server_name)s, %(display)s, %(version)s, %(server_host)s, %(server_port)s,
+							%(handle)s, %(start_raw)s, %(start_at)s, %(licenses)s)
+					""", dict(c, snapshot_id=snapshot_id, vendor=snap["vendor"],
+                              server_name=match_server(c["client_host"], servers)))
+            conn.commit()
+    logger.info("Stored license snapshots")
 
 
 def readServerList() -> List[Dict]:
@@ -705,7 +909,16 @@ if __name__ == "__main__":
     # Determine execution mode based on environment variables
     mode = os.getenv("EXECUTION_MODE", "continuous").lower()
 
-    if os.getenv("CLEANUP_ONLY") == "true":
+    if os.getenv("LICENSES_ONLY") == "true":
+        # License snapshot only (scheduled separately from host metrics)
+        try:
+            init_db()
+            exit(0 if collect_licenses() else 1)
+        except Exception as e:
+            logger.error(f"License collection failed: {e}", exc_info=True)
+            exit(1)
+
+    elif os.getenv("CLEANUP_ONLY") == "true":
         # Legacy cleanup-only mode
         logger.info("Running in cleanup-only mode")
         try:

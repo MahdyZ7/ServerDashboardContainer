@@ -114,6 +114,14 @@
             return fetchWithRetry(`${API_BASE}/servers/${encodeURIComponent(serverName)}/${encodeURIComponent(detail)}`);
         },
 
+        async getLicenseSummary() {
+            return fetchWithRetry(`${API_BASE}/licenses/summary`);
+        },
+
+        async getLicenseHistory(feature, hours = 24) {
+            return fetchWithRetry(`${API_BASE}/licenses/history/${encodeURIComponent(feature)}?hours=${encodeURIComponent(hours)}`);
+        },
+
         async getUserHistory(username, hours = 24) {
             return fetchWithRetry(`${API_BASE}/users/${encodeURIComponent(username)}/history/${encodeURIComponent(hours)}`);
         }
