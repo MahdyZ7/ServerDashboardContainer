@@ -10,35 +10,35 @@ load_dotenv()
 
 # Official Khalifa University brand colors per 2020 Brand Guidelines
 KU_COLORS = {
-    "primary": "#003DA5",  # Official KU Blue (Pantone 293C)
-    "secondary": "#6F5091",  # KU Purple (Pantone 267C)
-    "accent": "#78D64B",  # KU Green (Pantone 375C)
-    "undergraduate": "#00A9CE",  # Undergraduate Blue (Pantone 3125C)
-    "graduate": "#6F5091",  # Graduate Purple (Pantone 267C)
-    "postgraduate": "#E31E24",  # Postgraduate Red (Pantone 186C)
-    "orange": "#F57F29",  # KU Orange (Pantone 158C)
-    "light_gray": "#D1D3D4",  # Cool Gray 3C
-    "dark_gray": "#6D6E71",  # Cool Gray 10C
-    "light_brown": "#C5B9AC",  # Light Brown (Warm Gray 3C)
-    "body_text": "#231F20",  # Body text (Black)
+    "primary": "#0057B8",  # KU Blue (Pantone 2935) — Brand Guidelines 2020 §3.01
+    "secondary": "#6F5091",  # KU Purple (Pantone 7677)
+    "accent": "#78D64B",  # KU Green (Pantone 7488)
+    "undergraduate": "#00A9CE",  # Undergraduate Blue (Pantone 312)
+    "graduate": "#6F5091",  # Graduate Purple (Pantone 7677)
+    "postgraduate": "#F8485E",  # Postgraduate Red (Pantone 1785)
+    "orange": "#FF8F1C",  # KU Orange (Pantone 1495)
+    "light_gray": "#D0D0CE",  # Cool Gray 2
+    "dark_gray": "#75787B",  # Cool Gray 9
+    "light_brown": "#C5B9AC",  # Warm Gray (Pantone 7528)
+    "body_text": "#3C3C3B",  # Body text (K90)
     "white": "#FFFFFF",
     "light": "#F8F9FA",  # Light background
-    "success": "#003DA5",  # Using KU Blue for success
-    "warning": "#F57F29",  # Using KU Orange for warning
-    "danger": "#E31E24",  # Using KU Red for danger
+    "success": "#0057B8",  # Using KU Blue for success
+    "warning": "#FF8F1C",  # Using KU Orange for warning
+    "danger": "#F8485E",  # Using KU Red for danger
     "info": "#00A9CE",  # Using Undergraduate Blue for info
-    "muted": "#6D6E71",  # Using Cool Gray 10C
-    "border": "#D1D3D4",  # Using Cool Gray 3C
-    "gradient_start": "#003DA5",
+    "muted": "#75787B",  # Using Cool Gray 9
+    "border": "#D0D0CE",  # Using Cool Gray 2
+    "gradient_start": "#0057B8",
     "gradient_end": "#002B74",
     "card_bg": "#FFFFFF",
     "hover_bg": "#F1F3F4",
-    "text_primary": "#1A1A1A",
+    "text_primary": "#3C3C3B",
     "text_secondary": "#75787B",
-    "critical": "#E31E24",
-    "performance_good": "#003DA5",
-    "performance_fair": "#F57F29",
-    "performance_poor": "#E31E24",
+    "critical": "#F8485E",
+    "performance_good": "#0057B8",
+    "performance_fair": "#FF8F1C",
+    "performance_poor": "#F8485E",
 }
 
 # Dark mode color palette
@@ -101,13 +101,14 @@ TABLE_CONFIG = {
     "max_alerts": 5,
 }
 
-# Font Configuration - KU Brand Guidelines 2020 specify DIN Next (commercial)
-# Using Inter as the closest free alternative to DIN Next
+# Font Configuration - KU Brand Guidelines 2020 §4.01 specify DIN Next (commercial).
+# The CSS stack prefers a locally installed DIN Next and falls back to Barlow,
+# the closest free DIN-style grotesk (Light 300 / Regular 400 / Medium 500 / Bold 700).
 FONTS = {
-    "primary": "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-    "secondary": "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    "primary": "'DIN Next LT Pro', 'DIN Next', 'Barlow', 'Helvetica Neue', Arial, sans-serif",
+    "secondary": "'DIN Next LT Pro', 'DIN Next', 'Barlow', 'Helvetica Neue', Arial, sans-serif",
     "google_fonts": [
-        "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap",
+        "https://fonts.googleapis.com/css2?family=Barlow:wght@300;400;500;700&display=swap",
     ],
     "fontawesome": "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css",
 }

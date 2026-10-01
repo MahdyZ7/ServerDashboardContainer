@@ -13,53 +13,56 @@
 {% block content %}
 <!-- Dashboard Tabs -->
 <div class="dashboard-tabs">
-    <nav class="tabs-nav" role="tablist" aria-label="Dashboard navigation">
-        <button class="tab-button {% if active_tab == 'overview' %}active{% endif %}"
-                data-tab="overview"
-                role="tab"
-                aria-selected="{% if active_tab == 'overview' %}true{% else %}false{% endif %}"
-                aria-controls="overview-panel">
-            <i class="fas fa-th-large"></i>
-            <span>Usage Overview</span>
-        </button>
-
-        <button class="tab-button {% if active_tab == 'servers' %}active{% endif %}"
-                data-tab="servers"
-                role="tab"
-                aria-selected="{% if active_tab == 'servers' %}true{% else %}false{% endif %}"
-                aria-controls="servers-panel">
-            <i class="fas fa-server"></i>
-            <span>Server Details</span>
-        </button>
-
-        <button class="tab-button {% if active_tab == 'users' %}active{% endif %}"
-                data-tab="users"
-                role="tab"
-                aria-selected="{% if active_tab == 'users' %}true{% else %}false{% endif %}"
-                aria-controls="users-panel">
-            <i class="fas fa-users"></i>
-            <span>User Activity</span>
-        </button>
-
-        <button class="tab-button {% if active_tab == 'analytics' %}active{% endif %}"
-                data-tab="analytics"
-                role="tab"
-                aria-selected="{% if active_tab == 'analytics' %}true{% else %}false{% endif %}"
-                aria-controls="analytics-panel">
-            <i class="fas fa-chart-line"></i>
-            <span>Performance Analytics</span>
-        </button>
-
-        <button class="tab-button {% if active_tab == 'network' %}active{% endif %}"
-                data-tab="network"
-                role="tab"
-                aria-selected="{% if active_tab == 'network' %}true{% else %}false{% endif %}"
-                aria-controls="network-panel">
-            <i class="fas fa-network-wired"></i>
-            <span>Network Monitor</span>
-        </button>
-        <!-- Sliding indicator will be inserted by JS -->
-    </nav>
+    <div class="tabs-nav-wrap">
+        <nav class="tabs-nav" role="tablist" aria-label="Dashboard sections">
+            <button class="tab-button {% if active_tab == 'overview' %}active{% endif %}"
+                    id="overview-tab"
+                    data-tab="overview"
+                    role="tab"
+                    aria-selected="{% if active_tab == 'overview' %}true{% else %}false{% endif %}"
+                    aria-controls="overview-panel">
+                <span class="tab-num">01</span>
+                <span class="tab-label">Usage Overview</span>
+            </button>
+            <button class="tab-button {% if active_tab == 'servers' %}active{% endif %}"
+                    id="servers-tab"
+                    data-tab="servers"
+                    role="tab"
+                    aria-selected="{% if active_tab == 'servers' %}true{% else %}false{% endif %}"
+                    aria-controls="servers-panel">
+                <span class="tab-num">02</span>
+                <span class="tab-label">Server Details</span>
+            </button>
+            <button class="tab-button {% if active_tab == 'users' %}active{% endif %}"
+                    id="users-tab"
+                    data-tab="users"
+                    role="tab"
+                    aria-selected="{% if active_tab == 'users' %}true{% else %}false{% endif %}"
+                    aria-controls="users-panel">
+                <span class="tab-num">03</span>
+                <span class="tab-label">User Activity</span>
+            </button>
+            <button class="tab-button {% if active_tab == 'analytics' %}active{% endif %}"
+                    id="analytics-tab"
+                    data-tab="analytics"
+                    role="tab"
+                    aria-selected="{% if active_tab == 'analytics' %}true{% else %}false{% endif %}"
+                    aria-controls="analytics-panel">
+                <span class="tab-num">04</span>
+                <span class="tab-label">Performance Analytics</span>
+            </button>
+            <button class="tab-button {% if active_tab == 'network' %}active{% endif %}"
+                    id="network-tab"
+                    data-tab="network"
+                    role="tab"
+                    aria-selected="{% if active_tab == 'network' %}true{% else %}false{% endif %}"
+                    aria-controls="network-panel">
+                <span class="tab-num">05</span>
+                <span class="tab-label">Network Monitor</span>
+            </button>
+            <!-- Sliding indicator will be inserted by JS -->
+        </nav>
+    </div>
 
     <!-- Tab Panels -->
     <div class="tabs-content">
@@ -105,37 +108,34 @@
     <div class="footer-controls">
         <div class="footer-left">
             <button class="btn btn-primary" id="refresh-button" aria-label="Refresh all data">
-                <i class="fas fa-sync-alt"></i>
+                <i class="fas fa-sync-alt" aria-hidden="true"></i>
                 <span>Refresh</span>
             </button>
 
             <div class="export-dropdown">
                 <button class="btn btn-secondary" id="export-button" aria-label="Export report" aria-haspopup="true">
-                    <i class="fas fa-download"></i>
+                    <i class="fas fa-download" aria-hidden="true"></i>
                     <span>Export</span>
-                    <i class="fas fa-chevron-up" style="font-size: 0.625rem; margin-left: 2px;"></i>
                 </button>
                 <div class="export-menu" id="export-menu" role="menu">
                     <button class="export-menu-item" onclick="DashboardExport.toJSON()" role="menuitem">
-                        <i class="fas fa-code"></i>
+                        <i class="fas fa-code" aria-hidden="true"></i>
                         Export as JSON
                     </button>
                     <button class="export-menu-item" onclick="DashboardExport.toCSV()" role="menuitem">
-                        <i class="fas fa-file-csv"></i>
+                        <i class="fas fa-file-csv" aria-hidden="true"></i>
                         Export as CSV
                     </button>
                 </div>
             </div>
         </div>
 
-        <div style="display: flex; align-items: center; gap: var(--spacing-md);">
+        <div class="footer-meta">
             <span class="refresh-countdown" id="refresh-countdown"></span>
-            <div class="last-updated">
-                <i class="fas fa-clock"></i>
-                <span id="last-updated-time">Loading...</span>
-            </div>
+            <span class="last-updated" id="last-updated-time">Loading…</span>
         </div>
     </div>
+    <p class="colophon">Khalifa University of Science and Technology · KSRC infrastructure telemetry · ku.ac.ae</p>
 </footer>
 {% endblock %}
 

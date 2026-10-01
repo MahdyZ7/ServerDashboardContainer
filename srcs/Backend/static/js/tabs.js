@@ -38,7 +38,7 @@
         const navRect = nav.getBoundingClientRect();
         const btnRect = btn.getBoundingClientRect();
 
-        indicator.style.left = (btnRect.left - navRect.left) + 'px';
+        indicator.style.left = (btnRect.left - navRect.left + nav.scrollLeft) + 'px';
         indicator.style.width = btnRect.width + 'px';
     }
 

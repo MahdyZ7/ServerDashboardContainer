@@ -1,56 +1,39 @@
 <!-- Network Monitor Panel -->
-<div class="network-container" role="region" aria-label="Network activity monitor">
-    <div class="card">
-        <div class="card-header">
-            <div class="card-title">
-                <i class="fas fa-network-wired"></i>
-                <span>Network Activity Monitor</span>
-            </div>
-            <div class="card-subtitle">
-                Connection statistics and network health
-            </div>
+<section class="network-container" role="region" aria-labelledby="network-heading">
+    <header class="section-head">
+        <div>
+            <p class="kicker">Section 05</p>
+            <h2 id="network-heading">Network Monitor</h2>
+            <p class="section-deck">TCP connection counts and cumulative interface traffic for each server.</p>
         </div>
-        <div class="card-body">
-            <!-- Network Overview Stats -->
-            <div id="network-overview" class="network-overview-grid" aria-label="Network overview statistics">
-                <!-- Skeleton loading -->
-                {% for i in range(4) %}
-                <div class="overview-stat skeleton" style="min-height: 72px;"></div>
-                {% endfor %}
-            </div>
+    </header>
 
-            <!-- Network Activity Chart -->
-            <div class="chart-container" style="margin-top: var(--spacing-xl);">
-                <h3 class="chart-title">
-                    <i class="fas fa-chart-line"></i>
-                    Connections by Server
-                </h3>
-                <div class="chart-wrapper"><canvas id="network-activity-chart" aria-label="Network connections chart"></canvas></div>
-            </div>
+    <div id="network-overview" class="network-overview-grid" aria-label="Network overview statistics">
+        {% for i in range(4) %}
+        <div class="overview-stat skeleton"></div>
+        {% endfor %}
+    </div>
 
-            <!-- Server Connection Details -->
-            <div class="network-details">
-                <h3 class="section-title">
-                    <i class="fas fa-server"></i>
-                    Server Connection Details
-                </h3>
-                <div id="server-connections" class="server-connections-grid" aria-label="Server connection details">
-                    <!-- Skeleton loading -->
-                    {% for i in range(3) %}
-                    <div class="skeleton-card skeleton" style="min-height: 120px;"></div>
-                    {% endfor %}
-                </div>
+    <figure class="chart-container chart-full-width">
+        <figcaption class="chart-title">
+            <span class="chart-num">Fig. 5.1</span>
+            <div>
+                <div class="chart-title-text">Connections by server</div>
+                <div class="chart-title-sub">Established TCP connections at the latest sample</div>
             </div>
+        </figcaption>
+        <div class="chart-wrapper"><canvas id="network-activity-chart" aria-label="Network connections chart"></canvas></div>
+    </figure>
+
+    <div class="network-details">
+        <h3 class="section-title"><span class="kicker">05.1</span>Connection ledger</h3>
+        <div id="server-connections" aria-label="Server connection details">
+            <div class="skeleton-card skeleton" style="min-height: 200px;"></div>
         </div>
     </div>
-</div>
+</section>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    if (document.getElementById('network-panel').classList.contains('active')) {
-        loadNetworkMonitor();
-    }
-});
 document.querySelector('[data-tab="network"]')?.addEventListener('click', function() {
     loadNetworkMonitor();
 });

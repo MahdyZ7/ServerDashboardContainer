@@ -1,39 +1,37 @@
-<!-- Usage Overview Panel - Compact Server Grid with Progress Rings -->
-<div class="overview-container" role="region" aria-label="Server usage overview">
+<!-- Usage Overview Panel -->
+<section class="overview-container" role="region" aria-labelledby="overview-heading">
+    <header class="section-head">
+        <div>
+            <p class="kicker">Section 01</p>
+            <h2 id="overview-heading">Usage Overview</h2>
+            <p class="section-deck">Live resource load across every monitored server. Tick marks on each bar sit at the 70% warning and 90% critical thresholds.</p>
+        </div>
+    </header>
+
+    <p class="lede" id="overview-lede" aria-live="polite"></p>
+
     <!-- Loading State - Skeleton Cards -->
     <div id="overview-loading" class="server-grid">
         {% for i in range(4) %}
-        <div class="skeleton-card skeleton">
-            <div class="skeleton-line short" style="margin-top: 16px;"></div>
-            <div class="skeleton-line medium" style="margin-top: 24px;"></div>
-            <div class="skeleton-line long" style="margin-top: 8px;"></div>
-            <div class="skeleton-line medium" style="margin-top: 8px;"></div>
-        </div>
+        <div class="skeleton-card skeleton"></div>
         {% endfor %}
     </div>
 
     <!-- Server Grid -->
-    <div id="server-grid" class="server-grid" style="display: none;" aria-label="Server cards grid">
-        <!-- Server cards will be dynamically loaded here -->
-    </div>
+    <div id="server-grid" class="server-grid" hidden aria-label="Server cards grid"></div>
 
     <!-- Empty State -->
-    <div id="overview-empty" class="empty-state" style="display: none;" role="status">
-        <i class="fas fa-server fa-3x"></i>
-        <h3>No Servers Available</h3>
+    <div id="overview-empty" class="empty-state" hidden role="status">
+        <i class="fas fa-server" aria-hidden="true"></i>
+        <h3>No servers available</h3>
         <p>No server data is currently available. Please check your connection.</p>
         <button class="btn btn-primary" onclick="loadServerGrid()" aria-label="Retry loading server data">
-            <i class="fas fa-sync-alt"></i> Retry
+            <i class="fas fa-sync-alt" aria-hidden="true"></i> Retry
         </button>
     </div>
-</div>
+</section>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    if (document.getElementById('overview-panel').classList.contains('active')) {
-        loadServerGrid();
-    }
-});
 document.querySelector('[data-tab="overview"]')?.addEventListener('click', function() {
     loadServerGrid();
 });

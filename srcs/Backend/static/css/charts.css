@@ -1,495 +1,78 @@
 /**
- * Chart Styles — Clear, Data-Dense, Readable
- * Generous chart height, strong labels, clear legend placement
+ * Charts — set as numbered figures with captions
  */
 
-/* ========================================
-   Chart Controls
-   ======================================== */
-.chart-controls {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--spacing-sm);
-    margin-bottom: var(--spacing-lg);
-    align-items: center;
-    padding: 0.75rem 1rem;
-    background: var(--bg-secondary);
-    border-radius: var(--border-radius-sm);
-    border: 1px solid var(--border-color);
-}
-
-.time-range-selector,
-.server-selector {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-}
-
-.time-range-selector label,
-.server-selector label {
-    font-size: 0.6875rem;
-    color: var(--text-secondary);
-    white-space: nowrap;
-    font-weight: var(--font-weight-bold);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-}
-
-.time-range-selector select,
-.server-selector select {
-    padding: 0.5rem 2.25rem 0.5rem 0.75rem;
-    border: 1.5px solid var(--border-color);
-    border-radius: var(--border-radius-xs);
-    font-size: 0.8125rem;
-    font-family: var(--font-family);
-    background: var(--card-bg);
-    color: var(--text-primary);
-    cursor: pointer;
-    appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2394A3B8' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 0.75rem center;
-    transition: all var(--transition-fast);
-    font-weight: var(--font-weight-medium);
-}
-
-.time-range-selector select:focus,
-.server-selector select:focus {
-    outline: none;
-    border-color: var(--ku-primary);
-    box-shadow: 0 0 0 3px rgba(0, 61, 165, 0.12);
-}
-
-/* Segmented time-range button group (alternative to select) */
-.time-range-pills {
-    display: flex;
-    gap: 2px;
-    background: var(--bg-tertiary);
-    border-radius: var(--border-radius-xs);
-    padding: 2px;
-    border: 1px solid var(--border-color);
-}
-
-.time-range-pill {
-    padding: 0.3rem 0.65rem;
-    border: none;
-    background: transparent;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    font-weight: var(--font-weight-semibold);
-    color: var(--text-secondary);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-    font-family: var(--font-family);
-}
-
-.time-range-pill:hover {
-    color: var(--ku-primary);
-    background: var(--card-bg);
-}
-
-.time-range-pill.active {
-    background: var(--ku-primary);
-    color: white;
-    box-shadow: 0 1px 4px rgba(0, 61, 165, 0.3);
-}
-
-/* Mobile */
-@media (max-width: 639px) {
-    .chart-controls {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-    .time-range-selector,
-    .server-selector {
-        justify-content: space-between;
-        width: 100%;
-    }
-
-    .time-range-pills {
-        width: 100%;
-        justify-content: stretch;
-    }
-
-    .time-range-pill {
-        flex: 1;
-        text-align: center;
-    }
-}
-
-/* ========================================
-   Charts Grid
-   ======================================== */
 .charts-grid {
     display: grid;
-    grid-template-columns: 1fr;
-    gap: var(--spacing-lg);
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 440px), 1fr));
+    gap: var(--spacing-2xl) clamp(1.5rem, 3vw, 3rem);
 }
 
-@media (min-width: 1024px) {
-    .charts-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
-
-/* ========================================
-   Chart Container
-   ======================================== */
 .chart-container {
-    background: var(--card-bg);
-    border-radius: var(--border-radius-sm);
-    border: 1px solid var(--border-color);
-    padding: var(--spacing-lg);
-    transition: box-shadow var(--transition-base);
-    position: relative;
-    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    min-width: 0;
+    padding-top: var(--spacing-md);
+    border-top: 1px solid var(--rule-strong);
 }
 
-/* Subtle top accent bar keyed to chart type */
-.chart-container::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 3px;
-    background: var(--chart-accent, var(--ku-primary));
-    opacity: 0.7;
-}
+.chart-full-width { grid-column: 1 / -1; }
 
-.chart-container:hover {
-    box-shadow: var(--shadow-md);
-}
-
-.chart-container.chart-full-width {
-    grid-column: 1 / -1;
-}
-
-/* Tall variant for the overview combined chart */
-.chart-container.chart-tall .chart-wrapper {
-    height: 380px;
-}
-
-/* ========================================
-   Chart Header
-   ======================================== */
 .chart-title {
     display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-    margin-bottom: var(--spacing-md);
+    align-items: baseline;
+    gap: 0.9rem;
+    font-weight: 400;
+}
+
+.chart-num {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    white-space: nowrap;
 }
 
 .chart-title-text {
-    font-size: 0.9375rem;
-    font-weight: var(--font-weight-semibold);
-    color: var(--text-primary);
-    line-height: 1.2;
+    font-family: var(--font-display);
+    font-size: 1.3125rem;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    line-height: 1.15;
+    color: var(--ink);
 }
 
 .chart-title-sub {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    font-weight: var(--font-weight-normal);
-    margin-top: 0.125rem;
+    font-family: var(--font-display);
+    font-size: 0.9375rem;
+    color: var(--ink-soft);
 }
 
-/* Icon badge keyed per chart type */
-.chart-icon {
-    width: 32px;
-    height: 32px;
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 8px;
-    font-size: 0.8125rem;
-}
-
-/* CPU — blue */
-.chart-icon.icon-cpu {
-    background: rgba(0, 61, 165, 0.1);
-    color: var(--ku-primary);
-}
-.chart-container.chart-cpu { --chart-accent: #003DA5; }
-
-/* Memory — purple */
-.chart-icon.icon-memory {
-    background: rgba(111, 80, 145, 0.12);
-    color: var(--ku-secondary);
-}
-.chart-container.chart-memory { --chart-accent: #6F5091; }
-
-/* Disk — green */
-.chart-icon.icon-disk {
-    background: rgba(120, 214, 75, 0.12);
-    color: #3a9320;
-}
-.chart-container.chart-disk { --chart-accent: #4CAF50; }
-
-/* Network — orange */
-.chart-icon.icon-network {
-    background: rgba(245, 127, 41, 0.1);
-    color: var(--ku-orange);
-}
-.chart-container.chart-network { --chart-accent: #F57F29; }
-
-/* Users — teal */
-.chart-icon.icon-users {
-    background: rgba(0, 169, 206, 0.1);
-    color: var(--ku-info);
-}
-.chart-container.chart-users { --chart-accent: #00A9CE; }
-
-/* Swap — secondary */
-.chart-icon.icon-swap {
-    background: rgba(111, 80, 145, 0.08);
-    color: var(--ku-secondary);
-}
-
-/* Overview */
-.chart-icon.icon-overview {
-    background: rgba(0, 61, 165, 0.08);
-    color: var(--ku-primary);
-}
-
-/* Legacy icon classes — keep backward compat */
-.chart-title i {
-    width: 32px;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 8px;
-    font-size: 0.8125rem;
-}
-
-.chart-title i.fa-microchip {
-    background: rgba(0, 61, 165, 0.1);
-    color: var(--ku-primary);
-}
-.chart-title i.fa-memory {
-    background: rgba(111, 80, 145, 0.12);
-    color: var(--ku-secondary);
-}
-.chart-title i.fa-hdd {
-    background: rgba(120, 214, 75, 0.12);
-    color: #4CAF50;
-}
-.chart-title i.fa-network-wired {
-    background: rgba(245, 127, 41, 0.1);
-    color: var(--ku-orange);
-}
-.chart-title i.fa-users {
-    background: rgba(0, 169, 206, 0.1);
-    color: var(--ku-info);
-}
-.chart-title i.fa-chart-area,
-.chart-title i.fa-chart-line {
-    background: rgba(0, 61, 165, 0.08);
-    color: var(--ku-primary);
-}
-
-/* ========================================
-   Chart Live Stats Strip (optional mini KPIs under title)
-   ======================================== */
-.chart-stats-strip {
-    display: flex;
-    gap: var(--spacing-md);
-    margin-bottom: var(--spacing-md);
-    padding-bottom: var(--spacing-md);
-    border-bottom: 1px solid var(--border-color);
-    flex-wrap: wrap;
-}
-
-.chart-stat {
-    display: flex;
-    flex-direction: column;
-    gap: 0.125rem;
-}
-
-.chart-stat-label {
-    font-size: 0.625rem;
-    font-weight: var(--font-weight-bold);
-    text-transform: uppercase;
-    letter-spacing: 0.07em;
-    color: var(--text-muted);
-}
-
-.chart-stat-value {
-    font-size: 1.0625rem;
-    font-weight: var(--font-weight-bold);
-    color: var(--text-primary);
-    font-variant-numeric: tabular-nums;
-    line-height: 1;
-}
-
-.chart-stat-value.high   { color: var(--ku-danger); }
-.chart-stat-value.medium { color: var(--ku-warning); }
-.chart-stat-value.good   { color: #3a9320; }
-
-/* ========================================
-   Chart Canvas Wrapper — Generous Height
-   ======================================== */
 .chart-wrapper {
     position: relative;
+    height: 260px;
     width: 100%;
-    height: 280px; /* increased from 300px but with cleaner aspect */
 }
 
-.chart-container canvas {
-    max-width: 100%;
-}
+.chart-tall .chart-wrapper { height: 360px; }
 
-/* ========================================
-   No-data Overlay
-   ======================================== */
-.chart-no-data {
+/* Placeholder shown when a series has no data in the selected window */
+.chart-empty {
     position: absolute;
     inset: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    background: var(--card-bg);
-    color: var(--text-muted);
-    font-size: 0.875rem;
-    gap: 0.5rem;
-    border-radius: var(--border-radius-xs);
-}
-
-.chart-no-data i {
-    font-size: 1.75rem;
-    opacity: 0.3;
-}
-
-/* ========================================
-   Network Overview Grid
-   ======================================== */
-.network-overview-grid {
     display: grid;
-    grid-template-columns: 1fr;
-    gap: var(--spacing-md);
-    margin-bottom: var(--spacing-xl);
+    place-items: center;
+    padding: var(--spacing-md);
+    text-align: center;
+    color: var(--ink-faint);
+    border: 1px dashed var(--rule);
 }
 
-@media (min-width: 640px) {
-    .network-overview-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
+@media (max-width: 639px) {
+    .chart-wrapper { height: 220px; }
+    .chart-tall .chart-wrapper { height: 280px; }
 }
 
-@media (min-width: 1024px) {
-    .network-overview-grid {
-        grid-template-columns: repeat(4, 1fr);
-    }
-}
-
-/* ========================================
-   Server Connections Grid
-   ======================================== */
-.server-connections-grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: var(--spacing-md);
-}
-
-@media (min-width: 640px) {
-    .server-connections-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
-
-@media (min-width: 1024px) {
-    .server-connections-grid {
-        grid-template-columns: repeat(3, 1fr);
-    }
-}
-
-/* ========================================
-   Section Title
-   ======================================== */
-.section-title {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-    font-size: 1rem;
-    font-weight: var(--font-weight-bold);
-    color: var(--text-primary);
-    margin: var(--spacing-xl) 0 var(--spacing-lg);
-    padding-bottom: var(--spacing-sm);
-    border-bottom: 2px solid var(--border-color);
-}
-
-.section-title i {
-    width: 28px;
-    height: 28px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 6px;
-    background: rgba(0, 61, 165, 0.1);
-    color: var(--ku-primary);
-    font-size: 0.75rem;
-}
-
-/* ========================================
-   Mobile
-   ======================================== */
-@media (max-width: 767px) {
-    .chart-container {
-        padding: var(--spacing-md);
-    }
-
-    .chart-title-text {
-        font-size: 0.875rem;
-    }
-
-    .chart-wrapper {
-        height: 220px;
-    }
-
-    .chart-stats-strip {
-        gap: var(--spacing-sm);
-    }
-}
-
-/* ========================================
-   Dark Mode Overrides
-   ======================================== */
-[data-theme="dark"] .chart-container {
-    border-color: rgba(255, 255, 255, 0.08);
-}
-
-[data-theme="dark"] .chart-container::before {
-    opacity: 0.5;
-}
-
-[data-theme="dark"] .chart-icon.icon-cpu {
-    background: rgba(91, 156, 237, 0.12);
-    color: #5B9CED;
-}
-
-[data-theme="dark"] .chart-icon.icon-disk {
-    background: rgba(120, 214, 75, 0.1);
-    color: #78D64B;
-}
-
-[data-theme="dark"] .chart-stats-strip {
-    border-bottom-color: rgba(255, 255, 255, 0.08);
-}
-
-[data-theme="dark"] .chart-controls {
-    background: var(--bg-tertiary);
-    border-color: rgba(255, 255, 255, 0.08);
-}
-
-[data-theme="dark"] .time-range-pills {
-    background: rgba(255, 255, 255, 0.05);
-    border-color: rgba(255, 255, 255, 0.08);
-}
-
-[data-theme="dark"] .section-title {
-    border-bottom-color: rgba(255, 255, 255, 0.08);
-}
+.chart-controls .btn { margin-left: auto; }
