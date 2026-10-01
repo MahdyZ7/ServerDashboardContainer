@@ -228,7 +228,8 @@ def create_app(config_class=Config):
 
             query = """
             SELECT server_name, username, cpu, mem, disk, process_count,
-                   top_process, last_login, full_name, timestamp
+                   top_process, last_login, full_name, timestamp,
+                   rss_kb, io_read_bps, io_write_bps, disk_collected_at
             FROM top_users
             ORDER BY server_name, cpu DESC
             """
@@ -237,12 +238,32 @@ def create_app(config_class=Config):
             columns = [desc[0] for desc in cursor.description]
             users = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
+            # Licenses each account holds, from the latest successful license
+            # snapshot. A checkout from an unmonitored host goes on every row of
+            # that user (with its client host); otherwise on the matching server.
+            _, _, checkouts = _current_licenses(cursor)
+            now = datetime.now()
+            held = {}
+            for c in checkouts:
+                minutes = (now - c["start_at"]).total_seconds() / 60 if c["start_at"] else None
+                held.setdefault(c["username"].lower(), []).append({
+                    "feature": c["feature"], "vendor": c["vendor"], "server_name": c["server_name"],
+                    "client_host": c["client_host"], "licenses": c["licenses"],
+                    "start_at": c["start_at"].isoformat() if c["start_at"] else None,
+                    "start_raw": c["start_raw"],
+                    "held": format_held(c["start_at"], now),
+                    "held_minutes": round(minutes) if minutes is not None else None,
+                })
+
             # Convert datetime objects to ISO format strings
             for user in users:
-                if "timestamp" in user and user["timestamp"]:
-                    user["timestamp"] = user["timestamp"].isoformat()
-                if "last_login" in user and user["last_login"]:
-                    user["last_login"] = user["last_login"].isoformat()
+                for key in ("timestamp", "last_login", "disk_collected_at"):
+                    if user.get(key):
+                        user[key] = user[key].isoformat()
+                user["licenses"] = [
+                    lic for lic in held.get((user["username"] or "").lower(), [])
+                    if lic["server_name"] in (None, user["server_name"])
+                ]
 
             return jsonify({"success": True, "data": users, "count": len(users)})
         except Exception as e:

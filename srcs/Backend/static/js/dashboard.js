@@ -20,6 +20,7 @@
         setupAutoRefresh();
         setupRefreshButton();
         setupExportDropdown();
+        bindUserTableControls();
         loadInitialData();
     }
 
@@ -776,7 +777,7 @@
             const response = await API.getTopUsers();
 
             if (!response.success || !response.data) {
-                tableBody.innerHTML = '<tr><td colspan="11" class="text-center">No user data available</td></tr>';
+                tableBody.innerHTML = '<tr><td colspan="9" class="text-center">No user data available</td></tr>';
                 return;
             }
 
@@ -792,8 +793,7 @@
                 });
             }
 
-            renderUsersTable(users);
-            setupUserTableFilters(users);
+            setupUserTableFilters(users);  // filters, sorts and renders
             setupFootprintLookup(users);
             loadLicenses();
 
@@ -804,7 +804,7 @@
         } catch (error) {
             console.error('Error loading user activity:', error);
             if (tableBody) {
-                tableBody.innerHTML = `<tr><td colspan="11" class="text-center">
+                tableBody.innerHTML = `<tr><td colspan="9" class="text-center">
                     <div class="empty-state">
                         <i class="fas fa-exclamation-triangle fa-2x"></i>
                         <p>Failed to load user data</p>
@@ -886,7 +886,7 @@
         if (!tableBody) return;
 
         if (users.length === 0) {
-            tableBody.innerHTML = `<tr><td colspan="11" class="table-empty">
+            tableBody.innerHTML = `<tr><td colspan="9" class="table-empty">
                 <i class="fas fa-users-slash"></i>No users found</td></tr>`;
             return;
         }
@@ -899,8 +899,34 @@
             const memVal = Math.min(100, Math.max(0, parseFloat(user.mem || 0)));
             const cpuClass = cpuVal > 90 ? 'danger' : cpuVal > 70 ? 'warning' : 'good';
             const memClass = memVal > 90 ? 'danger' : memVal > 70 ? 'warning' : 'good';
-            const ioRead  = user.io_read_bytes  ? formatBytes(user.io_read_bytes)  : '—';
-            const ioWrite = user.io_write_bytes ? formatBytes(user.io_write_bytes) : '—';
+            // Licenses held from this server: feature, extra seats, how long
+            // Grouped under a vendor subheading; one line per feature (and client
+            // host), seats summed, longest hold shown
+            const byVendor = new Map();
+            (user.licenses || []).forEach(l => {
+                if (!byVendor.has(l.vendor)) byVendor.set(l.vendor, new Map());
+                const features = byVendor.get(l.vendor);
+                const key = `${l.feature}|${l.client_host}`;
+                const g = features.get(key);
+                if (!g) { features.set(key, { ...l, licenses: l.licenses || 1 }); return; }
+                g.licenses += l.licenses || 1;
+                if ((l.held_minutes || 0) > (g.held_minutes || 0)) {
+                    Object.assign(g, { held: l.held, held_minutes: l.held_minutes, start_raw: l.start_raw });
+                }
+            });
+            const licenses = [...byVendor.entries()]
+                .sort(([a], [b]) => a.localeCompare(b))
+                .map(([vendor, features]) => `
+                    <div class="license-group">
+                        <span class="license-vendor">${escapeHtml(vendor)}</span>
+                        ${[...features.values()].map(l => {
+                            const seats = l.licenses > 1 ? ` ×${l.licenses}` : '';
+                            const from = l.server_name ? '' : ` <span class="cell-muted">from ${escapeHtml(l.client_host || '?')}</span>`;
+                            const held = escapeHtml(l.held || l.start_raw || '—');
+                            return `<span class="license-chip" title="Checked out ${escapeHtml(l.start_raw || 'at an unknown time')}">`
+                                + `${escapeHtml(l.feature)}${seats}${from} <span class="cell-muted">· ${held}</span></span>`;
+                        }).join('')}
+                    </div>`).join('') || '<span class="cell-muted">—</span>';
 
             // Inline mini-bar for CPU
             const cpuBar = `<div class="cell-bar">
@@ -917,16 +943,17 @@
             return `
                 <tr>
                     <td class="cell-server">${escapeHtml(user.server_name || 'N/A')}</td>
-                    <td><strong>${escapeHtml(user.username || 'N/A')}</strong></td>
-                    <td class="cell-truncate" title="${escapeHtml(user.full_name || '')}">${escapeHtml(user.full_name || '—')}</td>
+                    <td class="cell-user">
+                        <strong>${escapeHtml(user.username || 'N/A')}</strong>
+                        ${user.full_name && user.full_name !== 'N/A' ? `<span class="cell-subline" title="${escapeHtml(user.full_name)}">${escapeHtml(user.full_name)}</span>` : ''}
+                    </td>
                     <td>${cpuBar}</td>
                     <td>${memBar}</td>
-                    <td class="cell-numeric">${parseFloat(user.disk || 0).toFixed(1)} GB</td>
+                    <td class="cell-numeric">${user.disk == null ? '—' : `${parseFloat(user.disk).toFixed(1)} GB`}</td>
                     <td class="cell-numeric">${user.process_count || 0}</td>
                     <td class="cell-truncate" title="${escapeHtml(user.top_process || '')}">${escapeHtml(user.top_process || '—')}</td>
-                    <td class="cell-numeric">${ioRead}</td>
-                    <td class="cell-numeric">${ioWrite}</td>
-                    <td class="cell-muted">${formatUserTimestamp(user.last_login)}</td>
+                    <td class="cell-licenses">${licenses}</td>
+                    <td class="cell-muted cell-date" title="${escapeHtml(formatUserTimestamp(user.last_login))}">${formatUserDate(user.last_login)}</td>
                 </tr>
             `;
         }).join('');
@@ -934,58 +961,120 @@
 
     let userFiltersBound = false;
     let allUsersCache = [];
+    let usersLoaded = false;
+
+    // Users table sort state; any column header toggles it
+    const userSort = { key: 'cpu', dir: 'desc' };
+
+    /** Value used to sort a row by `key`; null/empty always sorts last. */
+    function userSortValue(user, key, type) {
+        if (key === 'licenses') {
+            const lic = user.licenses || [];
+            if (!lic.length) return null;
+            // Seats held, then the longest hold breaks ties
+            const longest = Math.max(0, ...lic.map(l => l.held_minutes || 0));
+            return lic.reduce((n, l) => n + (l.licenses || 1), 0) * 1e7 + longest;
+        }
+        const value = user[key];
+        if (value === null || value === undefined || value === '') return null;
+        if (type === 'number') {
+            const n = parseFloat(value);
+            return Number.isNaN(n) ? null : n;
+        }
+        return String(value).toLowerCase();
+    }
+
+    function sortUsers(users) {
+        const header = document.querySelector(`#users-table .th-sort[data-sort="${userSort.key}"]`);
+        const type = header ? header.dataset.type : 'number';
+        const sign = userSort.dir === 'asc' ? 1 : -1;
+        return [...users].sort((a, b) => {
+            const av = userSortValue(a, userSort.key, type);
+            const bv = userSortValue(b, userSort.key, type);
+            if (av === null && bv === null) return 0;
+            if (av === null) return 1;
+            if (bv === null) return -1;
+            const cmp = type === 'number' ? av - bv : av.localeCompare(bv);
+            return sign * cmp;
+        });
+    }
+
+    function updateSortHeaders() {
+        document.querySelectorAll('#users-table .th-sort').forEach(btn => {
+            const active = btn.dataset.sort === userSort.key;
+            btn.closest('th').setAttribute('aria-sort',
+                active ? (userSort.dir === 'asc' ? 'ascending' : 'descending') : 'none');
+        });
+    }
+
+    function applyUserFilters() {
+        const searchBox = document.getElementById('user-search');
+        const serverFilter = document.getElementById('server-filter');
+        const allUsers = allUsersCache;
+        let filteredUsers = allUsers;
+
+        if (serverFilter && serverFilter.value) {
+            filteredUsers = filteredUsers.filter(u => u.server_name === serverFilter.value);
+        }
+
+        if (searchBox && searchBox.value) {
+            const search = searchBox.value.toLowerCase();
+            filteredUsers = filteredUsers.filter(u =>
+                (u.username || '').toLowerCase().includes(search) ||
+                (u.full_name || '').toLowerCase().includes(search) ||
+                (u.server_name || '').toLowerCase().includes(search) ||
+                (u.licenses || []).some(l => l.feature.toLowerCase().includes(search))
+            );
+        }
+
+        updateSortHeaders();
+        if (!usersLoaded) return;  // sort choice is kept and applied once data arrives
+        renderUsersTable(sortUsers(filteredUsers));
+
+        // Update result count
+        const countEl = document.getElementById('users-result-count');
+        if (countEl) {
+            const total = allUsers.length;
+            const shown = filteredUsers.length;
+            countEl.textContent = shown === total
+                ? `${total} user${total !== 1 ? 's' : ''}`
+                : `${shown} of ${total} users`;
+        }
+    }
+
+    /** Bind search, server filter and sortable headers once, at page load. */
+    function bindUserTableControls() {
+        if (userFiltersBound) return;
+        userFiltersBound = true;
+        document.getElementById('user-search')?.addEventListener('input', applyUserFilters);
+        document.getElementById('server-filter')?.addEventListener('change', applyUserFilters);
+        document.querySelectorAll('#users-table .th-sort').forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (userSort.key === btn.dataset.sort) {
+                    userSort.dir = userSort.dir === 'asc' ? 'desc' : 'asc';
+                } else {
+                    // Text columns start A→Z, numbers start largest first
+                    userSort.key = btn.dataset.sort;
+                    userSort.dir = btn.dataset.type === 'text' ? 'asc' : 'desc';
+                }
+                applyUserFilters();
+            });
+        });
+    }
 
     function setupUserTableFilters(users) {
         allUsersCache = users;
-        if (userFiltersBound) return;
-        userFiltersBound = true;
+        usersLoaded = true;
+        bindUserTableControls();
+        applyUserFilters();
+    }
 
-        const searchBox = document.getElementById('user-search');
-        const serverFilter = document.getElementById('server-filter');
-        const sortBy = document.getElementById('sort-by');
-
-        function applyFilters() {
-            const allUsers = allUsersCache;
-            let filteredUsers = allUsers;
-
-            if (serverFilter && serverFilter.value) {
-                filteredUsers = filteredUsers.filter(u => u.server_name === serverFilter.value);
-            }
-
-            if (searchBox && searchBox.value) {
-                const search = searchBox.value.toLowerCase();
-                filteredUsers = filteredUsers.filter(u =>
-                    (u.username || '').toLowerCase().includes(search) ||
-                    (u.full_name || '').toLowerCase().includes(search) ||
-                    (u.server_name || '').toLowerCase().includes(search)
-                );
-            }
-
-            if (sortBy && sortBy.value) {
-                const sortField = sortBy.value;
-                filteredUsers = [...filteredUsers].sort((a, b) => {
-                    const aVal = parseFloat(a[sortField]) || 0;
-                    const bVal = parseFloat(b[sortField]) || 0;
-                    return bVal - aVal;
-                });
-            }
-
-            renderUsersTable(filteredUsers);
-
-            // Update result count
-            const countEl = document.getElementById('users-result-count');
-            if (countEl) {
-                const total = allUsers.length;
-                const shown = filteredUsers.length;
-                countEl.textContent = shown === total
-                    ? `${total} user${total !== 1 ? 's' : ''}`
-                    : `${shown} of ${total} users`;
-            }
-        }
-
-        if (searchBox) searchBox.addEventListener('input', applyFilters);
-        if (serverFilter) serverFilter.addEventListener('change', applyFilters);
-        if (sortBy) sortBy.addEventListener('change', applyFilters);
+    /** Date only ("Oct 1, 2026"); the full timestamp goes in the cell's title. */
+    function formatUserDate(timestamp) {
+        if (!timestamp) return '—';
+        const date = new Date(timestamp);
+        if (isNaN(date)) return '—';
+        return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
     }
 
     function formatUserTimestamp(timestamp) {
