@@ -1,88 +1,98 @@
 <!-- User Activity Panel -->
-<div class="users-container" role="region" aria-label="User activity monitor">
-    <div class="card">
-        <div class="card-header">
-            <div class="card-title">
-                <i class="fas fa-users"></i>
-                <span>User Activity Monitor</span>
-            </div>
-            <div class="card-subtitle">
-                Active user sessions and resource consumption
-            </div>
+<section class="users-container" role="region" aria-labelledby="users-heading">
+    <header class="section-head">
+        <div>
+            <p class="kicker">Section 03</p>
+            <h2 id="users-heading">User Activity</h2>
+            <p class="section-deck">Active sessions and the resources each account is consuming.</p>
         </div>
-        <div class="card-body">
-            <!-- Search and Filter Controls -->
-            <div class="table-controls" role="search">
-                <div class="search-box">
-                    <i class="fas fa-search"></i>
-                    <input type="text"
-                           id="user-search"
-                           placeholder="Search users..."
-                           aria-label="Search users by name or server">
-                </div>
+    </header>
 
-                <div class="filter-group">
-                    <label for="server-filter">Server:</label>
-                    <select id="server-filter" aria-label="Filter by server">
-                        <option value="">All Servers</option>
-                    </select>
-                </div>
-
-                <div class="sort-group">
-                    <label for="sort-by">Sort:</label>
-                    <select id="sort-by" aria-label="Sort users by field">
-                        <option value="cpu">CPU Usage</option>
-                        <option value="mem">Memory Usage</option>
-                        <option value="disk">Disk Usage</option>
-                        <option value="username">Username</option>
-                    </select>
-                </div>
-
-                <span class="table-result-count" id="users-result-count" aria-live="polite"></span>
+    <!-- My usage lookup -->
+    <section class="footprint" aria-labelledby="footprint-heading">
+        <form class="footprint-form" id="footprint-form" role="search">
+            <div>
+                <p class="kicker">For users</p>
+                <h3 id="footprint-heading">Look up your usage</h3>
             </div>
-
-            <!-- Users Table -->
-            <div class="table-wrapper" role="region" aria-label="User data table" tabindex="0">
-                <table id="users-table" class="data-table" aria-label="User activity data">
-                    <thead>
-                        <tr>
-                            <th scope="col">Server</th>
-                            <th scope="col">Username</th>
-                            <th scope="col">Full Name</th>
-                            <th scope="col" style="min-width:130px">CPU %</th>
-                            <th scope="col" style="min-width:130px">Memory %</th>
-                            <th scope="col" class="col-numeric">Disk</th>
-                            <th scope="col" class="col-numeric">Procs</th>
-                            <th scope="col">Top Process</th>
-                            <th scope="col" class="col-numeric">I/O Read</th>
-                            <th scope="col" class="col-numeric">I/O Write</th>
-                            <th scope="col">Last Login</th>
-                        </tr>
-                    </thead>
-                    <tbody id="users-table-body">
-                        <tr>
-                            <td colspan="11" class="text-center" style="padding: 2rem;">
-                                <div class="spinner" style="margin: 0 auto;"></div>
-                                <p style="margin-top: 0.5rem; color: var(--text-secondary);">Loading user data...</p>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+            <div class="search-box footprint-input">
+                <i class="fas fa-user" aria-hidden="true"></i>
+                <input type="text" id="footprint-username" list="footprint-usernames"
+                       placeholder="Your username" autocomplete="off" spellcheck="false"
+                       aria-label="Username to look up">
+                <datalist id="footprint-usernames"></datalist>
             </div>
+            <button class="btn btn-primary" type="submit">Show my usage</button>
+        </form>
+        <div id="footprint-result" aria-live="polite"></div>
+    </section>
 
-            <!-- Pagination -->
-            <div class="pagination" id="users-pagination" role="navigation" aria-label="Table pagination">
-            </div>
+    <h3 class="section-title"><span class="kicker">03.1</span>All accounts</h3>
+
+    <!-- Search and Filter Controls -->
+    <div class="table-controls" role="search">
+        <div class="search-box">
+            <i class="fas fa-search" aria-hidden="true"></i>
+            <input type="text"
+                   id="user-search"
+                   placeholder="Search users or servers"
+                   aria-label="Search users by name or server">
         </div>
+
+        <div class="filter-group">
+            <label for="server-filter">Server</label>
+            <select id="server-filter">
+                <option value="">All servers</option>
+            </select>
+        </div>
+
+        <div class="sort-group">
+            <label for="sort-by">Sort by</label>
+            <select id="sort-by">
+                <option value="cpu">CPU usage</option>
+                <option value="mem">Memory usage</option>
+                <option value="disk">Disk usage</option>
+                <option value="username">Username</option>
+            </select>
+        </div>
+
+        <span class="table-result-count" id="users-result-count" aria-live="polite"></span>
     </div>
-</div>
+
+    <!-- Users Table -->
+    <div class="table-wrapper" role="region" aria-label="User data table" tabindex="0">
+        <table id="users-table" class="data-table" aria-label="User activity data">
+            <thead>
+                <tr>
+                    <th scope="col">Server</th>
+                    <th scope="col">Username</th>
+                    <th scope="col">Full name</th>
+                    <th scope="col" style="min-width:140px">CPU</th>
+                    <th scope="col" style="min-width:140px">Memory</th>
+                    <th scope="col" class="col-numeric">Disk</th>
+                    <th scope="col" class="col-numeric">Procs</th>
+                    <th scope="col">Top process</th>
+                    <th scope="col" class="col-numeric">I/O read</th>
+                    <th scope="col" class="col-numeric">I/O write</th>
+                    <th scope="col">Last login</th>
+                </tr>
+            </thead>
+            <tbody id="users-table-body">
+                <tr>
+                    <td colspan="11" class="table-loading">
+                        <div class="spinner"></div>
+                        <p>Loading user data…</p>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    <div class="pagination" id="users-pagination" role="navigation" aria-label="Table pagination"></div>
+</section>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    if (document.getElementById('users-panel').classList.contains('active')) {
-        loadUserActivity();
-    }
-});
 document.querySelector('[data-tab="users"]')?.addEventListener('click', function() {
     loadUserActivity();
 });

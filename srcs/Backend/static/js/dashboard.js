@@ -11,6 +11,7 @@
     let countdownInterval = null;
     let lastUpdatedTime = null;
     let nextRefreshTime = null;
+    let analyticsControlsBound = false;
 
     /**
      * Initialize dashboard
@@ -167,22 +168,54 @@
     window.loadNetworkMonitor = loadNetworkMonitor;
 
     /**
-     * Build circular progress ring style (conic-gradient)
-     */
-    function progressRingStyle(percentage, color) {
-        const p = Math.min(100, Math.max(0, percentage));
-        const trackColor = getComputedStyle(document.documentElement)
-            .getPropertyValue('--bg-tertiary').trim() || '#EEF0F4';
-        return `background: conic-gradient(${color} ${p * 3.6}deg, ${trackColor} ${p * 3.6}deg);`;
-    }
-
-    /**
-     * Get color for percentage value
+     * Map a utilisation percentage to a status tone (CSS custom property)
      */
     function getPercentageColor(value) {
         if (value > 90) return 'var(--ku-danger)';
         if (value > 70) return 'var(--ku-warning)';
         return 'var(--ku-primary)';
+    }
+
+    /**
+     * Split a percentage into figure + unit markup: 42<small>%</small>
+     */
+    function pctFigure(value, digits = 0) {
+        return `${value.toFixed(digits)}<small>%</small>`;
+    }
+
+    /**
+     * Build a plain-English summary of fleet health for the overview lede
+     */
+    // Lede combines connectivity (from latest metrics) with the attention queue
+    const ledeState = { total: null, reporting: null, issues: null };
+
+    function renderOverviewLede(servers) {
+        const stale = servers.filter(s => getServerStatus(s).class === 'status-offline').length;
+        ledeState.total = servers.length;
+        ledeState.reporting = servers.length - stale;
+        updateLede();
+    }
+
+    function updateLede() {
+        const lede = document.getElementById('overview-lede');
+        if (!lede || ledeState.total === null) return;
+
+        const { total, reporting, issues } = ledeState;
+        let text = reporting === total
+            ? `All <strong>${total}</strong> servers are reporting`
+            : `<strong>${reporting} of ${total}</strong> servers are reporting; <strong class="lede-crit">${total - reporting}</strong> ${total - reporting === 1 ? 'has' : 'have'} gone quiet`;
+
+        if (issues) {
+            const parts = [];
+            if (issues.critical) parts.push(`<strong class="lede-crit">${issues.critical} critical</strong>`);
+            if (issues.warning) parts.push(`<strong class="lede-warn">${issues.warning} ${issues.warning === 1 ? 'warning' : 'warnings'}</strong>`);
+            text += parts.length
+                ? `, with ${parts.join(' and ')} below.`
+                : ', and nothing needs attention.';
+        } else {
+            text += '.';
+        }
+        lede.innerHTML = text;
     }
 
     /**
@@ -196,41 +229,233 @@
         if (!container) return;
 
         try {
-            if (loading) loading.style.display = 'flex';
-            if (container) container.style.display = 'none';
-            if (empty) empty.style.display = 'none';
+            if (loading) loading.hidden = false;
+            container.hidden = true;
+            if (empty) empty.hidden = true;
 
+            loadActionBand();
             const response = await API.getLatestMetrics();
 
             if (!response.success || !response.data || response.data.length === 0) {
-                if (loading) loading.style.display = 'none';
-                if (empty) empty.style.display = 'flex';
+                if (loading) loading.hidden = true;
+                if (empty) empty.hidden = false;
                 return;
             }
 
-            // Use simplified cards for overview
-            container.innerHTML = response.data.map(server => renderSimplifiedServerCard(server)).join('');
+            renderOverviewLede(response.data);
+            container.innerHTML = response.data.map((server, i) => renderSimplifiedServerCard(server, i)).join('');
 
-            if (loading) loading.style.display = 'none';
-            container.style.display = 'grid';
+            if (loading) loading.hidden = true;
+            container.hidden = false;
 
         } catch (error) {
             console.error('Error loading server grid:', error);
-            if (loading) loading.style.display = 'none';
+            if (loading) loading.hidden = true;
             if (empty) {
-                empty.style.display = 'flex';
+                empty.hidden = false;
                 empty.innerHTML = `
-                    <i class="fas fa-exclamation-triangle fa-3x"></i>
-                    <h3>Failed to Load Data</h3>
+                    <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
+                    <h3>Failed to load data</h3>
                     <p>Could not connect to the server. Please try again.</p>
                     <button class="btn btn-primary" onclick="loadServerGrid()">
-                        <i class="fas fa-sync-alt"></i> Retry
+                        <i class="fas fa-sync-alt" aria-hidden="true"></i> Retry
                     </button>
                 `;
             }
             Toast.error('Failed to load server metrics');
         }
     }
+
+    /**
+     * Load the overview action band: attention queue (admins) + placement (users)
+     */
+    async function loadActionBand() {
+        await Promise.all([loadAttention(), loadPlacement()]);
+    }
+
+    async function loadAttention() {
+        const list = document.getElementById('attention-list');
+        const counts = document.getElementById('attention-counts');
+        if (!list) return;
+
+        try {
+            const response = await API.getAttentionItems();
+            if (!response.success) throw new Error(response.error || 'Bad response');
+            const items = response.data || [];
+
+            const tally = { critical: 0, warning: 0, info: 0 };
+            items.forEach(i => { tally[i.severity] = (tally[i.severity] || 0) + 1; });
+            ledeState.issues = tally;
+            updateLede();
+            if (counts) {
+                counts.innerHTML = ['critical', 'warning', 'info']
+                    .filter(k => tally[k])
+                    .map(k => `<span class="count-chip sev-${k}">${tally[k]} ${k}</span>`)
+                    .join('');
+            }
+
+            if (items.length === 0) {
+                list.innerHTML = `
+                    <li class="attention-clear">
+                        <strong>Nothing needs attention.</strong>
+                        Every reporting server is within its disk, memory and CPU thresholds.
+                    </li>`;
+                return;
+            }
+
+            list.innerHTML = items.map((item, i) => `
+                <li class="attention-item sev-${escapeHtml(item.severity)}" style="--i:${i}">
+                    <div class="attention-meta">
+                        <span class="sev-label">${escapeHtml(item.severity)}</span>
+                        <span class="attention-cat">${escapeHtml(item.category)}</span>
+                    </div>
+                    <div class="attention-body">
+                        <p class="attention-title">${escapeHtml(item.title)}</p>
+                        <p class="attention-detail">${escapeHtml(item.detail)}</p>
+                        <p class="attention-action"><span>Next step</span>${escapeHtml(item.action)}</p>
+                    </div>
+                </li>`).join('');
+        } catch (error) {
+            console.error('Error loading attention items:', error);
+            list.innerHTML = `
+                <li class="attention-clear">
+                    Could not load the attention queue.
+                    <button class="btn btn-secondary" onclick="loadActionBand()">Retry</button>
+                </li>`;
+        }
+    }
+
+    async function loadPlacement() {
+        const list = document.getElementById('placement-list');
+        if (!list) return;
+
+        try {
+            const response = await API.getPlacement();
+            if (!response.success) throw new Error(response.error || 'Bad response');
+            const servers = response.data || [];
+
+            const badge = {
+                both: 'Best for CPU &amp; memory',
+                cpu: 'Most free cores',
+                memory: 'Most free memory'
+            };
+
+            list.innerHTML = servers.map((s, i) => `
+                <li class="placement-item ${s.available ? '' : 'is-unavailable'}" style="--i:${i}">
+                    <span class="placement-rank">${s.available ? String(i + 1).padStart(2, '0') : '—'}</span>
+                    <div class="placement-main">
+                        <div class="placement-name">
+                            ${escapeHtml(s.server_name)}
+                            ${s.best_for ? `<span class="placement-badge">${badge[s.best_for]}</span>` : ''}
+                            ${s.available ? '' : '<span class="placement-badge is-off">Unavailable</span>'}
+                        </div>
+                        <div class="placement-facts">
+                            <span><strong>${s.free_cores}</strong> of ${s.virtual_cpus} cores free</span>
+                            <span><strong>${s.free_ram_gb ?? '?'} GB</strong> of ${s.ram_total_gb ?? '?'} GB RAM free</span>
+                            <span>${s.sessions} session${s.sessions === 1 ? '' : 's'}</span>
+                        </div>
+                        <div class="placement-bar" aria-hidden="true"><i style="width:${s.score}%"></i></div>
+                    </div>
+                    <span class="placement-score" title="Headroom score">${s.available ? s.score : ''}</span>
+                </li>`).join('');
+        } catch (error) {
+            console.error('Error loading placement:', error);
+            list.innerHTML = `<li class="attention-clear">Could not rank servers right now.</li>`;
+        }
+    }
+
+    /**
+     * "Look up your usage" — one user's footprint across servers
+     */
+    let footprintBound = false;
+
+    function setupFootprintLookup(users) {
+        const form = document.getElementById('footprint-form');
+        const input = document.getElementById('footprint-username');
+        const datalist = document.getElementById('footprint-usernames');
+        if (!form || !input) return;
+
+        if (datalist) {
+            const names = [...new Set(users.map(u => u.username).filter(Boolean))].sort();
+            datalist.innerHTML = names.map(n => `<option value="${escapeHtml(n)}"></option>`).join('');
+        }
+
+        if (footprintBound) return;
+        footprintBound = true;
+
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const name = input.value.trim();
+            if (name) lookupFootprint(name);
+        });
+
+        // Deep link: /?tab=users&user=alice
+        const initial = new URLSearchParams(window.location.search).get('user');
+        if (initial) {
+            input.value = initial;
+            lookupFootprint(initial);
+        }
+    }
+
+    async function lookupFootprint(username) {
+        const result = document.getElementById('footprint-result');
+        if (!result) return;
+        result.innerHTML = '<div class="spinner" style="margin: 1rem 0;"></div>';
+
+        const url = new URL(window.location);
+        url.searchParams.set('user', username);
+        window.history.replaceState({}, '', url);
+
+        let response;
+        try {
+            response = await API.getUserFootprint(username);
+        } catch (error) {
+            // A 404 surfaces here as an HTTP error after retries
+            result.innerHTML = `
+                <p class="footprint-empty">No records found for <strong>${escapeHtml(username)}</strong>.
+                Check the spelling, or the account may not have run anything on a monitored server.</p>`;
+            return;
+        }
+
+        const d = response.data;
+        const rows = d.servers.map(s => `
+            <tr>
+                <td class="cell-server">${escapeHtml(s.server_name)}</td>
+                <td class="cell-numeric">${(s.disk ?? 0).toFixed(1)} GB</td>
+                <td class="cell-numeric">${s.process_count ?? 0}</td>
+                <td class="cell-truncate" title="${escapeHtml(s.top_process || '')}">${escapeHtml(s.top_process || '—')}</td>
+                <td class="cell-numeric">${(s.mem ?? 0).toFixed(1)}%</td>
+                <td class="cell-muted">${formatUserTimestamp(s.last_login)}</td>
+                <td class="cell-muted">${formatUserTimestamp(s.timestamp)}</td>
+            </tr>`).join('');
+
+        result.innerHTML = `
+            <div class="footprint-card">
+                <div class="footprint-summary">
+                    <div class="fig"><span class="fig-value">${escapeHtml(d.username)}</span><span class="fig-label">${escapeHtml(d.full_name || 'Account')}</span></div>
+                    <div class="fig"><span class="fig-value">${d.servers.length}</span><span class="fig-label">Servers used</span></div>
+                    <div class="fig"><span class="fig-value">${d.total_disk_gb}<small> GB</small></span><span class="fig-label">Disk across servers</span></div>
+                    <div class="fig"><span class="fig-value">${d.total_processes}</span><span class="fig-label">Processes</span></div>
+                </div>
+                <div class="table-wrapper">
+                    <table class="data-table">
+                        <thead><tr>
+                            <th scope="col">Server</th>
+                            <th scope="col" class="col-numeric">Disk</th>
+                            <th scope="col" class="col-numeric">Procs</th>
+                            <th scope="col">Top process</th>
+                            <th scope="col" class="col-numeric">Memory</th>
+                            <th scope="col">Last login</th>
+                            <th scope="col">Recorded</th>
+                        </tr></thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                </div>
+                <p class="action-note">Disk is measured once a day; "Recorded" is when this account was first seen on that server.</p>
+            </div>`;
+    }
+
+    window.loadActionBand = loadActionBand;
 
     /**
      * Format bytes into human-readable string (KB, MB, GB, TB)
@@ -246,24 +471,24 @@
     }
 
     /**
-     * Build a gauge bar row for the simplified overview card
+     * Build a gauge row: label + figure, hairline track with threshold ticks
      */
-    function gaugeBar(label, value, pct, color) {
+    function gaugeBar(label, valueHtml, pct, color) {
         const clampedPct = Math.min(100, Math.max(0, pct));
         return `
             <div class="gauge-row">
                 <span class="gauge-label">${label}</span>
-                <div class="gauge-track">
+                <span class="gauge-value">${valueHtml}</span>
+                <div class="gauge-track" role="meter" aria-label="${label}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${clampedPct.toFixed(0)}">
                     <div class="gauge-fill" style="width:${clampedPct}%;background:${color};"></div>
                 </div>
-                <span class="gauge-value">${value}</span>
             </div>`;
     }
 
     /**
-     * Render simplified server card for overview — horizontal gauge layout
+     * Render overview entry for one server
      */
-    function renderSimplifiedServerCard(server) {
+    function renderSimplifiedServerCard(server, index = 0) {
         const cpuLoad = parseFloat(server.cpu_load_5min || 0);
         const cpuUsage = server.cpu_usage_percent != null ? parseFloat(server.cpu_usage_percent) : null;
         const ramUsage = parseFloat(server.ram_percentage || 0);
@@ -271,63 +496,40 @@
         const swapPerc = parseFloat(server.swap_percentage || 0);
 
         const cpuPct = cpuUsage !== null ? cpuUsage : Math.min(cpuLoad * 10, 100);
-        const cpuDisplayVal = cpuUsage !== null ? `${cpuUsage.toFixed(1)}%` : `${cpuLoad.toFixed(2)}`;
-        const cpuLabel = cpuUsage !== null ? 'CPU' : 'Load';
-
-        function gaugeColor(pct) {
-            if (pct > 90) return 'var(--ku-danger)';
-            if (pct > 70) return 'var(--ku-warning)';
-            return 'var(--ku-primary)';
-        }
+        const cpuDisplay = cpuUsage !== null ? pctFigure(cpuUsage, 1) : cpuLoad.toFixed(2);
+        const cpuLabel = cpuUsage !== null ? 'CPU' : 'Load (5m)';
 
         const status = getServerStatus(server);
-
         const hasNet = server.net_rx_bytes > 0 || server.net_tx_bytes > 0;
 
         return `
-            <div class="sc-overview ${status.class}">
-                <div class="sc-head">
-                    <div class="sc-name-row">
-                        <span class="sc-status-dot ${status.class}"></span>
-                        <h3 class="sc-name">${escapeHtml(server.server_name)}</h3>
-                    </div>
-                    <span class="sc-badge ${status.class}">${status.label}</span>
-                </div>
+            <article class="sc-overview ${status.class}" style="--i:${index}">
+                <header class="sc-head">
+                    <span class="sc-index">${String(index + 1).padStart(2, '0')}</span>
+                    <h3 class="sc-name" title="${escapeHtml(server.server_name)}">${escapeHtml(server.server_name)}</h3>
+                    <span class="sc-badge ${status.class}"><span class="sc-status-dot"></span>${status.label}</span>
+                </header>
                 <div class="sc-gauges">
-                    ${gaugeBar(cpuLabel, cpuDisplayVal, cpuPct, gaugeColor(cpuPct))}
-                    ${gaugeBar('RAM', `${ramUsage.toFixed(0)}%`, ramUsage, gaugeColor(ramUsage))}
-                    ${gaugeBar('Disk', `${diskUsage.toFixed(0)}%`, diskUsage, gaugeColor(diskUsage))}
-                    ${swapPerc > 0 ? gaugeBar('Swap', `${swapPerc.toFixed(0)}%`, swapPerc, gaugeColor(swapPerc)) : ''}
+                    ${gaugeBar(cpuLabel, cpuDisplay, cpuPct, getPercentageColor(cpuPct))}
+                    ${gaugeBar('Memory', pctFigure(ramUsage), ramUsage, getPercentageColor(ramUsage))}
+                    ${gaugeBar('Disk', pctFigure(diskUsage), diskUsage, getPercentageColor(diskUsage))}
+                    ${swapPerc > 0 ? gaugeBar('Swap', pctFigure(swapPerc), swapPerc, getPercentageColor(swapPerc)) : ''}
                 </div>
-                <div class="sc-footer">
-                    <div class="sc-pill">
-                        <i class="fas fa-users"></i>
-                        <strong>${server.logged_users || 0}</strong>
-                        <span>users</span>
-                    </div>
-                    <div class="sc-pill">
-                        <i class="fas fa-ethernet"></i>
-                        <strong>${server.tcp_connections || 0}</strong>
-                        <span>TCP</span>
-                    </div>
+                <footer class="sc-footer">
+                    <span class="sc-pill"><strong>${server.logged_users || 0}</strong> users</span>
+                    <span class="sc-pill"><strong>${server.tcp_connections || 0}</strong> TCP</span>
                     ${hasNet ? `
-                    <div class="sc-pill">
-                        <i class="fas fa-arrow-down"></i>
-                        <strong>${formatBytes(server.net_rx_bytes)}</strong>
-                    </div>
-                    <div class="sc-pill">
-                        <i class="fas fa-arrow-up"></i>
-                        <strong>${formatBytes(server.net_tx_bytes)}</strong>
-                    </div>` : ''}
-                </div>
-            </div>
+                    <span class="sc-pill" title="Received (cumulative)"><i class="fas fa-arrow-down" aria-hidden="true"></i><strong>${formatBytes(server.net_rx_bytes)}</strong></span>
+                    <span class="sc-pill" title="Transmitted (cumulative)"><i class="fas fa-arrow-up" aria-hidden="true"></i><strong>${formatBytes(server.net_tx_bytes)}</strong></span>` : ''}
+                </footer>
+            </article>
         `;
     }
 
     /**
-     * Render detailed server card (full information)
+     * Render a server specification sheet (Servers tab)
      */
-    function renderDetailedServerCard(server) {
+    function renderDetailedServerCard(server, index = 0) {
         const cpuLoad = parseFloat(server.cpu_load_5min || 0);
         const cpuUsage = server.cpu_usage_percent != null ? parseFloat(server.cpu_usage_percent) : null;
         const ramUsage = parseFloat(server.ram_percentage || 0);
@@ -336,134 +538,73 @@
         const swapUsedMb = parseInt(server.swap_used_mb || 0);
         const swapTotalMb = parseInt(server.swap_total_mb || 0);
 
-        // Use actual CPU utilization for ring if available
-        const cpuRingValue = cpuUsage !== null ? cpuUsage : Math.min(cpuLoad * 10, 100);
-        const cpuLabel = cpuUsage !== null ? `${cpuUsage.toFixed(1)}%` : cpuLoad.toFixed(1);
-        const cpuRingLabel = cpuUsage !== null ? 'CPU %' : 'CPU Load';
+        const cpuPct = cpuUsage !== null ? cpuUsage : Math.min(cpuLoad * 10, 100);
+        const cpuFigure = cpuUsage !== null ? pctFigure(cpuUsage, 1) : cpuLoad.toFixed(2);
+        const cpuLabel = cpuUsage !== null ? 'CPU' : 'CPU load';
 
         const status = getServerStatus(server);
-        const performance = getPerformanceRating(cpuRingValue, ramUsage, diskUsage);
+        const performance = getPerformanceRating(cpuPct, ramUsage, diskUsage);
+
+        function fig(label, valueHtml, pct) {
+            const p = Math.min(100, Math.max(0, pct));
+            return `
+                <div class="fig">
+                    <span class="fig-value">${valueHtml}</span>
+                    <div class="fig-bar"><i style="width:${p}%;background:${getPercentageColor(p)}"></i></div>
+                    <span class="fig-label">${label}</span>
+                </div>`;
+        }
+
+        function infoRow(label, value) {
+            return `
+                <div class="server-info-row">
+                    <span class="server-info-label">${label}</span>
+                    <span class="server-info-value">${value}</span>
+                </div>`;
+        }
 
         return `
-            <div class="server-card ${status.class}">
-                <div class="server-card-header">
-                    <h3>${escapeHtml(server.server_name)}</h3>
+            <article class="server-card ${status.class}" style="--i:${index}">
+                <header class="server-card-header">
+                    <div>
+                        <p class="kicker">Server ${String(index + 1).padStart(2, '0')}</p>
+                        <h3>${escapeHtml(server.server_name)}</h3>
+                    </div>
                     <span class="status-badge ${status.class}">
                         <span class="status-dot"></span>
                         ${status.label}
                     </span>
+                </header>
+
+                <div class="server-figures">
+                    ${fig(cpuLabel, cpuFigure, cpuPct)}
+                    ${fig('Memory', pctFigure(ramUsage), ramUsage)}
+                    ${fig('Disk', pctFigure(diskUsage), diskUsage)}
+                    ${swapPerc > 0 ? fig('Swap', pctFigure(swapPerc), swapPerc) : ''}
                 </div>
+
                 <div class="server-info">
-                    <div class="server-info-row">
-                        <i class="fas fa-desktop"></i>
-                        <span class="server-info-label">OS</span>
-                        <span class="server-info-value">${escapeHtml(server.operating_system || 'N/A')}</span>
-                    </div>
-                    <div class="server-info-row">
-                        <i class="fas fa-clock"></i>
-                        <span class="server-info-label">Last Boot</span>
-                        <span class="server-info-value">${escapeHtml(server.last_boot || 'N/A')}</span>
-                    </div>
-                    <div class="server-info-row">
-                        <i class="fas fa-cogs"></i>
-                        <span class="server-info-label">CPUs</span>
-                        <span class="server-info-value">${server.physical_cpus || '?'}P / ${server.virtual_cpus || '?'}V</span>
-                    </div>
-                    <div class="server-info-row">
-                        <i class="fas fa-memory"></i>
-                        <span class="server-info-label">RAM</span>
-                        <span class="server-info-value">${escapeHtml(server.ram_used || '?')} / ${escapeHtml(server.ram_total || '?')}</span>
-                    </div>
-                    ${swapTotalMb > 0 ? `
-                    <div class="server-info-row">
-                        <i class="fas fa-layer-group"></i>
-                        <span class="server-info-label">Swap</span>
-                        <span class="server-info-value">${swapUsedMb} MB / ${swapTotalMb} MB (${swapPerc}%)</span>
-                    </div>` : ''}
-                    <div class="server-info-row">
-                        <i class="fas fa-hdd"></i>
-                        <span class="server-info-label">Disk</span>
-                        <span class="server-info-value">${escapeHtml(server.disk_used || '?')} / ${escapeHtml(server.disk_total || '?')}</span>
-                    </div>
-                    ${server.net_rx_bytes ? `
-                    <div class="server-info-row">
-                        <i class="fas fa-network-wired"></i>
-                        <span class="server-info-label">Network</span>
-                        <span class="server-info-value">↓${formatBytes(server.net_rx_bytes)} ↑${formatBytes(server.net_tx_bytes)}</span>
-                    </div>` : ''}
+                    ${infoRow('Operating system', escapeHtml(server.operating_system || 'N/A'))}
+                    ${infoRow('Last boot', escapeHtml(server.last_boot || 'N/A'))}
+                    ${infoRow('CPUs', `${server.physical_cpus || '?'} physical / ${server.virtual_cpus || '?'} virtual`)}
+                    ${infoRow('Memory', `${escapeHtml(server.ram_used || '?')} of ${escapeHtml(server.ram_total || '?')}`)}
+                    ${swapTotalMb > 0 ? infoRow('Swap', `${swapUsedMb} MB of ${swapTotalMb} MB`) : ''}
+                    ${infoRow('Disk', `${escapeHtml(server.disk_used || '?')} of ${escapeHtml(server.disk_total || '?')}`)}
+                    ${server.net_rx_bytes ? infoRow('Network (cumulative)', `↓ ${formatBytes(server.net_rx_bytes)} &nbsp; ↑ ${formatBytes(server.net_tx_bytes)}`) : ''}
                 </div>
-                <div class="progress-rings">
-                    <div class="progress-ring-item">
-                        <div class="progress-ring" style="${progressRingStyle(cpuRingValue, getPercentageColor(cpuRingValue))}">
-                            <span>${cpuLabel}</span>
-                        </div>
-                        <span class="progress-ring-label">${cpuRingLabel}</span>
-                    </div>
-                    <div class="progress-ring-item">
-                        <div class="progress-ring" style="${progressRingStyle(ramUsage, getPercentageColor(ramUsage))}">
-                            <span>${ramUsage.toFixed(0)}%</span>
-                        </div>
-                        <span class="progress-ring-label">RAM</span>
-                    </div>
-                    <div class="progress-ring-item">
-                        <div class="progress-ring" style="${progressRingStyle(diskUsage, getPercentageColor(diskUsage))}">
-                            <span>${diskUsage.toFixed(0)}%</span>
-                        </div>
-                        <span class="progress-ring-label">Disk</span>
-                    </div>
-                    ${swapPerc > 0 ? `
-                    <div class="progress-ring-item">
-                        <div class="progress-ring" style="${progressRingStyle(swapPerc, getPercentageColor(swapPerc))}">
-                            <span>${swapPerc.toFixed(0)}%</span>
-                        </div>
-                        <span class="progress-ring-label">Swap</span>
-                    </div>` : ''}
-                </div>
+
                 <div class="server-metrics-grid">
-                    <div class="metric-item">
-                        <div class="metric-icon-bg connections">
-                            <i class="fas fa-plug"></i>
-                        </div>
-                        <div class="metric-content">
-                            <span class="metric-label">Connections</span>
-                            <span class="metric-value">${server.tcp_connections || 0}</span>
-                        </div>
-                    </div>
-                    <div class="metric-item">
-                        <div class="metric-icon-bg users">
-                            <i class="fas fa-users"></i>
-                        </div>
-                        <div class="metric-content">
-                            <span class="metric-label">Users</span>
-                            <span class="metric-value">${server.logged_users || 0}</span>
-                        </div>
-                    </div>
-                    <div class="metric-item">
-                        <div class="metric-icon-bg ssh">
-                            <i class="fas fa-terminal"></i>
-                        </div>
-                        <div class="metric-content">
-                            <span class="metric-label">SSH</span>
-                            <span class="metric-value">${server.active_ssh_users || 0}</span>
-                        </div>
-                    </div>
-                    <div class="metric-item">
-                        <div class="metric-icon-bg vnc">
-                            <i class="fas fa-tv"></i>
-                        </div>
-                        <div class="metric-content">
-                            <span class="metric-label">VNC</span>
-                            <span class="metric-value">${server.active_vnc_users || 0}</span>
-                        </div>
-                    </div>
+                    <div class="metric-item"><span class="metric-label">Connections</span><span class="metric-value">${server.tcp_connections || 0}</span></div>
+                    <div class="metric-item"><span class="metric-label">Users</span><span class="metric-value">${server.logged_users || 0}</span></div>
+                    <div class="metric-item"><span class="metric-label">SSH</span><span class="metric-value">${server.active_ssh_users || 0}</span></div>
+                    <div class="metric-item"><span class="metric-label">VNC</span><span class="metric-value">${server.active_vnc_users || 0}</span></div>
                 </div>
-                <div class="server-card-footer">
-                    <span class="performance-badge ${performance.class}">
-                        <i class="fas ${performance.icon}"></i>
-                        ${performance.rating}
-                    </span>
-                </div>
-            </div>
+
+                <footer class="server-card-footer">
+                    <span>Performance rating</span>
+                    <span class="performance-badge ${performance.class}">${performance.rating}</span>
+                </footer>
+            </article>
         `;
     }
 
@@ -528,97 +669,38 @@
             const trends = data.trends || {};
 
             function trendArrow(trend) {
-                if (trend === 'up') return '<span class="stat-trend trend-up"><i class="fas fa-arrow-up"></i></span>';
-                if (trend === 'down') return '<span class="stat-trend trend-down"><i class="fas fa-arrow-down"></i></span>';
-                return '<span class="stat-trend trend-stable"><i class="fas fa-minus"></i></span>';
+                if (trend === 'up') return '<span class="stat-trend trend-up" title="Rising"><i class="fas fa-arrow-up"></i></span>';
+                if (trend === 'down') return '<span class="stat-trend trend-down" title="Falling"><i class="fas fa-arrow-down"></i></span>';
+                return '';
             }
 
-            const cpuDisplay = data.avg_cpu_usage != null
-                ? `${data.avg_cpu_usage.toFixed(1)}%`
-                : `${(data.avg_cpu_load || 0).toFixed(1)}`;
-            const cpuSubLabel = data.avg_cpu_usage != null ? 'Avg CPU Usage' : 'Avg CPU Load';
+            function stat(label, valueHtml, tone = '') {
+                return { label, valueHtml, tone };
+            }
 
-            container.innerHTML = `
-                <div class="overview-stat">
-                    <i class="fas fa-server"></i>
-                    <div>
-                        <div class="stat-value">${data.total_servers || 0} ${trendArrow(trends.servers)}</div>
-                        <div class="stat-label">Total Servers</div>
-                    </div>
-                </div>
-                <div class="overview-stat">
-                    <i class="fas fa-check-circle" style="color: var(--ku-success);"></i>
-                    <div>
-                        <div class="stat-value">${data.online_servers || 0}</div>
-                        <div class="stat-label">Online</div>
-                    </div>
-                </div>
-                <div class="overview-stat">
-                    <i class="fas fa-exclamation-triangle" style="color: var(--ku-warning);"></i>
-                    <div>
-                        <div class="stat-value">${data.warning_servers || 0}</div>
-                        <div class="stat-label">Warning</div>
-                    </div>
-                </div>
-                <div class="overview-stat">
-                    <i class="fas fa-times-circle" style="color: var(--ku-danger);"></i>
-                    <div>
-                        <div class="stat-value">${data.offline_servers || 0}</div>
-                        <div class="stat-label">Offline</div>
-                    </div>
-                </div>
-                <div class="overview-stat">
-                    <i class="fas fa-microchip"></i>
-                    <div>
-                        <div class="stat-value">${cpuDisplay} ${trendArrow(trends.cpu)}</div>
-                        <div class="stat-label">${cpuSubLabel}</div>
-                    </div>
-                </div>
-                <div class="overview-stat">
-                    <i class="fas fa-memory"></i>
-                    <div>
-                        <div class="stat-value">${(data.avg_ram_usage || 0).toFixed(1)}% ${trendArrow(trends.ram)}</div>
-                        <div class="stat-label">Avg RAM Usage</div>
-                    </div>
-                </div>
-                ${data.avg_swap_usage > 0 ? `
-                <div class="overview-stat">
-                    <i class="fas fa-layer-group"></i>
-                    <div>
-                        <div class="stat-value">${(data.avg_swap_usage || 0).toFixed(1)}%</div>
-                        <div class="stat-label">Avg Swap Usage</div>
-                    </div>
-                </div>` : ''}
-                <div class="overview-stat">
-                    <i class="fas fa-users"></i>
-                    <div>
-                        <div class="stat-value">${data.total_active_users || 0}</div>
-                        <div class="stat-label">Active Users</div>
-                    </div>
-                </div>
-                <div class="overview-stat">
-                    <i class="fas fa-chart-line"></i>
-                    <div>
-                        <div class="stat-value">${(data.uptime_percentage || 0).toFixed(1)}%</div>
-                        <div class="stat-label">Uptime</div>
-                    </div>
-                </div>
-                ${data.total_net_rx_bytes ? `
-                <div class="overview-stat">
-                    <i class="fas fa-download"></i>
-                    <div>
-                        <div class="stat-value">${formatBytes(data.total_net_rx_bytes)}</div>
-                        <div class="stat-label">Total RX</div>
-                    </div>
-                </div>
-                <div class="overview-stat">
-                    <i class="fas fa-upload"></i>
-                    <div>
-                        <div class="stat-value">${formatBytes(data.total_net_tx_bytes)}</div>
-                        <div class="stat-label">Total TX</div>
-                    </div>
-                </div>` : ''}
-            `;
+            const cpuStat = data.avg_cpu_usage != null
+                ? stat('Avg CPU usage', `${data.avg_cpu_usage.toFixed(1)}<small>%</small> ${trendArrow(trends.cpu)}`)
+                : stat('Avg CPU load', `${(data.avg_cpu_load || 0).toFixed(2)} ${trendArrow(trends.cpu)}`);
+
+            const stats = [
+                stat('Servers', `${data.total_servers || 0} ${trendArrow(trends.servers)}`),
+                stat('Online', `${data.online_servers || 0}`, 'tone-ok'),
+                stat('Warning', `${data.warning_servers || 0}`, data.warning_servers ? 'tone-warn' : 'tone-idle'),
+                stat('Offline', `${data.offline_servers || 0}`, data.offline_servers ? 'tone-crit' : 'tone-idle'),
+                cpuStat,
+                stat('Avg memory', `${(data.avg_ram_usage || 0).toFixed(1)}<small>%</small> ${trendArrow(trends.ram)}`),
+                data.avg_swap_usage > 0 ? stat('Avg swap', `${data.avg_swap_usage.toFixed(1)}<small>%</small>`) : null,
+                stat('Active users', `${data.total_active_users || 0}`),
+                stat('Uptime', `${(data.uptime_percentage || 0).toFixed(1)}<small>%</small>`),
+                data.total_net_rx_bytes ? stat('Total RX', formatBytes(data.total_net_rx_bytes)) : null,
+                data.total_net_rx_bytes ? stat('Total TX', formatBytes(data.total_net_tx_bytes)) : null
+            ].filter(Boolean);
+
+            container.innerHTML = stats.map((s, i) => `
+                <div class="overview-stat ${s.tone}" style="--i:${i}">
+                    <div class="stat-value">${s.valueHtml}</div>
+                    <div class="stat-label">${s.label}</div>
+                </div>`).join('');
 
         } catch (error) {
             console.error('Error loading system overview:', error);
@@ -646,7 +728,7 @@
             if (!response.success || !response.data) return;
 
             // Use detailed cards for server details tab
-            container.innerHTML = response.data.map(server => renderDetailedServerCard(server)).join('');
+            container.innerHTML = response.data.map((server, i) => renderDetailedServerCard(server, i)).join('');
         } catch (error) {
             console.error('Error loading enhanced server cards:', error);
             container.innerHTML = `
@@ -692,6 +774,7 @@
 
             renderUsersTable(users);
             setupUserTableFilters(users);
+            setupFootprintLookup(users);
 
             // Set initial result count
             const countEl = document.getElementById('users-result-count');
@@ -700,7 +783,7 @@
         } catch (error) {
             console.error('Error loading user activity:', error);
             if (tableBody) {
-                tableBody.innerHTML = `<tr><td colspan="9" class="text-center">
+                tableBody.innerHTML = `<tr><td colspan="11" class="text-center">
                     <div class="empty-state">
                         <i class="fas fa-exclamation-triangle fa-2x"></i>
                         <p>Failed to load user data</p>
@@ -727,8 +810,8 @@
         tableBody.innerHTML = users.map(user => {
             const cpuVal = Math.min(100, Math.max(0, parseFloat(user.cpu || 0)));
             const memVal = Math.min(100, Math.max(0, parseFloat(user.mem || 0)));
-            const cpuClass = cpuVal > 70 ? 'danger' : cpuVal > 40 ? 'warning' : 'good';
-            const memClass = memVal > 70 ? 'danger' : memVal > 40 ? 'warning' : 'good';
+            const cpuClass = cpuVal > 90 ? 'danger' : cpuVal > 70 ? 'warning' : 'good';
+            const memClass = memVal > 90 ? 'danger' : memVal > 70 ? 'warning' : 'good';
             const ioRead  = user.io_read_bytes  ? formatBytes(user.io_read_bytes)  : '—';
             const ioWrite = user.io_write_bytes ? formatBytes(user.io_write_bytes) : '—';
 
@@ -746,9 +829,7 @@
 
             return `
                 <tr>
-                    <td class="cell-server">
-                        <span class="server-dot"></span>${escapeHtml(user.server_name || 'N/A')}
-                    </td>
+                    <td class="cell-server">${escapeHtml(user.server_name || 'N/A')}</td>
                     <td><strong>${escapeHtml(user.username || 'N/A')}</strong></td>
                     <td class="cell-truncate" title="${escapeHtml(user.full_name || '')}">${escapeHtml(user.full_name || '—')}</td>
                     <td>${cpuBar}</td>
@@ -758,18 +839,26 @@
                     <td class="cell-truncate" title="${escapeHtml(user.top_process || '')}">${escapeHtml(user.top_process || '—')}</td>
                     <td class="cell-numeric">${ioRead}</td>
                     <td class="cell-numeric">${ioWrite}</td>
-                    <td style="white-space:nowrap;font-size:0.8125rem">${formatUserTimestamp(user.last_login)}</td>
+                    <td class="cell-muted">${formatUserTimestamp(user.last_login)}</td>
                 </tr>
             `;
         }).join('');
     }
 
-    function setupUserTableFilters(allUsers) {
+    let userFiltersBound = false;
+    let allUsersCache = [];
+
+    function setupUserTableFilters(users) {
+        allUsersCache = users;
+        if (userFiltersBound) return;
+        userFiltersBound = true;
+
         const searchBox = document.getElementById('user-search');
         const serverFilter = document.getElementById('server-filter');
         const sortBy = document.getElementById('sort-by');
 
         function applyFilters() {
+            const allUsers = allUsersCache;
             let filteredUsers = allUsers;
 
             if (serverFilter && serverFilter.value) {
@@ -816,9 +905,12 @@
         if (!timestamp) return 'N/A';
         try {
             const date = new Date(timestamp);
-            return date.toLocaleString('en-US', {
-                year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-            });
+            if (isNaN(date)) return 'N/A';
+            // Logins are recorded as dates only; a midnight time carries no information
+            const dateOnly = date.getHours() === 0 && date.getMinutes() === 0;
+            return date.toLocaleString('en-US', dateOnly
+                ? { year: 'numeric', month: 'short', day: 'numeric' }
+                : { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
         } catch {
             return 'N/A';
         }
@@ -847,33 +939,58 @@
 
                 if (serversResponse.data.length > 0) {
                     const hours = parseInt(timeRange?.value || '24');
-                    await loadServerCharts(serversResponse.data[0], hours);
+                    await loadServerCharts(serverSelect.value || serversResponse.data[0], hours);
                 }
             }
 
-            serverSelect.addEventListener('change', async () => {
-                const hours = parseInt(timeRange?.value || '24');
-                await loadServerCharts(serverSelect.value, hours);
-            });
+            if (!analyticsControlsBound) {
+                analyticsControlsBound = true;
 
-            if (timeRange) {
-                timeRange.addEventListener('change', async () => {
-                    await loadServerCharts(serverSelect.value, parseInt(timeRange.value));
-                });
-            }
-
-            const refreshBtn = document.getElementById('refresh-charts');
-            if (refreshBtn) {
-                refreshBtn.addEventListener('click', async () => {
+                serverSelect.addEventListener('change', async () => {
                     const hours = parseInt(timeRange?.value || '24');
                     await loadServerCharts(serverSelect.value, hours);
-                    Toast.success('Charts refreshed');
                 });
+
+                if (timeRange) {
+                    timeRange.addEventListener('change', async () => {
+                        await loadServerCharts(serverSelect.value, parseInt(timeRange.value));
+                    });
+                }
+
+                const refreshBtn = document.getElementById('refresh-charts');
+                if (refreshBtn) {
+                    refreshBtn.addEventListener('click', async () => {
+                        const hours = parseInt(timeRange?.value || '24');
+                        await loadServerCharts(serverSelect.value, hours);
+                        Toast.success('Charts refreshed');
+                    });
+                }
             }
 
         } catch (error) {
             console.error('Error loading performance analytics:', error);
             Toast.error('Failed to load analytics');
+        }
+    }
+
+    /**
+     * Show or clear a "no data" placeholder over a chart canvas
+     */
+    function setChartEmpty(canvasId, message) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) return;
+        const wrapper = canvas.parentElement;
+        let note = wrapper.querySelector('.chart-empty');
+        if (message) {
+            if (window.ChartManager) ChartManager.destroyChart(canvasId);
+            if (!note) {
+                note = document.createElement('div');
+                note.className = 'chart-empty';
+                wrapper.appendChild(note);
+            }
+            note.textContent = message;
+        } else if (note) {
+            note.remove();
         }
     }
 
@@ -905,22 +1022,19 @@
                     {
                         label: 'CPU Utilization %',
                         data: data.map(d => d.cpu_usage_percent != null ? parseFloat(d.cpu_usage_percent) : null),
-                        borderColor: '#003DA5',
-                        backgroundColor: 'rgba(0, 61, 165, 0.1)',
+                        colorKey: 'blue',
                         tension: 0.4, fill: true
                     },
                     {
                         label: 'CPU Load (5min)',
                         data: data.map(d => parseFloat(d.cpu_load_5min || 0)),
-                        borderColor: '#A0B8E0',
-                        backgroundColor: 'rgba(160, 184, 224, 0.05)',
+                        colorKey: 'grayLight',
                         tension: 0.4, fill: false, borderDash: [4, 4]
                     }
                 ] : [{
                     label: 'CPU Load (5min)',
                     data: data.map(d => parseFloat(d.cpu_load_5min || 0)),
-                    borderColor: '#003DA5',
-                    backgroundColor: 'rgba(0, 61, 165, 0.1)',
+                    colorKey: 'blue',
                     tension: 0.4, fill: true
                 }]
             }, hasCpuUsage ? { scales: { y: { min: 0, max: 100, title: { display: true, text: 'CPU %' } } } } : {});
@@ -930,8 +1044,7 @@
                 datasets: [{
                     label: 'RAM Usage %',
                     data: data.map(d => parseFloat(d.ram_percentage || 0)),
-                    borderColor: '#6F5091',
-                    backgroundColor: 'rgba(111, 80, 145, 0.1)',
+                    colorKey: 'purple',
                     tension: 0.4, fill: true
                 }]
             }, { scales: { y: { min: 0, max: 100 } } });
@@ -941,8 +1054,7 @@
                 datasets: [{
                     label: 'Disk Usage %',
                     data: data.map(d => parseFloat(d.disk_percentage || 0)),
-                    borderColor: '#4CAF50',
-                    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                    colorKey: 'green',
                     tension: 0.4, fill: true
                 }]
             }, { scales: { y: { min: 0, max: 100 } } });
@@ -952,14 +1064,14 @@
                 datasets: [{
                     label: 'TCP Connections',
                     data: data.map(d => parseInt(d.tcp_connections || 0)),
-                    borderColor: '#F57F29',
-                    backgroundColor: 'rgba(245, 127, 41, 0.1)',
+                    colorKey: 'orange',
                     tension: 0.4, fill: true
                 }]
-            });
+            }, { scales: { y: { ticks: { precision: 0 } } } });
 
             // Network throughput chart (bytes → MB for readability)
             const hasNetData = data.some(d => d.net_rx_bytes || d.net_tx_bytes);
+            setChartEmpty('network-throughput-chart', hasNetData ? null : 'No network counters reported in this window');
             if (hasNetData && document.getElementById('network-throughput-chart')) {
                 ChartManager.createLineChart('network-throughput-chart', {
                     labels,
@@ -967,15 +1079,13 @@
                         {
                             label: 'RX (cumulative MB)',
                             data: data.map(d => ((parseInt(d.net_rx_bytes) || 0) / 1048576).toFixed(2)),
-                            borderColor: '#00A9CE',
-                            backgroundColor: 'rgba(0, 169, 206, 0.1)',
+                            colorKey: 'cyan',
                             tension: 0.4, fill: true
                         },
                         {
                             label: 'TX (cumulative MB)',
                             data: data.map(d => ((parseInt(d.net_tx_bytes) || 0) / 1048576).toFixed(2)),
-                            borderColor: '#78D64B',
-                            backgroundColor: 'rgba(120, 214, 75, 0.1)',
+                            colorKey: 'green',
                             tension: 0.4, fill: true
                         }
                     ]
@@ -984,14 +1094,14 @@
 
             // Swap usage chart
             const hasSwapData = data.some(d => d.swap_percentage > 0);
+            setChartEmpty('swap-chart', hasSwapData ? null : 'No swap in use during this window');
             if (hasSwapData && document.getElementById('swap-chart')) {
                 ChartManager.createLineChart('swap-chart', {
                     labels,
                     datasets: [{
                         label: 'Swap Usage %',
                         data: data.map(d => parseFloat(d.swap_percentage || 0)),
-                        borderColor: '#E31E24',
-                        backgroundColor: 'rgba(227, 30, 36, 0.1)',
+                        colorKey: 'red',
                         tension: 0.4, fill: true
                     }]
                 }, { scales: { y: { min: 0, max: 100, title: { display: true, text: '%' } } } });
@@ -1002,11 +1112,10 @@
                 datasets: [{
                     label: 'Logged Users',
                     data: data.map(d => parseInt(d.logged_users || 0)),
-                    borderColor: '#00A9CE',
-                    backgroundColor: 'rgba(0, 169, 206, 0.1)',
+                    colorKey: 'cyan',
                     tension: 0.4, fill: true
                 }]
-            });
+            }, { scales: { y: { ticks: { precision: 0 } } } });
 
             ChartManager.createLineChart('combined-chart', {
                 labels,
@@ -1014,22 +1123,19 @@
                     {
                         label: 'CPU Load (5min)',
                         data: data.map(d => parseFloat(d.cpu_load_5min || 0) * 10),
-                        borderColor: '#003DA5',
-                        backgroundColor: 'rgba(0, 61, 165, 0.05)',
+                        colorKey: 'blue',
                         yAxisID: 'y', tension: 0.4, fill: true
                     },
                     {
                         label: 'RAM %',
                         data: data.map(d => parseFloat(d.ram_percentage || 0)),
-                        borderColor: '#6F5091',
-                        backgroundColor: 'rgba(111, 80, 145, 0.05)',
+                        colorKey: 'purple',
                         yAxisID: 'y1', tension: 0.4, fill: true
                     },
                     {
                         label: 'Disk %',
                         data: data.map(d => parseFloat(d.disk_percentage || 0)),
-                        borderColor: '#4CAF50',
-                        backgroundColor: 'rgba(76, 175, 80, 0.05)',
+                        colorKey: 'green',
                         yAxisID: 'y1', tension: 0.4, fill: true
                     }
                 ]
@@ -1056,12 +1162,9 @@
         if (!overviewContainer) return;
 
         try {
-            const [metricsResponse, serversResponse] = await Promise.all([
-                API.getLatestMetrics(),
-                API.getServerList()
-            ]);
+            const metricsResponse = await API.getLatestMetrics();
 
-            if (!metricsResponse.success || !metricsResponse.data) return;
+            if (!metricsResponse.success || !metricsResponse.data || metricsResponse.data.length === 0) return;
 
             const servers = metricsResponse.data;
 
@@ -1070,104 +1173,67 @@
             const maxConnections = Math.max(...servers.map(s => parseInt(s.tcp_connections) || 0));
             const activeServers = servers.filter(s => (parseInt(s.tcp_connections) || 0) > 0).length;
 
-            overviewContainer.innerHTML = `
-                <div class="overview-stat">
-                    <i class="fas fa-network-wired"></i>
-                    <div>
-                        <div class="stat-value">${totalConnections}</div>
-                        <div class="stat-label">Total Connections</div>
-                    </div>
-                </div>
-                <div class="overview-stat">
-                    <i class="fas fa-chart-line"></i>
-                    <div>
-                        <div class="stat-value">${avgConnections.toFixed(1)}</div>
-                        <div class="stat-label">Avg per Server</div>
-                    </div>
-                </div>
-                <div class="overview-stat">
-                    <i class="fas fa-arrow-up"></i>
-                    <div>
-                        <div class="stat-value">${maxConnections}</div>
-                        <div class="stat-label">Peak Connections</div>
-                    </div>
-                </div>
-                <div class="overview-stat">
-                    <i class="fas fa-server"></i>
-                    <div>
-                        <div class="stat-value">${activeServers}</div>
-                        <div class="stat-label">Active Servers</div>
-                    </div>
-                </div>
-            `;
+            const netStats = [
+                ['Total connections', totalConnections],
+                ['Avg per server', avgConnections.toFixed(1)],
+                ['Peak on one server', maxConnections],
+                ['Servers with traffic', `${activeServers}<small>/${servers.length}</small>`]
+            ];
+            overviewContainer.innerHTML = netStats.map(([label, value], i) => `
+                <div class="overview-stat" style="--i:${i}">
+                    <div class="stat-value">${value}</div>
+                    <div class="stat-label">${label}</div>
+                </div>`).join('');
 
-            // Render connections bar chart
+            // Connections bar chart — one brand colour; the busiest server is emphasised
             if (window.ChartManager) {
+                const counts = servers.map(s => parseInt(s.tcp_connections) || 0);
                 ChartManager.createBarChart('network-activity-chart', {
                     labels: servers.map(s => s.server_name),
                     datasets: [{
-                        label: 'TCP Connections',
-                        data: servers.map(s => parseInt(s.tcp_connections) || 0),
-                        backgroundColor: servers.map((_, i) => {
-                            const colors = ['rgba(0, 61, 165, 0.7)', 'rgba(111, 80, 145, 0.7)', 'rgba(0, 169, 206, 0.7)', 'rgba(245, 127, 41, 0.7)', 'rgba(120, 214, 75, 0.7)', 'rgba(227, 30, 36, 0.7)', 'rgba(0, 61, 165, 0.5)'];
-                            return colors[i % colors.length];
-                        }),
-                        borderRadius: 6,
-                        borderSkipped: false
+                        label: 'TCP connections',
+                        data: counts,
+                        colorKeys: counts.map(c => (c === maxConnections && c > 0) ? 'blue' : 'blueSoft'),
+                        borderRadius: 0,
+                        borderSkipped: false,
+                        maxBarThickness: 56
                     }]
-                });
+                }, { plugins: { legend: { display: false } } });
             }
 
             if (connectionsContainer) {
-                connectionsContainer.innerHTML = servers.map(server => `
-                    <div class="card">
-                        <div class="card-header">
-                            <div class="card-title">
-                                <i class="fas fa-server"></i>
-                                ${escapeHtml(server.server_name)}
-                            </div>
-                        </div>
-                        <div class="card-body">
-                            <div class="metric-item">
-                                <div class="metric-icon-bg connections">
-                                    <i class="fas fa-plug"></i>
-                                </div>
-                                <div class="metric-content">
-                                    <span class="metric-label">TCP Connections</span>
-                                    <span class="metric-value">${server.tcp_connections || 0}</span>
-                                </div>
-                            </div>
-                            <div class="metric-item" style="margin-top: var(--spacing-sm);">
-                                <div class="metric-icon-bg users">
-                                    <i class="fas fa-users"></i>
-                                </div>
-                                <div class="metric-content">
-                                    <span class="metric-label">Active Users</span>
-                                    <span class="metric-value">${server.logged_users || 0}</span>
-                                </div>
-                            </div>
-                            ${server.net_rx_bytes ? `
-                            <div class="metric-item" style="margin-top: var(--spacing-sm);">
-                                <div class="metric-icon-bg" style="background: rgba(0,169,206,0.15);">
-                                    <i class="fas fa-download" style="color:#00A9CE;"></i>
-                                </div>
-                                <div class="metric-content">
-                                    <span class="metric-label">RX (cumulative)</span>
-                                    <span class="metric-value">${formatBytes(server.net_rx_bytes)}</span>
-                                </div>
-                            </div>
-                            <div class="metric-item" style="margin-top: var(--spacing-sm);">
-                                <div class="metric-icon-bg" style="background: rgba(120,214,75,0.15);">
-                                    <i class="fas fa-upload" style="color:#78D64B;"></i>
-                                </div>
-                                <div class="metric-content">
-                                    <span class="metric-label">TX (cumulative)</span>
-                                    <span class="metric-value">${formatBytes(server.net_tx_bytes)}</span>
-                                </div>
-                            </div>` : ''}
-                        </div>
-                    </div>
-                `).join('');
+                const hasNet = servers.some(s => s.net_rx_bytes || s.net_tx_bytes);
+                connectionsContainer.innerHTML = `
+                    <div class="table-wrapper">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Server</th>
+                                    <th scope="col" style="min-width:200px">TCP connections</th>
+                                    <th scope="col" class="col-numeric">Users</th>
+                                    ${hasNet ? '<th scope="col" class="col-numeric">RX (cumulative)</th><th scope="col" class="col-numeric">TX (cumulative)</th>' : ''}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${servers.map(server => {
+                                    const c = parseInt(server.tcp_connections) || 0;
+                                    const share = maxConnections > 0 ? (c / maxConnections) * 100 : 0;
+                                    return `
+                                    <tr>
+                                        <td class="cell-server">${escapeHtml(server.server_name)}</td>
+                                        <td>
+                                            <div class="cell-bar">
+                                                <div class="bar-track"><div class="bar-fill good" style="width:${share}%"></div></div>
+                                                <span class="bar-label">${c}</span>
+                                            </div>
+                                        </td>
+                                        <td class="cell-numeric">${server.logged_users || 0}</td>
+                                        ${hasNet ? `<td class="cell-numeric">${formatBytes(server.net_rx_bytes)}</td><td class="cell-numeric">${formatBytes(server.net_tx_bytes)}</td>` : ''}
+                                    </tr>`;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>`;
             }
 
         } catch (error) {

@@ -1,506 +1,278 @@
 /**
- * Table Styles — Readable, Data-Forward Design
- * Clear hierarchy, strong contrast, scannable rows
+ * Tables & controls
+ * Ledger-style tables: hairline rules, mono column heads, tabular figures.
  */
 
 /* ========================================
-   Table Controls
+   Controls row (search / filter / sort)
    ======================================== */
-.table-controls {
+.table-controls,
+.chart-controls {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--spacing-md);
+    align-items: flex-end;
+    gap: var(--spacing-md) var(--spacing-xl);
     margin-bottom: var(--spacing-lg);
-    align-items: center;
-    padding: var(--spacing-md);
-    background: var(--bg-secondary);
-    border-radius: var(--border-radius-sm);
-    border: 1px solid var(--border-color);
 }
 
 .search-box {
     position: relative;
-    flex: 1;
-    min-width: 220px;
+    flex: 1 1 260px;
+    max-width: 420px;
 }
 
 .search-box i {
     position: absolute;
-    left: 0.875rem;
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--text-muted);
-    font-size: 0.8125rem;
+    left: 0;
+    bottom: 0.7rem;
+    font-size: 0.75rem;
+    color: var(--ink-faint);
     pointer-events: none;
 }
 
 .search-box input {
     width: 100%;
-    padding: 0.6rem 0.875rem 0.6rem 2.5rem;
-    border: 1.5px solid var(--border-color);
-    border-radius: var(--border-radius-xs);
-    font-size: 0.875rem;
-    font-family: var(--font-family);
-    background: var(--card-bg);
-    color: var(--text-primary);
-    transition: all var(--transition-fast);
-    line-height: 1.4;
+    padding: 0.55rem 0 0.55rem 1.4rem;
+    font-family: var(--font-display);
+    font-size: 1.125rem;
+    color: var(--ink);
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid var(--ink);
+    border-radius: 0;
+    outline: none;
+    transition: border-color var(--transition-fast);
 }
 
-.search-box input::placeholder {
-    color: var(--text-muted);
-}
+.search-box input::placeholder { color: var(--ink-faint); }
 
 .search-box input:focus {
-    outline: none;
-    border-color: var(--ku-primary);
-    box-shadow: 0 0 0 3px rgba(0, 61, 165, 0.12);
-    background: var(--bg-primary);
+    border-bottom-color: var(--accent);
+    box-shadow: 0 1px 0 0 var(--accent);
 }
 
 .filter-group,
-.sort-group {
+.sort-group,
+.time-range-selector,
+.server-selector {
     display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
+    flex-direction: column;
+    gap: 0.25rem;
 }
 
 .filter-group label,
-.sort-group label {
-    font-size: 0.75rem;
-    color: var(--text-secondary);
-    white-space: nowrap;
-    font-weight: var(--font-weight-semibold);
+.sort-group label,
+.time-range-selector label,
+.server-selector label {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    color: var(--ink-faint);
 }
 
 .filter-group select,
-.sort-group select {
-    padding: 0.6rem 2.25rem 0.6rem 0.875rem;
-    border: 1.5px solid var(--border-color);
-    border-radius: var(--border-radius-xs);
-    font-size: 0.8125rem;
-    font-family: var(--font-family);
-    background: var(--card-bg);
-    color: var(--text-primary);
-    cursor: pointer;
+.sort-group select,
+.time-range-selector select,
+.server-selector select {
     appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2394A3B8' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+    -webkit-appearance: none;
+    min-width: 150px;
+    padding: 0.5rem 1.6rem 0.5rem 0;
+    font-family: var(--font-sans);
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--ink);
+    background-color: transparent;
+    background-image:
+        linear-gradient(45deg, transparent 50%, currentColor 50%),
+        linear-gradient(135deg, currentColor 50%, transparent 50%);
+    background-position: calc(100% - 7px) 55%, calc(100% - 3px) 55%;
+    background-size: 4px 4px, 4px 4px;
     background-repeat: no-repeat;
-    background-position: right 0.75rem center;
-    transition: all var(--transition-fast);
+    border: 0;
+    border-bottom: 1px solid var(--ink);
+    border-radius: 0;
+    cursor: pointer;
+    outline: none;
 }
 
 .filter-group select:focus,
-.sort-group select:focus {
-    outline: none;
-    border-color: var(--ku-primary);
-    box-shadow: 0 0 0 3px rgba(0, 61, 165, 0.12);
+.sort-group select:focus,
+.time-range-selector select:focus,
+.server-selector select:focus {
+    border-bottom-color: var(--accent);
+    box-shadow: 0 1px 0 0 var(--accent);
+}
+
+select option {
+    background: var(--paper-raised);
+    color: var(--ink);
 }
 
 .table-result-count {
-    font-size: 0.8125rem;
-    color: var(--text-muted);
     margin-left: auto;
-    white-space: nowrap;
-    font-variant-numeric: tabular-nums;
-}
-
-/* Mobile */
-@media (max-width: 639px) {
-    .table-controls {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-    .search-box,
-    .filter-group,
-    .sort-group {
-        width: 100%;
-    }
-
-    .filter-group,
-    .sort-group {
-        justify-content: space-between;
-    }
-
-    .table-result-count {
-        margin-left: 0;
-        text-align: center;
-    }
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    padding-bottom: 0.6rem;
 }
 
 /* ========================================
-   Data Table — Core Layout
+   Table
    ======================================== */
 .table-wrapper {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
-    border-radius: var(--border-radius-sm);
-    border: 1px solid var(--border-color);
-    box-shadow: var(--shadow-sm);
-    /* Subtle scroll indicator on right edge */
-    background:
-        linear-gradient(to right, var(--card-bg) 30%, transparent),
-        linear-gradient(to right, transparent, var(--bg-secondary) 70%) 100% 0 / 40px 100% no-repeat,
-        var(--card-bg);
+    border-top: 2px solid var(--rule-strong);
+}
+
+.table-wrapper:focus-visible {
+    outline-offset: 4px;
 }
 
 .data-table {
     width: 100%;
     border-collapse: collapse;
-    background: var(--card-bg);
     font-size: 0.875rem;
-    /* Minimum width ensures columns don't collapse */
-    min-width: 640px;
-}
-
-/* ========================================
-   Table Head — High Contrast, Clear Labels
-   ======================================== */
-.data-table thead {
-    position: sticky;
-    top: 0;
-    z-index: 2;
+    font-variant-numeric: tabular-nums;
 }
 
 .data-table th {
-    padding: 0.875rem 1rem;
+    position: sticky;
+    top: 0;
+    padding: 0.75rem 0.9rem;
     text-align: left;
-    font-weight: var(--font-weight-bold);
+    font-family: var(--font-mono);
     font-size: 0.6875rem;
-    color: var(--ku-primary);
-    white-space: nowrap;
-    background: var(--bg-tertiary);
-    border-bottom: 2px solid var(--ku-primary);
+    font-weight: 500;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
-    letter-spacing: 0.07em;
-    /* Sortable column hint */
-    user-select: none;
+    color: var(--ink-faint);
+    background: var(--paper);
+    border-bottom: 1px solid var(--rule-strong);
+    white-space: nowrap;
 }
 
-.data-table th[data-sortable] {
-    cursor: pointer;
-}
+.data-table th:first-child,
+.data-table td:first-child { padding-left: 0; }
 
-.data-table th[data-sortable]:hover {
-    background: rgba(0, 61, 165, 0.06);
-    color: var(--ku-primary-dark);
-}
+.data-table th:last-child,
+.data-table td:last-child { padding-right: 0; }
 
-.data-table th.sort-asc::after {
-    content: " ↑";
-    opacity: 0.7;
-    font-size: 0.6rem;
-}
-
-.data-table th.sort-desc::after {
-    content: " ↓";
-    opacity: 0.7;
-    font-size: 0.6rem;
-}
-
-/* Numeric columns right-align */
-.data-table th.col-numeric {
-    text-align: right;
-}
-
-/* ========================================
-   Table Body — Readable Rows
-   ======================================== */
 .data-table td {
-    padding: 0.8125rem 1rem;
-    border-bottom: 1px solid var(--border-color);
-    color: var(--text-primary);
+    padding: 0.7rem 0.9rem;
+    border-bottom: 1px solid var(--rule-faint);
+    color: var(--ink);
     vertical-align: middle;
-    line-height: 1.4;
 }
 
 .data-table tbody tr {
     transition: background-color var(--transition-fast);
 }
 
-/* Stripe every other row with a very light tint for scannability */
-.data-table tbody tr:nth-child(even) {
-    background: var(--bg-secondary);
-}
-
 .data-table tbody tr:hover {
-    background: rgba(0, 61, 165, 0.045);
+    background: var(--accent-wash);
 }
 
-/* Active / selected row */
-.data-table tbody tr.row-selected {
-    background: rgba(0, 61, 165, 0.08);
-    outline: 2px solid rgba(0, 61, 165, 0.2);
-    outline-offset: -2px;
+.data-table td strong {
+    font-weight: 600;
 }
 
-.data-table tbody tr:last-child td {
-    border-bottom: none;
-}
-
-/* Empty state */
-.data-table .table-empty {
-    text-align: center;
-    padding: 3rem 1rem;
-    color: var(--text-muted);
-    font-size: 0.9375rem;
-}
-
-.data-table .table-empty i {
-    display: block;
-    font-size: 2rem;
-    margin-bottom: 0.75rem;
-    opacity: 0.4;
-}
-
-/* ========================================
-   Cell Utilities
-   ======================================== */
-.cell-numeric {
+.data-table .col-numeric,
+.data-table .cell-numeric {
     text-align: right;
-    font-variant-numeric: tabular-nums;
-    font-weight: var(--font-weight-medium);
-    letter-spacing: -0.01em;
-}
-
-/* Server name cell */
-.cell-server {
-    font-weight: var(--font-weight-semibold);
-    color: var(--text-primary);
     white-space: nowrap;
 }
 
-.cell-server .server-dot {
-    display: inline-block;
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--ku-accent);
-    margin-right: 0.5rem;
-    vertical-align: middle;
-    position: relative;
-    top: -1px;
-}
-
-.cell-server .server-dot.offline {
-    background: var(--ku-danger);
-}
-
-/* Inline mini bar for usage % values */
-.cell-bar {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    min-width: 110px;
-}
-
-.cell-bar .bar-track {
-    flex: 1;
-    height: 5px;
-    background: var(--border-color);
-    border-radius: 99px;
-    overflow: hidden;
-}
-
-.cell-bar .bar-fill {
-    height: 100%;
-    border-radius: 99px;
-    background: var(--ku-primary);
-    transition: width var(--transition-slow);
-}
-
-.cell-bar .bar-fill.danger  { background: var(--ku-danger); }
-.cell-bar .bar-fill.warning { background: var(--ku-warning); }
-.cell-bar .bar-fill.good    { background: var(--ku-accent); }
-
-.cell-bar .bar-label {
+.data-table .cell-numeric {
+    font-family: var(--font-mono);
     font-size: 0.8125rem;
-    font-variant-numeric: tabular-nums;
-    font-weight: var(--font-weight-semibold);
-    color: var(--text-primary);
+}
+
+.cell-server {
     white-space: nowrap;
-    min-width: 3ch;
-    text-align: right;
+    font-family: var(--font-display);
+    font-size: 1rem;
 }
 
-/* Badge chips */
-.cell-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-    padding: 0.2rem 0.55rem;
-    border-radius: 5px;
-    font-size: 0.6875rem;
-    font-weight: var(--font-weight-bold);
-    font-variant-numeric: tabular-nums;
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
-    white-space: nowrap;
-}
-
-.cell-badge::before {
-    content: '';
-    display: inline-block;
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-    background: currentColor;
-    opacity: 0.7;
-}
-
-.cell-badge.high {
-    background: rgba(227, 30, 36, 0.1);
-    color: var(--ku-danger);
-    border: 1px solid rgba(227, 30, 36, 0.18);
-}
-
-.cell-badge.medium {
-    background: rgba(245, 127, 41, 0.1);
-    color: var(--ku-warning);
-    border: 1px solid rgba(245, 127, 41, 0.18);
-}
-
-.cell-badge.low {
-    background: rgba(120, 214, 75, 0.1);
-    color: #3a9320;
-    border: 1px solid rgba(120, 214, 75, 0.25);
-}
-
-/* Truncate long text with tooltip */
 .cell-truncate {
-    max-width: 160px;
-    white-space: nowrap;
+    max-width: 200px;
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--ink-soft);
 }
 
+.cell-muted {
+    color: var(--ink-faint);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    white-space: nowrap;
+}
+
+/* Inline bar cells */
+.cell-bar {
+    display: grid;
+    grid-template-columns: minmax(60px, 1fr) 3.5em;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.bar-track {
+    height: 3px;
+    background: var(--rule-faint);
+}
+
+.bar-fill {
+    height: 100%;
+    background: var(--ok);
+}
+
+.bar-fill.good    { background: var(--ok); }
+.bar-fill.warning { background: var(--warn); }
+.bar-fill.danger  { background: var(--crit); }
+
+.bar-label {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    text-align: right;
+    color: var(--ink-soft);
+}
+
+.table-empty {
+    padding: var(--spacing-2xl) !important;
+    text-align: center;
+    font-family: var(--font-display);
+    font-size: 1.125rem;
+    color: var(--ink-soft);
+}
+
+.table-empty i { display: none; }
+
+.table-loading {
+    padding: var(--spacing-2xl) !important;
+    text-align: center;
+}
+
+.table-loading p {
+    margin-top: 0.75rem;
+    font-family: var(--font-display);
+    color: var(--ink-soft);
+}
+
+.table-loading .spinner { margin: 0 auto; }
+
 /* ========================================
-   Pagination
+   Pagination (reserved)
    ======================================== */
 .pagination {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: var(--spacing-sm);
-    margin-top: var(--spacing-lg);
-    flex-wrap: wrap;
-    padding: 0 0.25rem;
-}
-
-.pagination-info {
-    font-size: 0.8125rem;
-    color: var(--text-muted);
-    font-variant-numeric: tabular-nums;
-}
-
-.pagination-controls {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-}
-
-.pagination-button {
-    min-width: 32px;
-    height: 32px;
-    padding: 0 0.5rem;
-    border: 1.5px solid var(--border-color);
-    background: var(--card-bg);
-    color: var(--text-secondary);
-    border-radius: var(--border-radius-xs);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-    font-size: 0.8125rem;
-    font-family: var(--font-family);
-    font-weight: var(--font-weight-medium);
-    display: inline-flex;
-    align-items: center;
     justify-content: center;
+    gap: 0.25rem;
+    margin-top: var(--spacing-lg);
 }
 
-.pagination-button:hover:not(:disabled) {
-    background: var(--bg-secondary);
-    border-color: var(--ku-primary);
-    color: var(--ku-primary);
-}
-
-.pagination-button:disabled {
-    opacity: 0.35;
-    cursor: not-allowed;
-}
-
-.pagination-button.active {
-    background: var(--ku-primary);
-    color: white;
-    border-color: var(--ku-primary);
-    font-weight: var(--font-weight-bold);
-    box-shadow: 0 2px 8px rgba(0, 61, 165, 0.25);
-}
-
-/* ========================================
-   Mobile
-   ======================================== */
-@media (max-width: 767px) {
-    .data-table {
-        font-size: 0.8125rem;
-    }
-
-    .data-table th,
-    .data-table td {
-        padding: 0.625rem 0.75rem;
-    }
-
-    .cell-bar {
-        min-width: 80px;
-    }
-
-    .pagination {
-        justify-content: center;
-        flex-direction: column;
-        gap: var(--spacing-sm);
-    }
-}
-
-@media (max-width: 480px) {
-    .table-wrapper {
-        font-size: 0.75rem;
-    }
-
-    .data-table th {
-        font-size: 0.625rem;
-    }
-}
-
-/* ========================================
-   Dark Mode Overrides
-   ======================================== */
-[data-theme="dark"] .table-wrapper {
-    background: var(--card-bg);
-}
-
-[data-theme="dark"] .data-table th {
-    color: #5B9CED;
-    background: var(--bg-tertiary);
-    border-bottom-color: #1E4A8C;
-}
-
-[data-theme="dark"] .data-table tbody tr:nth-child(even) {
-    background: rgba(255, 255, 255, 0.025);
-}
-
-[data-theme="dark"] .data-table tbody tr:hover {
-    background: rgba(91, 156, 237, 0.07);
-}
-
-[data-theme="dark"] .cell-badge.low {
-    background: rgba(120, 214, 75, 0.08);
-    color: #78D64B;
-    border-color: rgba(120, 214, 75, 0.2);
-}
-
-[data-theme="dark"] .table-controls {
-    background: var(--bg-tertiary);
-    border-color: var(--border-color);
-}
+.pagination:empty { display: none; }

@@ -8,6 +8,17 @@
 
     <title>{% block title %}{{ DASHBOARD_CONFIG.title }}{% endblock %}</title>
 
+    <!-- Apply saved theme before first paint to avoid a light flash -->
+    <script>
+        (function() {
+            try {
+                var t = localStorage.getItem('theme') ||
+                    (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+                document.documentElement.setAttribute('data-theme', t);
+            } catch (e) {}
+        })();
+    </script>
+
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/KU_logo.png') }}">
     <link rel="apple-touch-icon" href="{{ url_for('static', filename='images/KU_logo.png') }}">
@@ -32,35 +43,37 @@
     {% block extra_css %}{% endblock %}
 </head>
 <body>
-    <!-- Header -->
-    <header class="dashboard-header" role="banner">
-        <div class="header-container">
-            <div class="header-left">
+    <!-- Masthead: 2-segment layout (white brandmark segment + KU Blue title segment) -->
+    <header class="masthead" role="banner">
+        <div class="wrap masthead-grid">
+            <div class="segment-brand">
                 <img src="{{ url_for('static', filename='images/KU_logo.png') }}"
                      alt="{{ DASHBOARD_CONFIG.logo_alt }}"
                      class="ku-logo"
-                     width="44"
-                     height="44"
+                     width="180"
+                     height="53"
                      loading="eager">
-                <div class="header-title">
-                    <h1>{{ DASHBOARD_CONFIG.header_title }}</h1>
-                </div>
             </div>
 
-            <div class="header-right">
-                <!-- Theme Toggle Button -->
-                <button class="theme-toggle-btn"
-                        id="theme-toggle"
-                        aria-label="Toggle dark mode"
-                        title="Toggle dark mode (Ctrl+D)">
-                    <i class="fas fa-sun"></i>
-                    <i class="fas fa-moon"></i>
-                </button>
+            <div class="segment-title">
+                <div class="segment-meta">
+                    <span class="strip-item"><span class="live-dot" aria-hidden="true"></span>Live telemetry</span>
+                    <span class="strip-item system-time" id="system-time" aria-live="off">
+                        <span id="current-time"></span>
+                    </span>
+                    <span class="strip-spacer"></span>
+                    <button class="theme-toggle-btn"
+                            id="theme-toggle"
+                            aria-label="Toggle dark mode"
+                            title="Toggle dark mode (Ctrl+D)">
+                        <i class="fas fa-moon" aria-hidden="true"></i><span class="label-dark">Dark</span>
+                        <i class="fas fa-sun" aria-hidden="true"></i><span class="label-light">Light</span>
+                    </button>
+                </div>
 
-                <!-- System Time -->
-                <div class="system-time" id="system-time" aria-live="polite">
-                    <i class="fas fa-clock"></i>
-                    <span id="current-time"></span>
+                <div class="masthead-title">
+                    <p class="kicker">Khalifa University · Research Computing</p>
+                    <h1>{{ DASHBOARD_CONFIG.header_title }}</h1>
                 </div>
             </div>
         </div>

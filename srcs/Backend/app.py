@@ -14,8 +14,9 @@ from dotenv import load_dotenv
 from datetime import datetime, timedelta
 import requests
 
-from flask_config import Config, KU_COLORS, DASHBOARD_CONFIG, FONTS
+from flask_config import Config, KU_COLORS, DASHBOARD_CONFIG, FONTS, PERFORMANCE_THRESHOLDS
 from blueprints.dashboard import dashboard_bp
+from utils.insights import build_attention_items, rank_placement
 
 # Load environment variables
 load_dotenv(".env")
@@ -525,6 +526,127 @@ def create_app(config_class=Config):
 
         except Exception as e:
             logger.error(f"Error fetching system overview: {e}")
+            return jsonify({"success": False, "error": str(e)}), 500
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+
+    # ==========================================
+    # Actionable insights
+    # ==========================================
+
+    LATEST_METRICS_SQL = """
+    SELECT DISTINCT ON (server_name) *
+    FROM server_metrics
+    ORDER BY server_name, timestamp DESC
+    """
+
+    def _fetch_dicts(cursor, query, params=None):
+        cursor.execute(query, params)
+        columns = [desc[0] for desc in cursor.description]
+        return [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+    @app.route("/api/insights/attention", methods=["GET"])
+    def get_attention_items():
+        """Ranked list of issues that need an admin, each with a suggested action."""
+        conn = None
+        cursor = None
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+
+            servers = _fetch_dicts(cursor, LATEST_METRICS_SQL)
+
+            # Disk growth in percentage points per day over the last 14 days
+            cursor.execute("""
+                SELECT server_name,
+                       regr_slope(disk_percentage, EXTRACT(EPOCH FROM timestamp) / 86400.0)
+                FROM server_metrics
+                WHERE timestamp > NOW() - INTERVAL '14 days'
+                  AND disk_percentage IS NOT NULL
+                GROUP BY server_name
+            """)
+            disk_growth = {name: float(slope) for name, slope in cursor.fetchall() if slope is not None}
+
+            users_by_server = {}
+            for row in _fetch_dicts(cursor, "SELECT server_name, username, cpu, mem, disk FROM top_users"):
+                users_by_server.setdefault(row["server_name"], []).append(row)
+
+            now = datetime.now()
+            items = build_attention_items(servers, disk_growth, users_by_server, PERFORMANCE_THRESHOLDS, now)
+            return jsonify({
+                "success": True,
+                "data": items,
+                "count": len(items),
+                "generated_at": now.isoformat(),
+            })
+        except Exception as e:
+            logger.error(f"Error building attention items: {e}", exc_info=True)
+            return jsonify({"success": False, "error": str(e)}), 500
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+
+    @app.route("/api/insights/placement", methods=["GET"])
+    def get_placement():
+        """Servers ranked by spare CPU and memory for starting a new job."""
+        conn = None
+        cursor = None
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            servers = _fetch_dicts(cursor, LATEST_METRICS_SQL)
+            return jsonify({"success": True, "data": rank_placement(servers, datetime.now())})
+        except Exception as e:
+            logger.error(f"Error ranking placement: {e}", exc_info=True)
+            return jsonify({"success": False, "error": str(e)}), 500
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+
+    @app.route("/api/users/<username>/footprint", methods=["GET"])
+    def get_user_footprint(username):
+        """One user's recorded footprint (disk, processes, last login) across all servers."""
+        conn = None
+        cursor = None
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            rows = _fetch_dicts(cursor, """
+                SELECT server_name, username, full_name, cpu, mem, disk, process_count,
+                       top_process, last_login, io_read_bytes, io_write_bytes, timestamp
+                FROM top_users
+                WHERE LOWER(username) = LOWER(%s)
+                ORDER BY disk DESC NULLS LAST, server_name
+            """, (username,))
+
+            if not rows:
+                return jsonify({"success": False, "message": f"No records for user '{username}'"}), 404
+
+            for row in rows:
+                for key in ("cpu", "mem", "disk"):
+                    row[key] = float(row[key]) if row[key] is not None else None
+                for key in ("last_login", "timestamp"):
+                    row[key] = row[key].isoformat() if row[key] else None
+
+            return jsonify({
+                "success": True,
+                "data": {
+                    "username": rows[0]["username"],
+                    "full_name": next((r["full_name"] for r in rows if r["full_name"] and r["full_name"] != "N/A"), None),
+                    "servers": rows,
+                    "total_disk_gb": round(sum(r["disk"] or 0 for r in rows), 1),
+                    "total_processes": sum(r["process_count"] or 0 for r in rows),
+                },
+            })
+        except Exception as e:
+            logger.error(f"Error fetching footprint for {username}: {e}", exc_info=True)
             return jsonify({"success": False, "error": str(e)}), 500
         finally:
             if cursor:

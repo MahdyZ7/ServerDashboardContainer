@@ -46,7 +46,7 @@ The dashboard is a unified Flask application (`srcs/Backend/app.py`) combining A
 - **Static CSS** (`static/css/`) - Modular stylesheets
   - `main.css` - Core design system (variables, header, buttons, cards, footer)
   - `dashboard.css` - Server cards, progress rings, overview grid
-  - `dark-mode.css` - Rich dark theme with blue glow accents
+  - `dark-mode.css` - Dark theme token overrides (navy ground, white brandmark)
   - `tabs.css` - Tab navigation with sliding indicator
   - `cards.css` - Toast notifications, metric cards, alert cards
   - `tables.css` - Data tables with alternating rows, search, pagination
@@ -55,7 +55,7 @@ The dashboard is a unified Flask application (`srcs/Backend/app.py`) combining A
 - **Static JS** (`static/js/`) - Modular JavaScript
   - `api.js` - API client with retry logic (3 attempts, exponential backoff, 10s timeout)
   - `dashboard.js` - Main data loading, rendering (progress rings, trend arrows)
-  - `charts.js` - Chart.js manager with gradient fills, theme-aware colors
+  - `charts.js` - Chart.js manager; datasets use `colorKey` resolved to the theme-aware brand palette
   - `tabs.js` - Tab switching with sliding indicator animation
   - `export.js` - JSON and CSV export with dropdown menu
   - `theme.js` - Dark mode toggle with localStorage persistence
@@ -64,11 +64,13 @@ The dashboard is a unified Flask application (`srcs/Backend/app.py`) combining A
   - `mobile.js` - Touch optimizations
 
 ### KU Brand Guidelines
-- Primary: `#003DA5` (KU Blue, Pantone 293C)
-- Secondary: `#6F5091` (KU Purple)
-- Accent: `#78D64B` (KU Green)
-- Font: Inter (closest free alternative to DIN Next)
-- All colors defined in `flask_config.py` and CSS variables in `main.css`
+Source of truth: `DesginGuideLine/KU_Guidelines_2020_V7.pdf`. Follow it for all frontend work.
+- Primary: `#0057B8` (KU Blue, Pantone 2935). Secondary: `#6F5091` purple, `#78D64B` green, `#F8485E` red, `#FF8F1C` orange, `#00A9CE` cyan, `#C5B9AC` warm gray; Cool Gray 2 `#D0D0CE` / Cool Gray 9 `#75787B`
+- Body text K90 (`#3C3C3B`) on white
+- Font: DIN Next (headlines Medium/Bold, sub-heads & body Regular, captions Light); Barlow is the free web fallback
+- Brandmark: full colour on light, white on dark, min 180px wide, sits in a white segment (masthead is a 2-segment layout: white brand segment + KU Blue title segment)
+- Square segments on a 12-column grid; section labels use a short 40px rule above the kicker
+- Colours defined in `flask_config.py` and as CSS tokens in `main.css` (`dark-mode.css` only overrides tokens)
 
 ## Development Commands
 
@@ -184,6 +186,11 @@ The unified dashboard (`srcs/Backend/app.py`) provides REST endpoints at `/api/`
 ### System Overview
 - `GET /api/system/overview` - Real-time system statistics and trends
 - `GET /api/health` - Health check
+
+### Actionable Insights (rules in `utils/insights.py`, tests in `tests/test_insights.py`)
+- `GET /api/insights/attention` - Ranked issues with a suggested next step (offline, disk incl. 14-day fill forecast, memory, swap, CPU oversubscription); thresholds from `PERFORMANCE_THRESHOLDS`
+- `GET /api/insights/placement` - Servers ranked by free cores (5-min load vs. logical CPUs) and free RAM
+- `GET /api/users/<username>/footprint` - One account's recorded usage across all servers (404 if unknown)
 
 ## Common Development Tasks
 

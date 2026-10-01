@@ -1,62 +1,69 @@
 /**
- * Main Stylesheet
+ * Main Stylesheet — design system
  * Khalifa University Server Monitoring Dashboard
- * Following KU Brand Guidelines 2020 V7
- * Mobile-First Responsive Design
+ *
+ * Follows KU Brand Guidelines 2020 V7 (DesginGuideLine/): official RGB
+ * palette, DIN Next typography hierarchy, 12-column grid, square segments,
+ * white segment housing the brandmark, short rule above section labels.
  */
 
 /* ========================================
-   CSS Variables - KU Brand Colors
+   Tokens — values from KU Brand Guidelines 2020 V7 (§3.01 digital RGB)
    ======================================== */
 :root {
-    /* KU Primary Colors */
-    --ku-primary: #003DA5;
-    --ku-primary-light: #1a5bc4;
-    --ku-primary-dark: #002B74;
-    --ku-secondary: #6F5091;
-    --ku-accent: #78D64B;
-    --ku-orange: #F57F29;
+    color-scheme: light;
 
-    /* Status Colors */
-    --ku-success: #003DA5;
-    --ku-warning: #F57F29;
-    --ku-danger: #E31E24;
-    --ku-info: #00A9CE;
+    /* Primary */
+    --ku-blue: #0057B8;        /* Pantone 2935 */
+    --ku-cool-gray-2: #D0D0CE; /* Pantone Cool Gray 2 */
+    --ku-cool-gray-9: #75787B; /* Pantone Cool Gray 9 */
+    /* Secondary */
+    --ku-purple: #6F5091;      /* Pantone 7677 */
+    --ku-red: #F8485E;         /* Pantone 1785 */
+    --ku-cyan: #00A9CE;        /* Pantone 312 */
+    --ku-green: #78D64B;       /* Pantone 7488 */
+    --ku-orange: #FF8F1C;      /* Pantone 1495 */
+    --ku-warm-gray: #C5B9AC;   /* Pantone 7528 */
 
-    /* Grays */
-    --ku-light-gray: #D1D3D4;
-    --ku-dark-gray: #6D6E71;
-    --ku-body-text: #231F20;
+    /* Surfaces & text — body copy is K90 per §4.02 */
+    --paper: #FFFFFF;
+    --paper-raised: #FFFFFF;
+    --paper-sunk: #F3F3F2;
+    --ink: #3C3C3B;
+    --ink-soft: #5F6164;
+    --ink-faint: var(--ku-cool-gray-9);
+    --rule: var(--ku-cool-gray-2);
+    --rule-faint: #E7E7E5;
+    --rule-strong: #3C3C3B;
 
-    /* Background Colors */
-    --bg-primary: #FFFFFF;
-    --bg-secondary: #F5F6F8;
-    --bg-tertiary: #EEF0F4;
-    --card-bg: #FFFFFF;
-    --hover-bg: #F1F3F7;
+    /* Semantic */
+    --accent: var(--ku-blue);
+    --accent-ink: #FFFFFF;
+    --accent-wash: rgba(0, 87, 184, 0.06);
+    --segment: var(--ku-blue);
+    --segment-ink: #FFFFFF;
+    --ok: var(--ku-blue);
+    --warn: var(--ku-orange);
+    --crit: var(--ku-red);
+    --idle: var(--ku-cool-gray-9);
+    --live: var(--ku-green);
 
-    /* Glassmorphism */
-    --glass-bg: rgba(255, 255, 255, 0.7);
-    --glass-border: rgba(255, 255, 255, 0.3);
-    --glass-blur: 12px;
+    /* Legacy aliases (referenced by inline styles rendered from JS) */
+    --ku-primary: var(--accent);
+    --ku-success: var(--ok);
+    --ku-warning: var(--warn);
+    --ku-danger: var(--crit);
+    --text-primary: var(--ink);
+    --text-secondary: var(--ink-soft);
+    --text-muted: var(--ink-faint);
+    --bg-tertiary: var(--paper-sunk);
+    --border-color: var(--rule);
+    --card-bg: var(--paper-raised);
 
-    /* Text Colors */
-    --text-primary: #1A1A2E;
-    --text-secondary: #64748B;
-    --text-muted: #94A3B8;
-
-    /* Border */
-    --border-color: #E2E8F0;
-    --border-radius: 16px;
-    --border-radius-sm: 10px;
-    --border-radius-xs: 6px;
-
-    /* Shadows */
-    --shadow-sm: 0 1px 3px rgba(0, 61, 165, 0.04), 0 1px 2px rgba(0, 0, 0, 0.03);
-    --shadow-md: 0 4px 16px rgba(0, 61, 165, 0.06), 0 2px 4px rgba(0, 0, 0, 0.03);
-    --shadow-lg: 0 12px 40px rgba(0, 61, 165, 0.1), 0 4px 12px rgba(0, 0, 0, 0.04);
-    --shadow-xl: 0 20px 60px rgba(0, 61, 165, 0.12), 0 8px 20px rgba(0, 0, 0, 0.06);
-    --shadow-colored: 0 4px 20px rgba(0, 61, 165, 0.15);
+    /* Type — DIN Next is the brand face (§4.01); Barlow is the free fallback */
+    --font-sans: 'DIN Next LT Pro', 'DIN Next', 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+    --font-display: var(--font-sans);
+    --font-mono: var(--font-sans);
 
     /* Spacing */
     --spacing-xs: 0.25rem;
@@ -65,216 +72,309 @@
     --spacing-lg: 1.5rem;
     --spacing-xl: 2rem;
     --spacing-2xl: 3rem;
+    --spacing-3xl: 4.5rem;
 
-    /* Typography */
-    --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    --font-size-base: 16px;
-    --font-weight-normal: 400;
-    --font-weight-medium: 500;
-    --font-weight-semibold: 600;
-    --font-weight-bold: 700;
+    /* Shape & depth — segments are square (§7.04), separation comes from rules */
+    --radius: 0;
+    --shadow-pop: 0 12px 32px -12px rgba(60, 60, 59, 0.28);
 
-    /* Transitions */
-    --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
-    --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
-    --transition-slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
-    --transition-spring: 500ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    /* Motion */
+    --ease: cubic-bezier(0.2, 0.7, 0.1, 1);
+    --transition-fast: 140ms var(--ease);
+    --transition-base: 240ms var(--ease);
+    --transition-slow: 520ms var(--ease);
 
-    /* Layout */
-    --header-height: 72px;
-    --container-max-width: 1440px;
+    /* Layout — 12-column grid (§7.01) */
+    --container-max-width: 1360px;
+    --gutter: clamp(1rem, 3.2vw, 3rem);
+    --col-gap: clamp(0.75rem, 1.6vw, 1.5rem);
 }
 
 /* ========================================
-   Base Styles - Mobile First
+   Base
    ======================================== */
-* {
+*,
+*::before,
+*::after {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
 }
 
 html {
-    font-size: var(--font-size-base);
+    font-size: 16px;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    scroll-behavior: smooth;
+    text-rendering: optimizeLegibility;
 }
 
 body {
-    font-family: var(--font-family);
-    font-weight: var(--font-weight-normal);
-    line-height: 1.6;
-    color: var(--text-primary);
-    background-color: var(--bg-secondary);
+    font-family: var(--font-sans);
+    font-size: 0.9375rem;
+    line-height: 1.55;
+    color: var(--ink);
+    background-color: var(--paper);
     min-height: 100vh;
-}
-
-/* ========================================
-   Header
-   ======================================== */
-.dashboard-header {
-    background: linear-gradient(135deg, var(--ku-primary) 0%, var(--ku-primary-dark) 100%);
-    color: white;
-    position: sticky;
-    top: 0;
-    z-index: 1000;
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border-bottom: 2px solid rgba(120, 214, 75, 0.4);
-}
-
-.header-container {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: var(--spacing-md) var(--spacing-lg);
-    max-width: var(--container-max-width);
-    margin: 0 auto;
-    gap: var(--spacing-md);
-    flex-wrap: wrap;
-}
-
-.header-left {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-md);
-}
-
-.ku-logo {
-    height: 40px;
-    width: auto;
-    filter: brightness(0) invert(1);
-    transition: transform var(--transition-base);
-}
-
-.ku-logo:hover {
-    transform: scale(1.05);
-}
-
-.header-title h1 {
-    font-size: 1.125rem;
-    font-weight: var(--font-weight-bold);
-    margin: 0;
-    letter-spacing: -0.01em;
-}
-
-.header-right {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-md);
-}
-
-.theme-toggle-btn {
-    background: rgba(255, 255, 255, 0.12);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    color: white;
-    width: 40px;
-    height: 40px;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all var(--transition-base);
-    font-size: 1rem;
-}
-
-.theme-toggle-btn:hover {
-    background: rgba(255, 255, 255, 0.22);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-}
-
-.theme-toggle-btn .fa-sun {
-    display: block;
-}
-
-.theme-toggle-btn .fa-moon {
-    display: none;
-}
-
-[data-theme="dark"] .theme-toggle-btn .fa-sun {
-    display: none;
-}
-
-[data-theme="dark"] .theme-toggle-btn .fa-moon {
-    display: block;
-}
-
-.system-time {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-    font-size: 0.8125rem;
-    white-space: nowrap;
-    opacity: 0.85;
     font-variant-numeric: tabular-nums;
 }
 
+::selection {
+    background: var(--accent);
+    color: var(--accent-ink);
+}
+
+:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+img { max-width: 100%; }
+
+[hidden] { display: none !important; }
+
+.wrap {
+    max-width: var(--container-max-width);
+    margin: 0 auto;
+    padding-inline: var(--gutter);
+}
+
+/* Shared micro-typography */
+.kicker {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+}
+
+.figure {
+    font-family: var(--font-display);
+    font-variant-numeric: lining-nums tabular-nums;
+    font-optical-sizing: auto;
+}
+
 /* ========================================
-   Main Container
+   Masthead — 2-segment layout (§7.04):
+   white segment houses the brandmark, KU Blue segment carries the title
+   ======================================== */
+.masthead {
+    padding-top: var(--gutter);
+}
+
+.masthead-grid {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    column-gap: var(--col-gap);
+}
+
+.segment-brand {
+    grid-column: span 3;
+    display: flex;
+    align-items: center;
+    background: var(--paper);
+    /* clearspace: 2X around the mark (§2.06) */
+    padding: clamp(1rem, 2vw, 1.75rem) clamp(1rem, 2vw, 1.75rem) clamp(1rem, 2vw, 1.75rem) 0;
+    min-height: 168px;
+}
+
+.ku-logo {
+    width: 180px;              /* digital minimum size (§2.06) */
+    max-width: none;
+    height: auto;
+    display: block;
+}
+
+.segment-title {
+    grid-column: span 9;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: var(--spacing-lg);
+    padding: clamp(1rem, 2vw, 1.5rem) clamp(1.25rem, 2.6vw, 2.25rem) clamp(1.25rem, 2.4vw, 2rem);
+    background: var(--segment);
+    color: var(--segment-ink);
+    position: relative;
+    overflow: hidden;
+}
+
+.segment-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.5rem;
+    font-size: 0.8125rem;
+    font-weight: 400;
+    letter-spacing: 0.02em;
+}
+
+.segment-meta .strip-spacer { flex: 1; }
+
+.strip-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    white-space: nowrap;
+}
+
+.system-time {
+    font-variant-numeric: tabular-nums;
+    opacity: 0.9;
+}
+
+.live-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--live);
+    animation: livePulse 2.4s var(--ease) infinite;
+}
+
+@keyframes livePulse {
+    0%   { box-shadow: 0 0 0 0 rgba(120, 214, 75, 0.6); }
+    70%  { box-shadow: 0 0 0 8px rgba(120, 214, 75, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(120, 214, 75, 0); }
+}
+
+.theme-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: none;
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    padding: 0.3rem 0.75rem;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+    transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.theme-toggle-btn:hover {
+    background: var(--segment-ink);
+    color: var(--segment);
+}
+
+.theme-toggle-btn:focus-visible { outline-color: var(--segment-ink); }
+
+.theme-toggle-btn .fa-sun,
+.theme-toggle-btn .label-light { display: none; }
+.theme-toggle-btn .fa-moon,
+.theme-toggle-btn .label-dark { display: inline; }
+
+[data-theme="dark"] .theme-toggle-btn .fa-sun,
+[data-theme="dark"] .theme-toggle-btn .label-light { display: inline; }
+[data-theme="dark"] .theme-toggle-btn .fa-moon,
+[data-theme="dark"] .theme-toggle-btn .label-dark { display: none; }
+
+.masthead-title .kicker {
+    color: inherit;
+    opacity: 0.85;
+    margin-bottom: 0.5rem;
+}
+
+/* Headline: DIN Next Medium, leading = size + 2pt (§4.02) */
+.masthead-title h1 {
+    font-weight: 500;
+    font-size: clamp(2rem, 4.6vw, 3.75rem);
+    line-height: 1.04;
+    letter-spacing: -0.01em;
+}
+
+.masthead-title h1 span {
+    font-weight: 300;
+}
+
+@media (max-width: 899px) {
+    .segment-brand { grid-column: 1 / -1; min-height: 0; }
+    .segment-title { grid-column: 1 / -1; }
+}
+
+/* ========================================
+   Main container
    ======================================== */
 .dashboard-container {
     max-width: var(--container-max-width);
     margin: 0 auto;
-    padding: var(--spacing-md);
+    padding: 0 var(--gutter);
 }
 
 /* ========================================
-   Cards
+   Section heads (one per tab panel)
    ======================================== */
-.card {
-    background: var(--card-bg);
-    border-radius: var(--border-radius);
-    border: 1px solid var(--border-color);
-    box-shadow: var(--shadow-sm);
-    margin-bottom: var(--spacing-lg);
-    overflow: hidden;
-    transition: box-shadow var(--transition-base), transform var(--transition-base);
+.section-head {
+    padding-block: var(--spacing-2xl) var(--spacing-lg);
+    border-bottom: 1px solid var(--rule-strong);
+    margin-bottom: var(--spacing-xl);
 }
 
-.card:hover {
-    box-shadow: var(--shadow-md);
+/* Section label with the short leading rule used throughout the guidelines */
+.kicker-rule::before,
+.section-head .kicker::before {
+    content: '';
+    display: block;
+    width: 40px;
+    height: 2px;
+    background: currentColor;
+    margin-bottom: 0.75rem;
 }
 
-.card-header {
-    padding: var(--spacing-lg) var(--spacing-xl);
-    border-bottom: 1px solid var(--border-color);
+.section-head .kicker {
+    color: var(--accent);
+    font-weight: 500;
+    margin-bottom: 0.6rem;
 }
 
-.card-title {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-    font-size: 1.125rem;
-    font-weight: var(--font-weight-semibold);
-    color: var(--text-primary);
-    margin-bottom: 0;
+/* Sub headline: DIN Next Regular (§4.02), set in KU Blue */
+.section-head h2 {
+    font-weight: 400;
+    font-size: clamp(1.75rem, 3.2vw, 2.625rem);
+    line-height: 1.06;
     letter-spacing: -0.01em;
+    color: var(--accent);
 }
 
-.card-title i {
-    width: 32px;
-    height: 32px;
+.section-deck {
+    font-weight: 400;
+    font-size: 1.125rem;
+    line-height: 1.45;
+    color: var(--ink-soft);
+    max-width: 62ch;
+    margin-top: 0.5rem;
+}
+
+/* Sub-section title inside a panel */
+.section-title {
     display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 8px;
-    background: linear-gradient(135deg, rgba(0, 61, 165, 0.1), rgba(0, 61, 165, 0.05));
-    color: var(--ku-primary);
-    font-size: 0.875rem;
+    align-items: baseline;
+    gap: 0.75rem;
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 1.375rem;
+    letter-spacing: -0.01em;
+    padding-bottom: 0.6rem;
+    margin: var(--spacing-2xl) 0 var(--spacing-lg);
+    border-bottom: 1px solid var(--rule);
 }
 
-.card-subtitle {
-    color: var(--text-secondary);
-    font-size: 0.8125rem;
-    margin-top: var(--spacing-xs);
+.section-title .kicker { font-size: 0.6875rem; }
+
+/* Lede paragraph */
+.lede {
+    font-family: var(--font-display);
+    font-size: clamp(1.125rem, 1.8vw, 1.375rem);
+    line-height: 1.45;
+    color: var(--ink);
+    max-width: 68ch;
+    margin-bottom: var(--spacing-xl);
 }
 
-.card-body {
-    padding: var(--spacing-lg);
+.lede strong {
+    font-weight: 600;
 }
+
+.lede .lede-warn { color: #C66A00; }
+[data-theme="dark"] .lede .lede-warn { color: var(--warn); }
+.lede .lede-crit { color: var(--crit); }
 
 /* ========================================
    Buttons
@@ -282,49 +382,52 @@ body {
 .btn {
     display: inline-flex;
     align-items: center;
-    gap: var(--spacing-sm);
-    padding: 0.625rem 1.25rem;
-    font-size: 0.875rem;
-    font-weight: var(--font-weight-medium);
+    gap: 0.55rem;
+    padding: 0.6rem 1.05rem;
+    font-family: var(--font-sans);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
     text-decoration: none;
-    border: none;
-    border-radius: var(--border-radius-sm);
+    border: 1px solid transparent;
+    border-radius: var(--radius);
     cursor: pointer;
-    transition: all var(--transition-base);
     white-space: nowrap;
-    position: relative;
-    overflow: hidden;
+    transition: background-color var(--transition-fast),
+                color var(--transition-fast),
+                border-color var(--transition-fast);
 }
 
+.btn i { font-size: 0.75rem; }
+
 .btn-primary {
-    background: linear-gradient(135deg, var(--ku-primary) 0%, var(--ku-primary-dark) 100%);
-    color: white;
-    box-shadow: 0 2px 8px rgba(0, 61, 165, 0.25);
+    background: var(--ink);
+    color: var(--paper);
 }
 
 .btn-primary:hover {
-    background: linear-gradient(135deg, var(--ku-primary-light) 0%, var(--ku-primary) 100%);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 16px rgba(0, 61, 165, 0.3);
+    background: var(--accent);
+    color: var(--accent-ink);
 }
 
 .btn-secondary {
-    background: var(--bg-tertiary);
-    color: var(--text-primary);
-    border: 1px solid var(--border-color);
+    background: transparent;
+    color: var(--ink);
+    border-color: var(--ink);
 }
 
 .btn-secondary:hover {
-    background: var(--hover-bg);
-    border-color: var(--ku-primary);
-    color: var(--ku-primary);
+    background: var(--ink);
+    color: var(--paper);
 }
 
-.btn:active {
-    transform: translateY(0);
+.btn.spinning i.fa-sync-alt {
+    animation: spin 0.8s linear infinite;
 }
 
-/* Export dropdown */
+/* ========================================
+   Export dropdown
+   ======================================== */
 .export-dropdown {
     position: relative;
     display: inline-block;
@@ -333,18 +436,18 @@ body {
 .export-menu {
     position: absolute;
     bottom: calc(100% + 8px);
-    right: 0;
-    background: var(--card-bg);
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius-sm);
-    box-shadow: var(--shadow-lg);
-    min-width: 180px;
-    padding: var(--spacing-xs);
+    left: 0;
+    min-width: 200px;
+    background: var(--paper-raised);
+    border: 1px solid var(--ink);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-pop);
+    padding: 0.25rem 0;
     z-index: 100;
     opacity: 0;
     visibility: hidden;
-    transform: translateY(8px);
-    transition: all var(--transition-base);
+    transform: translateY(6px);
+    transition: opacity var(--transition-base), transform var(--transition-base), visibility var(--transition-base);
 }
 
 .export-menu.show {
@@ -356,45 +459,41 @@ body {
 .export-menu-item {
     display: flex;
     align-items: center;
-    gap: var(--spacing-sm);
-    padding: 0.625rem 0.875rem;
-    font-size: 0.875rem;
-    color: var(--text-primary);
+    gap: 0.75rem;
+    width: 100%;
+    padding: 0.6rem 1rem;
+    font: 500 0.8125rem var(--font-sans);
+    color: var(--ink);
     background: none;
     border: none;
-    border-radius: var(--border-radius-xs);
-    cursor: pointer;
-    width: 100%;
     text-align: left;
-    transition: background var(--transition-fast);
+    cursor: pointer;
+}
+
+.export-menu-item + .export-menu-item {
+    border-top: 1px solid var(--rule-faint);
 }
 
 .export-menu-item:hover {
-    background: var(--hover-bg);
+    background: var(--accent-wash);
+    color: var(--accent);
 }
 
 .export-menu-item i {
-    width: 20px;
-    color: var(--text-secondary);
+    width: 16px;
+    color: var(--ink-faint);
 }
+
+.export-menu-item:hover i { color: var(--accent); }
 
 /* ========================================
-   Loading States
+   Loading & empty states
    ======================================== */
-.loading-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: var(--spacing-2xl);
-    gap: var(--spacing-md);
-}
-
 .spinner {
-    width: 40px;
-    height: 40px;
-    border: 3px solid var(--border-color);
-    border-top-color: var(--ku-primary);
+    width: 28px;
+    height: 28px;
+    border: 1.5px solid var(--rule);
+    border-top-color: var(--ink);
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
 }
@@ -403,48 +502,52 @@ body {
     to { transform: rotate(360deg); }
 }
 
-/* ========================================
-   Empty States
-   ======================================== */
 .empty-state {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: var(--spacing-2xl);
+    gap: 0.5rem;
+    padding: var(--spacing-3xl) var(--spacing-lg);
     text-align: center;
-    color: var(--text-secondary);
+    color: var(--ink-soft);
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
 }
 
 .empty-state i {
-    color: var(--ku-light-gray);
-    margin-bottom: var(--spacing-lg);
+    font-size: 1.5rem !important;
+    color: var(--ink-faint);
+    margin-bottom: 0.5rem;
 }
 
 .empty-state h3 {
-    color: var(--text-primary);
-    margin-bottom: var(--spacing-sm);
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: 1.75rem;
+    color: var(--ink);
 }
 
-.empty-state .btn {
-    margin-top: var(--spacing-lg);
+.empty-state p {
+    font-family: var(--font-display);
+    font-size: 1.0625rem;
 }
+
+.empty-state .btn { margin-top: var(--spacing-md); }
 
 /* ========================================
-   Footer
+   Footer / colophon
    ======================================== */
 .dashboard-footer {
-    background: var(--card-bg);
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius);
-    margin: var(--spacing-xl) 0;
-    padding: var(--spacing-md) var(--spacing-lg);
+    margin-top: var(--spacing-3xl);
+    padding: var(--spacing-lg) 0 var(--spacing-2xl);
+    border-top: 2px solid var(--rule-strong);
 }
 
 .footer-controls {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--spacing-md);
+    gap: var(--spacing-md) var(--spacing-xl);
     align-items: center;
     justify-content: space-between;
 }
@@ -452,66 +555,83 @@ body {
 .footer-left {
     display: flex;
     align-items: center;
-    gap: var(--spacing-md);
+    gap: var(--spacing-sm);
     flex-wrap: wrap;
 }
 
-.last-updated {
+.footer-meta {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
+    gap: 0.4rem 1.25rem;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    font-variant-numeric: tabular-nums;
+}
+
+.last-updated {
+    color: var(--ink-soft);
+}
+
+.colophon {
+    margin-top: var(--spacing-lg);
+    font-family: var(--font-display);
+    font-size: 0.875rem;
+    color: var(--ink-faint);
+}
+
+/* ========================================
+   Error pages
+   ======================================== */
+.error-page {
+    min-height: 60vh;
+    display: grid;
+    place-items: center;
+    padding: var(--spacing-3xl) 0;
+}
+
+.error-content {
+    max-width: 560px;
+    text-align: left;
+}
+
+.error-content .kicker { color: var(--crit); font-weight: 500; }
+
+.error-content h1 {
+    font-family: var(--font-display);
+    font-weight: 300;
+    color: var(--accent);
+    font-size: clamp(5rem, 14vw, 9rem);
+    line-height: 0.9;
+    letter-spacing: -0.01em;
+    font-variant-numeric: lining-nums;
+    margin: 0.5rem 0;
+}
+
+.error-content h2 {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: 1.75rem;
+}
+
+.error-content p {
+    font-family: var(--font-display);
+    font-size: 1.125rem;
+    color: var(--ink-soft);
+    margin: 0.5rem 0 var(--spacing-xl);
+}
+
+.error-actions {
+    display: flex;
     gap: var(--spacing-sm);
-    font-size: 0.8125rem;
-    color: var(--text-secondary);
-    font-variant-numeric: tabular-nums;
-}
-
-.refresh-countdown {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    font-variant-numeric: tabular-nums;
+    flex-wrap: wrap;
 }
 
 /* ========================================
-   Tablet Breakpoint (768px and up)
-   ======================================== */
-@media (min-width: 768px) {
-    .dashboard-container {
-        padding: var(--spacing-xl);
-    }
-
-    .header-container {
-        padding: var(--spacing-md) var(--spacing-xl);
-        flex-wrap: nowrap;
-    }
-
-    .header-title h1 {
-        font-size: 1.375rem;
-    }
-
-    .ku-logo {
-        height: 44px;
-    }
-
-    .card-body {
-        padding: var(--spacing-xl);
-    }
-}
-
-/* ========================================
-   Desktop Breakpoint (1024px and up)
-   ======================================== */
-@media (min-width: 1024px) {
-    .dashboard-container {
-        padding: var(--spacing-xl) var(--spacing-2xl);
-    }
-
-    .header-title h1 {
-        font-size: 1.5rem;
-    }
-}
-
-/* ========================================
-   Utility Classes
+   Utilities
    ======================================== */
 .text-center { text-align: center; }
 .text-right { text-align: right; }

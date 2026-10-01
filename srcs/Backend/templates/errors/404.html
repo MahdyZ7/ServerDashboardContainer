@@ -5,58 +5,16 @@
 {% block content %}
 <div class="error-page">
     <div class="error-content">
-        <div class="error-icon">
-            <i class="fas fa-exclamation-triangle"></i>
-        </div>
+        <p class="kicker kicker-rule">Error</p>
         <h1>404</h1>
-        <h2>Page Not Found</h2>
+        <h2>Page not found</h2>
         <p>The page you're looking for doesn't exist or has been moved.</p>
-        <a href="/" class="btn btn-primary">
-            <i class="fas fa-home"></i>
-            Return to Dashboard
-        </a>
+        <div class="error-actions">
+            <a href="/" class="btn btn-primary">
+                <i class="fas fa-arrow-left" aria-hidden="true"></i>
+                Return to dashboard
+            </a>
+        </div>
     </div>
 </div>
-
-<style>
-.error-page {
-    min-height: 60vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 2rem;
-}
-
-.error-content {
-    text-align: center;
-    max-width: 600px;
-}
-
-.error-icon {
-    font-size: 5rem;
-    color: {{ KU_COLORS.warning }};
-    margin-bottom: 1rem;
-}
-
-.error-content h1 {
-    font-size: 6rem;
-    font-weight: 800;
-    color: {{ KU_COLORS.primary }};
-    margin: 0;
-    line-height: 1;
-}
-
-.error-content h2 {
-    font-size: 2rem;
-    font-weight: 600;
-    color: {{ KU_COLORS.text_primary }};
-    margin: 1rem 0;
-}
-
-.error-content p {
-    font-size: 1.125rem;
-    color: {{ KU_COLORS.text_secondary }};
-    margin-bottom: 2rem;
-}
-</style>
 {% endblock %}
