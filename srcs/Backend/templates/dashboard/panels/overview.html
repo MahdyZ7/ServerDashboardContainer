@@ -10,6 +10,35 @@
 
     <p class="lede" id="overview-lede" aria-live="polite"></p>
 
+    <!-- Action band: what needs fixing (admins) and where to run (users) -->
+    <div class="action-band">
+        <section class="action-panel attention-panel" aria-labelledby="attention-heading">
+            <header class="action-head">
+                <p class="kicker">For administrators</p>
+                <h3 id="attention-heading">Needs attention</h3>
+                <span class="attention-counts" id="attention-counts" aria-live="polite"></span>
+            </header>
+            <ol class="attention-list" id="attention-list" aria-live="polite">
+                <li class="skeleton" style="min-height: 72px;"></li>
+                <li class="skeleton" style="min-height: 72px;"></li>
+            </ol>
+        </section>
+
+        <section class="action-panel placement-panel" aria-labelledby="placement-heading">
+            <header class="action-head">
+                <p class="kicker">For users</p>
+                <h3 id="placement-heading">Where to run a new job</h3>
+            </header>
+            <ol class="placement-list" id="placement-list">
+                <li class="skeleton" style="min-height: 56px;"></li>
+                <li class="skeleton" style="min-height: 56px;"></li>
+            </ol>
+            <p class="action-note">Ranked by spare cores (5-minute load vs. logical CPUs) and free memory, relative to the roomiest server.</p>
+        </section>
+    </div>
+
+    <h3 class="section-title"><span class="kicker">01.1</span>All servers</h3>
+
     <!-- Loading State - Skeleton Cards -->
     <div id="overview-loading" class="server-grid">
         {% for i in range(4) %}

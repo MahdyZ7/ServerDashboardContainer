@@ -38,12 +38,16 @@
             });
 
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                const httpError = new Error(`HTTP error! status: ${response.status}`);
+                httpError.status = response.status;
+                throw httpError;
             }
 
             return await response.json();
 
         } catch (error) {
+            // Client errors (e.g. 404 unknown user) will not succeed on retry
+            if (error.status && error.status < 500) throw error;
             if (retries > 0) {
                 const attempt = MAX_RETRIES - retries + 1;
                 const delay = BASE_DELAY * Math.pow(2, attempt - 1);
@@ -87,6 +91,18 @@
 
         async getSystemOverview() {
             return fetchWithRetry(`${API_BASE}/system/overview`);
+        },
+
+        async getAttentionItems() {
+            return fetchWithRetry(`${API_BASE}/insights/attention`);
+        },
+
+        async getPlacement() {
+            return fetchWithRetry(`${API_BASE}/insights/placement`);
+        },
+
+        async getUserFootprint(username) {
+            return fetchWithRetry(`${API_BASE}/users/${encodeURIComponent(username)}/footprint`);
         },
 
         async getServerHealth(serverName) {

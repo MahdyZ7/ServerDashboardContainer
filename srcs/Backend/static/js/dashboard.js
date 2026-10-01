@@ -186,26 +186,36 @@
     /**
      * Build a plain-English summary of fleet health for the overview lede
      */
+    // Lede combines connectivity (from latest metrics) with the attention queue
+    const ledeState = { total: null, reporting: null, issues: null };
+
     function renderOverviewLede(servers) {
+        const stale = servers.filter(s => getServerStatus(s).class === 'status-offline').length;
+        ledeState.total = servers.length;
+        ledeState.reporting = servers.length - stale;
+        updateLede();
+    }
+
+    function updateLede() {
         const lede = document.getElementById('overview-lede');
-        if (!lede) return;
+        if (!lede || ledeState.total === null) return;
 
-        const counts = { online: 0, warning: 0, offline: 0 };
-        servers.forEach(s => {
-            const st = getServerStatus(s).class;
-            if (st === 'status-warning') counts.warning++;
-            else if (st === 'status-offline') counts.offline++;
-            else counts.online++;
-        });
+        const { total, reporting, issues } = ledeState;
+        let text = reporting === total
+            ? `All <strong>${total}</strong> servers are reporting`
+            : `<strong>${reporting} of ${total}</strong> servers are reporting; <strong class="lede-crit">${total - reporting}</strong> ${total - reporting === 1 ? 'has' : 'have'} gone quiet`;
 
-        const total = servers.length;
-        const parts = [`<strong>${counts.online} of ${total}</strong> servers are reporting normally`];
-        if (counts.warning) parts.push(`<strong class="lede-warn">${counts.warning}</strong> ${counts.warning === 1 ? 'needs' : 'need'} attention`);
-        if (counts.offline) parts.push(`<strong class="lede-crit">${counts.offline}</strong> ${counts.offline === 1 ? 'has' : 'have'} stopped reporting`);
-
-        lede.innerHTML = parts.length === 1
-            ? `${parts[0]}.`
-            : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}.`;
+        if (issues) {
+            const parts = [];
+            if (issues.critical) parts.push(`<strong class="lede-crit">${issues.critical} critical</strong>`);
+            if (issues.warning) parts.push(`<strong class="lede-warn">${issues.warning} ${issues.warning === 1 ? 'warning' : 'warnings'}</strong>`);
+            text += parts.length
+                ? `, with ${parts.join(' and ')} below.`
+                : ', and nothing needs attention.';
+        } else {
+            text += '.';
+        }
+        lede.innerHTML = text;
     }
 
     /**
@@ -223,6 +233,7 @@
             container.hidden = true;
             if (empty) empty.hidden = true;
 
+            loadActionBand();
             const response = await API.getLatestMetrics();
 
             if (!response.success || !response.data || response.data.length === 0) {
@@ -254,6 +265,197 @@
             Toast.error('Failed to load server metrics');
         }
     }
+
+    /**
+     * Load the overview action band: attention queue (admins) + placement (users)
+     */
+    async function loadActionBand() {
+        await Promise.all([loadAttention(), loadPlacement()]);
+    }
+
+    async function loadAttention() {
+        const list = document.getElementById('attention-list');
+        const counts = document.getElementById('attention-counts');
+        if (!list) return;
+
+        try {
+            const response = await API.getAttentionItems();
+            if (!response.success) throw new Error(response.error || 'Bad response');
+            const items = response.data || [];
+
+            const tally = { critical: 0, warning: 0, info: 0 };
+            items.forEach(i => { tally[i.severity] = (tally[i.severity] || 0) + 1; });
+            ledeState.issues = tally;
+            updateLede();
+            if (counts) {
+                counts.innerHTML = ['critical', 'warning', 'info']
+                    .filter(k => tally[k])
+                    .map(k => `<span class="count-chip sev-${k}">${tally[k]} ${k}</span>`)
+                    .join('');
+            }
+
+            if (items.length === 0) {
+                list.innerHTML = `
+                    <li class="attention-clear">
+                        <strong>Nothing needs attention.</strong>
+                        Every reporting server is within its disk, memory and CPU thresholds.
+                    </li>`;
+                return;
+            }
+
+            list.innerHTML = items.map((item, i) => `
+                <li class="attention-item sev-${escapeHtml(item.severity)}" style="--i:${i}">
+                    <div class="attention-meta">
+                        <span class="sev-label">${escapeHtml(item.severity)}</span>
+                        <span class="attention-cat">${escapeHtml(item.category)}</span>
+                    </div>
+                    <div class="attention-body">
+                        <p class="attention-title">${escapeHtml(item.title)}</p>
+                        <p class="attention-detail">${escapeHtml(item.detail)}</p>
+                        <p class="attention-action"><span>Next step</span>${escapeHtml(item.action)}</p>
+                    </div>
+                </li>`).join('');
+        } catch (error) {
+            console.error('Error loading attention items:', error);
+            list.innerHTML = `
+                <li class="attention-clear">
+                    Could not load the attention queue.
+                    <button class="btn btn-secondary" onclick="loadActionBand()">Retry</button>
+                </li>`;
+        }
+    }
+
+    async function loadPlacement() {
+        const list = document.getElementById('placement-list');
+        if (!list) return;
+
+        try {
+            const response = await API.getPlacement();
+            if (!response.success) throw new Error(response.error || 'Bad response');
+            const servers = response.data || [];
+
+            const badge = {
+                both: 'Best for CPU &amp; memory',
+                cpu: 'Most free cores',
+                memory: 'Most free memory'
+            };
+
+            list.innerHTML = servers.map((s, i) => `
+                <li class="placement-item ${s.available ? '' : 'is-unavailable'}" style="--i:${i}">
+                    <span class="placement-rank">${s.available ? String(i + 1).padStart(2, '0') : '—'}</span>
+                    <div class="placement-main">
+                        <div class="placement-name">
+                            ${escapeHtml(s.server_name)}
+                            ${s.best_for ? `<span class="placement-badge">${badge[s.best_for]}</span>` : ''}
+                            ${s.available ? '' : '<span class="placement-badge is-off">Unavailable</span>'}
+                        </div>
+                        <div class="placement-facts">
+                            <span><strong>${s.free_cores}</strong> of ${s.virtual_cpus} cores free</span>
+                            <span><strong>${s.free_ram_gb ?? '?'} GB</strong> of ${s.ram_total_gb ?? '?'} GB RAM free</span>
+                            <span>${s.sessions} session${s.sessions === 1 ? '' : 's'}</span>
+                        </div>
+                        <div class="placement-bar" aria-hidden="true"><i style="width:${s.score}%"></i></div>
+                    </div>
+                    <span class="placement-score" title="Headroom score">${s.available ? s.score : ''}</span>
+                </li>`).join('');
+        } catch (error) {
+            console.error('Error loading placement:', error);
+            list.innerHTML = `<li class="attention-clear">Could not rank servers right now.</li>`;
+        }
+    }
+
+    /**
+     * "Look up your usage" — one user's footprint across servers
+     */
+    let footprintBound = false;
+
+    function setupFootprintLookup(users) {
+        const form = document.getElementById('footprint-form');
+        const input = document.getElementById('footprint-username');
+        const datalist = document.getElementById('footprint-usernames');
+        if (!form || !input) return;
+
+        if (datalist) {
+            const names = [...new Set(users.map(u => u.username).filter(Boolean))].sort();
+            datalist.innerHTML = names.map(n => `<option value="${escapeHtml(n)}"></option>`).join('');
+        }
+
+        if (footprintBound) return;
+        footprintBound = true;
+
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const name = input.value.trim();
+            if (name) lookupFootprint(name);
+        });
+
+        // Deep link: /?tab=users&user=alice
+        const initial = new URLSearchParams(window.location.search).get('user');
+        if (initial) {
+            input.value = initial;
+            lookupFootprint(initial);
+        }
+    }
+
+    async function lookupFootprint(username) {
+        const result = document.getElementById('footprint-result');
+        if (!result) return;
+        result.innerHTML = '<div class="spinner" style="margin: 1rem 0;"></div>';
+
+        const url = new URL(window.location);
+        url.searchParams.set('user', username);
+        window.history.replaceState({}, '', url);
+
+        let response;
+        try {
+            response = await API.getUserFootprint(username);
+        } catch (error) {
+            // A 404 surfaces here as an HTTP error after retries
+            result.innerHTML = `
+                <p class="footprint-empty">No records found for <strong>${escapeHtml(username)}</strong>.
+                Check the spelling, or the account may not have run anything on a monitored server.</p>`;
+            return;
+        }
+
+        const d = response.data;
+        const rows = d.servers.map(s => `
+            <tr>
+                <td class="cell-server">${escapeHtml(s.server_name)}</td>
+                <td class="cell-numeric">${(s.disk ?? 0).toFixed(1)} GB</td>
+                <td class="cell-numeric">${s.process_count ?? 0}</td>
+                <td class="cell-truncate" title="${escapeHtml(s.top_process || '')}">${escapeHtml(s.top_process || '—')}</td>
+                <td class="cell-numeric">${(s.mem ?? 0).toFixed(1)}%</td>
+                <td class="cell-muted">${formatUserTimestamp(s.last_login)}</td>
+                <td class="cell-muted">${formatUserTimestamp(s.timestamp)}</td>
+            </tr>`).join('');
+
+        result.innerHTML = `
+            <div class="footprint-card">
+                <div class="footprint-summary">
+                    <div class="fig"><span class="fig-value">${escapeHtml(d.username)}</span><span class="fig-label">${escapeHtml(d.full_name || 'Account')}</span></div>
+                    <div class="fig"><span class="fig-value">${d.servers.length}</span><span class="fig-label">Servers used</span></div>
+                    <div class="fig"><span class="fig-value">${d.total_disk_gb}<small> GB</small></span><span class="fig-label">Disk across servers</span></div>
+                    <div class="fig"><span class="fig-value">${d.total_processes}</span><span class="fig-label">Processes</span></div>
+                </div>
+                <div class="table-wrapper">
+                    <table class="data-table">
+                        <thead><tr>
+                            <th scope="col">Server</th>
+                            <th scope="col" class="col-numeric">Disk</th>
+                            <th scope="col" class="col-numeric">Procs</th>
+                            <th scope="col">Top process</th>
+                            <th scope="col" class="col-numeric">Memory</th>
+                            <th scope="col">Last login</th>
+                            <th scope="col">Recorded</th>
+                        </tr></thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                </div>
+                <p class="action-note">Disk is measured once a day; "Recorded" is when this account was first seen on that server.</p>
+            </div>`;
+    }
+
+    window.loadActionBand = loadActionBand;
 
     /**
      * Format bytes into human-readable string (KB, MB, GB, TB)
@@ -572,6 +774,7 @@
 
             renderUsersTable(users);
             setupUserTableFilters(users);
+            setupFootprintLookup(users);
 
             // Set initial result count
             const countEl = document.getElementById('users-result-count');
@@ -642,12 +845,20 @@
         }).join('');
     }
 
-    function setupUserTableFilters(allUsers) {
+    let userFiltersBound = false;
+    let allUsersCache = [];
+
+    function setupUserTableFilters(users) {
+        allUsersCache = users;
+        if (userFiltersBound) return;
+        userFiltersBound = true;
+
         const searchBox = document.getElementById('user-search');
         const serverFilter = document.getElementById('server-filter');
         const sortBy = document.getElementById('sort-by');
 
         function applyFilters() {
+            const allUsers = allUsersCache;
             let filteredUsers = allUsers;
 
             if (serverFilter && serverFilter.value) {
@@ -694,9 +905,12 @@
         if (!timestamp) return 'N/A';
         try {
             const date = new Date(timestamp);
-            return date.toLocaleString('en-US', {
-                year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-            });
+            if (isNaN(date)) return 'N/A';
+            // Logins are recorded as dates only; a midnight time carries no information
+            const dateOnly = date.getHours() === 0 && date.getMinutes() === 0;
+            return date.toLocaleString('en-US', dateOnly
+                ? { year: 'numeric', month: 'short', day: 'numeric' }
+                : { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
         } catch {
             return 'N/A';
         }

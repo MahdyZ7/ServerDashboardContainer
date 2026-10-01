@@ -187,6 +187,11 @@ The unified dashboard (`srcs/Backend/app.py`) provides REST endpoints at `/api/`
 - `GET /api/system/overview` - Real-time system statistics and trends
 - `GET /api/health` - Health check
 
+### Actionable Insights (rules in `utils/insights.py`, tests in `tests/test_insights.py`)
+- `GET /api/insights/attention` - Ranked issues with a suggested next step (offline, disk incl. 14-day fill forecast, memory, swap, CPU oversubscription); thresholds from `PERFORMANCE_THRESHOLDS`
+- `GET /api/insights/placement` - Servers ranked by free cores (5-min load vs. logical CPUs) and free RAM
+- `GET /api/users/<username>/footprint` - One account's recorded usage across all servers (404 if unknown)
+
 ## Common Development Tasks
 
 ### Adding a New Dashboard Component

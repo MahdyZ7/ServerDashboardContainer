@@ -8,6 +8,27 @@
         </div>
     </header>
 
+    <!-- My usage lookup -->
+    <section class="footprint" aria-labelledby="footprint-heading">
+        <form class="footprint-form" id="footprint-form" role="search">
+            <div>
+                <p class="kicker">For users</p>
+                <h3 id="footprint-heading">Look up your usage</h3>
+            </div>
+            <div class="search-box footprint-input">
+                <i class="fas fa-user" aria-hidden="true"></i>
+                <input type="text" id="footprint-username" list="footprint-usernames"
+                       placeholder="Your username" autocomplete="off" spellcheck="false"
+                       aria-label="Username to look up">
+                <datalist id="footprint-usernames"></datalist>
+            </div>
+            <button class="btn btn-primary" type="submit">Show my usage</button>
+        </form>
+        <div id="footprint-result" aria-live="polite"></div>
+    </section>
+
+    <h3 class="section-title"><span class="kicker">03.1</span>All accounts</h3>
+
     <!-- Search and Filter Controls -->
     <div class="table-controls" role="search">
         <div class="search-box">

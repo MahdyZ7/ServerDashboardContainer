@@ -477,3 +477,317 @@
    Network ledger extras
    ======================================== */
 .network-details { margin-top: var(--spacing-xl); }
+
+/* ========================================
+   Action band (Overview): attention queue + where to run
+   12-column split: 7 / 5
+   ======================================== */
+.action-band {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: var(--spacing-xl) var(--col-gap);
+    margin-bottom: var(--spacing-lg);
+}
+
+.attention-panel { grid-column: span 7; }
+.placement-panel { grid-column: span 5; }
+
+@media (max-width: 1023px) {
+    .attention-panel,
+    .placement-panel { grid-column: 1 / -1; }
+}
+
+.action-panel {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.action-head {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: end;
+    gap: 0.25rem var(--spacing-md);
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid var(--rule-strong);
+}
+
+.action-head .kicker {
+    grid-column: 1 / -1;
+    color: var(--accent);
+    font-weight: 500;
+}
+
+.action-head h3 {
+    font-weight: 500;
+    font-size: 1.5rem;
+    line-height: 1.1;
+}
+
+.attention-counts {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.count-chip {
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0.15rem 0.5rem;
+    color: #FFFFFF;
+    background: var(--idle);
+}
+
+.count-chip.sev-critical { background: var(--crit); }
+.count-chip.sev-warning  { background: var(--warn); color: #3C3C3B; }
+.count-chip.sev-info     { background: var(--ku-cyan); }
+
+.attention-list,
+.placement-list {
+    list-style: none;
+}
+
+.attention-list > li.skeleton,
+.placement-list > li.skeleton {
+    margin-top: 0.75rem;
+}
+
+/* Attention item: severity rule on the left, decision text on the right */
+.attention-item {
+    --sev: var(--idle);
+    display: grid;
+    grid-template-columns: 6.5rem minmax(0, 1fr);
+    gap: var(--spacing-md);
+    padding: var(--spacing-md) 0 var(--spacing-md) var(--spacing-md);
+    border-bottom: 1px solid var(--rule);
+    border-left: 4px solid var(--sev);
+    animation: entryIn 520ms var(--ease) both;
+    animation-delay: calc(var(--i, 0) * 50ms);
+}
+
+.attention-item.sev-critical { --sev: var(--crit); }
+.attention-item.sev-warning  { --sev: var(--warn); }
+.attention-item.sev-info     { --sev: var(--ku-cyan); }
+
+.attention-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.sev-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--sev);
+}
+
+.attention-item.sev-warning .sev-label { color: #C66A00; }
+[data-theme="dark"] .attention-item.sev-warning .sev-label { color: var(--warn); }
+
+.attention-cat {
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+}
+
+.attention-title {
+    font-weight: 500;
+    font-size: 1.0625rem;
+    color: var(--ink);
+}
+
+.attention-detail {
+    color: var(--ink-soft);
+    margin-top: 0.15rem;
+}
+
+.attention-action {
+    margin-top: 0.5rem;
+    color: var(--ink);
+}
+
+.attention-action span {
+    display: inline-block;
+    margin-right: 0.5rem;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+}
+
+.attention-clear {
+    padding: var(--spacing-lg) 0 var(--spacing-lg) var(--spacing-md);
+    border-left: 4px solid var(--live);
+    border-bottom: 1px solid var(--rule);
+    color: var(--ink-soft);
+}
+
+.attention-clear strong {
+    display: block;
+    color: var(--ink);
+    font-weight: 500;
+    font-size: 1.0625rem;
+}
+
+.attention-clear .btn { margin-top: 0.75rem; }
+
+@media (max-width: 559px) {
+    .attention-item { grid-template-columns: 1fr; gap: 0.35rem; }
+    .attention-meta { flex-direction: row; gap: 0.75rem; }
+}
+
+/* Placement ranking */
+.placement-item {
+    display: grid;
+    grid-template-columns: 2rem minmax(0, 1fr) auto;
+    align-items: start;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md) 0;
+    border-bottom: 1px solid var(--rule);
+    animation: entryIn 520ms var(--ease) both;
+    animation-delay: calc(var(--i, 0) * 50ms);
+}
+
+.placement-rank {
+    font-size: 0.8125rem;
+    color: var(--ink-faint);
+    font-variant-numeric: tabular-nums;
+    padding-top: 0.2rem;
+}
+
+.placement-item:first-child .placement-rank { color: var(--accent); font-weight: 700; }
+
+.placement-name {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    font-weight: 500;
+    font-size: 1.125rem;
+    color: var(--ink);
+}
+
+.placement-badge {
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0.15rem 0.45rem;
+    background: var(--segment);
+    color: var(--segment-ink);
+}
+
+.placement-badge.is-off {
+    background: var(--idle);
+}
+
+.placement-facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.15rem 1rem;
+    margin-top: 0.25rem;
+    font-size: 0.8125rem;
+    color: var(--ink-faint);
+    font-variant-numeric: tabular-nums;
+}
+
+.placement-facts strong {
+    color: var(--ink);
+    font-weight: 500;
+}
+
+.placement-bar {
+    height: 3px;
+    margin-top: 0.6rem;
+    background: var(--rule-faint);
+}
+
+.placement-bar > i {
+    display: block;
+    height: 100%;
+    background: var(--accent);
+    transform-origin: left center;
+    animation: barGrow 800ms var(--ease) both;
+    animation-delay: calc(var(--i, 0) * 50ms + 150ms);
+}
+
+.placement-score {
+    font-weight: 300;
+    font-size: 1.75rem;
+    line-height: 1;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+}
+
+.placement-item.is-unavailable { opacity: 0.55; }
+
+.action-note {
+    margin-top: 0.75rem;
+    font-size: 0.8125rem;
+    font-weight: 300;
+    color: var(--ink-faint);
+}
+
+/* ========================================
+   "Look up your usage" (User Activity)
+   ======================================== */
+.footprint {
+    padding-bottom: var(--spacing-lg);
+}
+
+.footprint-form {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--spacing-md) var(--spacing-xl);
+}
+
+.footprint-form .kicker {
+    color: var(--accent);
+    font-weight: 500;
+    margin-bottom: 0.25rem;
+}
+
+.footprint-form h3 {
+    font-weight: 500;
+    font-size: 1.5rem;
+    line-height: 1.1;
+}
+
+.footprint-input {
+    flex: 1 1 240px;
+    max-width: 360px;
+}
+
+.footprint-card {
+    margin-top: var(--spacing-xl);
+    animation: entryIn 520ms var(--ease) both;
+}
+
+.footprint-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: var(--spacing-lg);
+    padding: var(--spacing-lg) var(--spacing-lg);
+    margin-bottom: var(--spacing-lg);
+    background: var(--segment);
+    color: var(--segment-ink);
+}
+
+.footprint-summary .fig-value { font-size: 2rem; overflow-wrap: anywhere; }
+.footprint-summary .fig-value small,
+.footprint-summary .fig-label { color: rgba(255, 255, 255, 0.8); }
+
+.footprint-empty {
+    margin-top: var(--spacing-lg);
+    padding: var(--spacing-md) var(--spacing-md);
+    border-left: 4px solid var(--idle);
+    color: var(--ink-soft);
+}
