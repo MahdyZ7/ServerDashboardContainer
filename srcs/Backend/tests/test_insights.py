@@ -82,3 +82,60 @@ def test_placement_prefers_absolute_headroom_and_skips_offline():
     assert [r["server_name"] for r in ranked] == ["big", "small", "gone"]
     assert ranked[0]["best_for"] == "both"
     assert ranked[-1]["available"] is False and ranked[-1]["score"] == 0
+
+
+def mount(point, use, fstype="xfs", source=None, inodes=1.0):
+    return {"mount_point": point, "fstype": fstype, "source": source or f"/dev/{point.strip('/') or 'root'}",
+            "use_percent": use, "inode_percent": inodes, "avail_bytes": 10 * 1024 ** 3}
+
+
+def test_full_mount_is_reported_even_when_total_looks_fine():
+    fs = {"a": [mount("/", 96), mount("/data", 20)]}
+    items = build_attention_items([server("a", disk_percentage=40)], {}, {}, THRESHOLDS, NOW,
+                                  filesystems_by_server=fs)
+    assert [(i["severity"], i["title"]) for i in items] == [("critical", "a / is 96% full")]
+    assert "du -xh /" in items[0]["action"]
+
+
+def test_boot_and_home_mounts_get_specific_actions():
+    fs = {"a": [mount("/boot", 93), mount("/home", 90)]}
+    users = {"a": [{"username": "alice", "disk": 300}]}
+    items = build_attention_items([server("a")], {}, users, THRESHOLDS, NOW, filesystems_by_server=fs)
+    actions = {i["metric"]["mount_point"]: i["action"] for i in items}
+    assert "oldinstallonly" in actions["/boot"]
+    assert "alice" in actions["/home"]
+
+
+def test_shared_nfs_export_reported_once():
+    share = lambda: mount("/share", 91, fstype="nfs4", source="nas:/share")
+    fs = {"a": [share()], "b": [share()]}
+    items = build_attention_items([server("a"), server("b")], {}, {}, THRESHOLDS, NOW,
+                                  filesystems_by_server=fs)
+    assert len(items) == 1
+    assert items[0]["title"] == "Shared /share is 91% full"
+    assert "mounted on a, b" in items[0]["detail"]
+
+
+def test_inode_exhaustion():
+    fs = {"a": [mount("/scratch", 30, inodes=96)]}
+    items = build_attention_items([server("a")], {}, {}, THRESHOLDS, NOW, filesystems_by_server=fs)
+    assert [(i["severity"], i["title"]) for i in items] == [("critical", "a /scratch is running out of inodes")]
+
+
+def test_forecast_still_applies_with_mount_data():
+    fs = {"a": [mount("/", 60)]}
+    items = build_attention_items([server("a", disk_percentage=60)], {"a": 2.0}, {}, THRESHOLDS, NOW,
+                                  filesystems_by_server=fs)
+    assert [(i["severity"], i["category"]) for i in items] == [("warning", "disk")]
+
+
+def test_pressure_saturated_disk_and_nic_errors():
+    s = server("a", psi_io_full_avg60=25.0, psi_memory_full_avg60=None)
+    io = {"a": [{"device": "dm-0", "name": "vg-root", "util_percent": 95, "await_ms": 40},
+                {"device": "sdb", "name": "sdb", "util_percent": None}]}
+    net = {"a": [{"interface": "eth0", "rx_errors_delta": 50, "tx_errors_delta": 0},
+                 {"interface": "eth1", "rx_errors_delta": None, "tx_errors_delta": None}]}
+    titles = sorted(i["title"] for i in build_attention_items(
+        [s], {}, {}, THRESHOLDS, NOW, disk_io_by_server=io, network_by_server=net))
+    assert titles == ["a disk vg-root is saturated", "a eth0 has network errors",
+                      "a jobs are stalling on storage"]

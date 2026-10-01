@@ -7,7 +7,7 @@ as reviewed; only the license helper and Dockerfile packaging change are impleme
 
 ## Fix status — 2026-10-01
 
-Implementation step 1 and parts of steps 2–3 are done and were verified against the live
+Implementation steps 1–3 are done and were verified against the live
 servers (RHEL 6.6 → 9.8). Tests: `python3 -m unittest discover -s srcs/DataCollection/tests -v`.
 
 | Finding | Status |
@@ -23,7 +23,14 @@ servers (RHEL 6.6 → 9.8). Tests: `python3 -m unittest discover -s srcs/DataCol
 | Disk scan roots | **Partly fixed.** Home from passwd (not `/home/$user`), null-safe paths, allocated size (`du -k`), `nice`/`ionice`, per-account timeout, unreadable roots reported unknown. Quotas not used. |
 | Fragile parsing | **Fixed.** Versioned output: `key=value` for host metrics, `#format=2` + TSV for users, `LC_ALL=C`, exact UID matching, field-count validation, ISO login times. |
 | Cron overlap / env quoting / ICMP gate | **Fixed.** `run-collection.sh` (NUL-safe env load + `flock` per job); SSH tried directly; per-user failures no longer discard host metrics; weekly cleanup no longer collides with the 15-min run. Needs an image rebuild to take effect. |
-| Per-mount disk, network deltas, SSH/VNC sessions, PSI, history, license integration | **Open** (steps 3–4). |
+| Filesystem totals hide full mounts | **Fixed.** `server_filesystems`: per-mount size/used/avail, df-style use %, inodes, including NFS (local-only fallback if a network mount hangs). Insights judge fill per mount, report each NFS export once and flag inode exhaustion. |
+| Per-device storage I/O | **Added.** `server_disk_io`: `/proc/diskstats` counters per whole device (dm names resolved) with read/write B/s, IOPS, utilisation and await averaged since the previous run. |
+| Network: one interface, counters only | **Fixed.** `server_network`: every physical NIC/bond with rates and per-interval error/drop counts; counter resets give NULL rates. |
+| SSH/VNC socket counts | **Fixed.** VNC = distinct Xvnc owners, SSH = distinct users with a remote utmp session (no root needed). Per-session detail is still not stored. |
+| Pressure / runnable tasks | **Added.** `psi_*_avg60` (NULL where the kernel lacks PSI — none of the current hosts enable it; boot with `psi=1` on RHEL 8/9) and `procs_running` / `procs_blocked`. |
+| No per-user history | **Added.** `top_users_history`: rows where an account used ≥ 5 % of a CPU, ≥ 1 GiB RSS or ≥ 1 MiB/s I/O. API: `/api/users/<name>/history/<hours>`. |
+| License integration | **Open** (step 4). |
+| Host and per-user samples are taken seconds apart in separate SSH sessions | **Open.** A bursty job can appear in one and not the other. |
 
 ## Findings, in priority order
 

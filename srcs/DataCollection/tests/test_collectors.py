@@ -12,6 +12,7 @@ sys.path.insert(0, str(HERE))
 from parsers import (  # noqa: E402
     DISK_NOT_COLLECTED, ParseError, TOP_USERS_COLUMNS, parse_monitoring_data, parse_top_users,
 )
+from rates import disk_rates, network_rates  # noqa: E402
 
 
 def run_script(name, *args, timeout=60):
@@ -44,6 +45,31 @@ class HostMetricsTests(unittest.TestCase):
     def test_values_may_contain_equals_and_commas(self):
         metrics = parse_monitoring_data("format_version=2\narchitecture=Linux #1 SMP, a=b\n")
         self.assertEqual(metrics["architecture"], "Linux #1 SMP, a=b")
+
+    def test_live_output_has_mounts_devices_and_nics(self):
+        metrics = parse_monitoring_data(run_script("mini_monitering.sh", "--kv"))
+        mounts = {fs["mount_point"]: fs for fs in metrics["filesystems"]}
+        self.assertIn("/", mounts)
+        self.assertTrue(0 <= mounts["/"]["use_percent"] <= 100)
+        self.assertFalse([m for m in mounts.values() if m["fstype"] in ("tmpfs", "devtmpfs")])
+        self.assertTrue(metrics["block_devices"])
+        self.assertFalse([d for d in metrics["block_devices"] if d["device"].startswith("loop")])
+        self.assertFalse([n for n in metrics["network"] if n["interface"] == "lo"])
+        self.assertIsNotNone(metrics["procs_running"])
+
+    def test_records_parse_mount_with_spaces_and_unknown_inodes(self):
+        metrics = parse_monitoring_data(
+            "format_version=2\n"
+            "fs=/mnt/my data\tvfat\t/dev/sdz1\t1000\t900\t50\t0\t0\n"
+            "net=eth0\t1\t2\t3\t4\t\t\t0\t0\n"
+        )
+        fs = metrics["filesystems"][0]
+        self.assertEqual(fs["mount_point"], "/mnt/my data")
+        self.assertEqual(fs["use_percent"], 94.7)  # used / (used + avail), like df
+        self.assertIsNone(fs["inode_percent"])
+        self.assertIsNone(metrics["network"][0]["rx_errors"])
+        with self.assertRaises(ParseError):
+            parse_monitoring_data("format_version=2\nblk=sda\tsda\t1\n")
 
     def test_old_or_unknown_format_is_rejected(self):
         with self.assertRaises(ParseError):
@@ -94,6 +120,33 @@ class TopUsersTests(unittest.TestCase):
             parse_top_users("#format=2\n" + tsv() + "\textra")
         with self.assertRaises(ParseError):
             parse_top_users(tsv())
+
+
+class RateTests(unittest.TestCase):
+    PREV = dict(reads=100, sectors_read=2000, ms_reading=50, writes=10, sectors_written=400,
+                ms_writing=30, ms_doing_io=100)
+
+    def test_disk_rates_over_interval(self):
+        cur = dict(reads=200, sectors_read=4048, ms_reading=250, writes=110, sectors_written=2448,
+                   ms_writing=230, ms_doing_io=500)
+        r = disk_rates(self.PREV, cur, 10.0)
+        self.assertEqual(r["read_bps"], round(2048 * 512 / 10))
+        self.assertEqual(r["read_iops"], 10.0)
+        self.assertEqual(r["util_percent"], 4.0)  # 400 ms busy in 10 s
+        self.assertEqual(r["await_ms"], 2.0)      # 400 ms over 200 requests
+
+    def test_reset_first_run_and_long_gap_are_unknown(self):
+        cur = dict(self.PREV, reads=5)            # counter went backwards: reboot
+        self.assertIsNone(disk_rates(self.PREV, cur, 10.0)["read_bps"])
+        self.assertIsNone(disk_rates(None, self.PREV, None)["util_percent"])
+        self.assertIsNone(disk_rates(self.PREV, self.PREV, 3 * 3600)["read_bps"])
+
+    def test_network_errors_are_interval_counts(self):
+        prev = dict(rx_bytes=0, tx_bytes=0, rx_packets=0, tx_packets=0, rx_errors=5,
+                    tx_errors=0, rx_dropped=7, tx_dropped=0)
+        cur = dict(prev, rx_bytes=9000, rx_errors=8, rx_dropped=7)
+        r = network_rates(prev, cur, 900.0)
+        self.assertEqual((r["rx_bps"], r["rx_errors_delta"], r["rx_dropped_delta"]), (10, 3, 0))
 
 
 class SshWrapperTests(unittest.TestCase):

@@ -27,6 +27,8 @@ The system uses Docker Compose to orchestrate **three services**:
 ### Database Schema
 - `server_metrics`: System metrics (CPU, RAM, disk usage, connections, users)
 - `top_users`: Per-user resource consumption data (one row per server+user; `cpu` is percent of ONE logical CPU over a short sample, so 400 = four cores; `disk` NULL = unknown)
+- `top_users_history`: Append-only per-user activity (only rows above the activity thresholds in `backend.py`)
+- `server_filesystems`, `server_disk_io`, `server_network`: Per-mount / per-device / per-interface rows for each collection run; I/O and network rates are averages since the previous run (`srcs/DataCollection/rates.py`)
 
 ## Dashboard Architecture (Unified Flask App)
 
@@ -189,9 +191,11 @@ The unified dashboard (`srcs/Backend/app.py`) provides REST endpoints at `/api/`
 - `GET /api/health` - Health check
 
 ### Actionable Insights (rules in `utils/insights.py`, tests in `tests/test_insights.py`)
-- `GET /api/insights/attention` - Ranked issues with a suggested next step (offline, disk incl. 14-day fill forecast, memory, swap, CPU oversubscription); thresholds from `PERFORMANCE_THRESHOLDS`
+- `GET /api/insights/attention` - Ranked issues with a suggested next step (offline, per-mount fill and inodes with shared NFS reported once, 14-day fill forecast, memory, swap, CPU oversubscription, pressure stalls, saturated disks, NIC errors); thresholds from `PERFORMANCE_THRESHOLDS`
 - `GET /api/insights/placement` - Servers ranked by free cores (5-min load vs. logical CPUs) and free RAM
 - `GET /api/users/<username>/footprint` - One account's recorded usage across all servers (404 if unknown)
+- `GET /api/users/<username>/history/<hours>` - When and where an account was active (default 24 h, max 90 days)
+- `GET /api/servers/<server_name>/filesystems|disk-io|network` - Latest per-mount, per-device or per-interface rows
 
 ## Common Development Tasks
 

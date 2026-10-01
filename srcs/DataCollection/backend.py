@@ -7,6 +7,7 @@ import os
 from dotenv import load_dotenv
 import time
 from parsers import DISK_NOT_COLLECTED, ParseError, parse_monitoring_data, parse_top_users
+from rates import DISK_COUNTERS, NETWORK_COUNTERS, disk_rates, network_rates
 
 RED = "\033[0;31m"
 GREEN = "\033[0;32m"
@@ -23,6 +24,12 @@ user_disk_data_interval: int = 1 * int(
     60 * 24 / data_collection_interval
 )  # 1 time a day (only used in continuous mode)
 data_retention_days: int = 90  # 3 months data retention
+# Per-user history keeps only rows where the account was doing something
+HISTORY_MIN_CPU: float = 5.0  # percent of one CPU
+HISTORY_MIN_RSS_KB: int = 1024 * 1024  # 1 GiB
+HISTORY_MIN_IO_BPS: int = 1024 * 1024  # 1 MiB/s
+RETENTION_TABLES = ["server_metrics", "top_users", "top_users_history",
+                    "server_filesystems", "server_disk_io", "server_network"]
 retention_cleanup_interval: int = 7 * int(
     60 * 24 / data_collection_interval
 )  # Run cleanup weekly (only used in continuous mode)
@@ -79,7 +86,14 @@ def init_db():
 				cpu_iowait_percent NUMERIC(5,2),
 				cpu_steal_percent NUMERIC(5,2),
 				ram_available_mb INT,
-				net_interface VARCHAR(64)
+				net_interface VARCHAR(64),
+				procs_running INT,
+				procs_blocked INT,
+				psi_cpu_some_avg60 NUMERIC(6,2),
+				psi_memory_some_avg60 NUMERIC(6,2),
+				psi_memory_full_avg60 NUMERIC(6,2),
+				psi_io_some_avg60 NUMERIC(6,2),
+				psi_io_full_avg60 NUMERIC(6,2)
 		)
 	"""
 
@@ -122,6 +136,13 @@ def init_db():
         "ALTER TABLE server_metrics ADD COLUMN IF NOT EXISTS cpu_steal_percent NUMERIC(5,2)",
         "ALTER TABLE server_metrics ADD COLUMN IF NOT EXISTS ram_available_mb INT",
         "ALTER TABLE server_metrics ADD COLUMN IF NOT EXISTS net_interface VARCHAR(64)",
+        "ALTER TABLE server_metrics ADD COLUMN IF NOT EXISTS procs_running INT",
+        "ALTER TABLE server_metrics ADD COLUMN IF NOT EXISTS procs_blocked INT",
+        "ALTER TABLE server_metrics ADD COLUMN IF NOT EXISTS psi_cpu_some_avg60 NUMERIC(6,2)",
+        "ALTER TABLE server_metrics ADD COLUMN IF NOT EXISTS psi_memory_some_avg60 NUMERIC(6,2)",
+        "ALTER TABLE server_metrics ADD COLUMN IF NOT EXISTS psi_memory_full_avg60 NUMERIC(6,2)",
+        "ALTER TABLE server_metrics ADD COLUMN IF NOT EXISTS psi_io_some_avg60 NUMERIC(6,2)",
+        "ALTER TABLE server_metrics ADD COLUMN IF NOT EXISTS psi_io_full_avg60 NUMERIC(6,2)",
         "ALTER TABLE top_users ADD COLUMN IF NOT EXISTS io_read_bytes BIGINT DEFAULT 0",
         "ALTER TABLE top_users ADD COLUMN IF NOT EXISTS io_write_bytes BIGINT DEFAULT 0",
         "ALTER TABLE top_users ADD COLUMN IF NOT EXISTS uid BIGINT",
@@ -133,6 +154,81 @@ def init_db():
         "ALTER TABLE top_users ALTER COLUMN disk DROP DEFAULT",
         "ALTER TABLE top_users ALTER COLUMN io_read_bytes DROP DEFAULT",
         "ALTER TABLE top_users ALTER COLUMN io_write_bytes DROP DEFAULT",
+    ]
+
+    # Snapshot tables written once per collection run. Disk I/O and network
+    # keep the raw kernel counters plus rates averaged since the previous run.
+    detail_tables = [
+        """
+		CREATE TABLE IF NOT EXISTS server_filesystems (
+			id BIGSERIAL PRIMARY KEY,
+			timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			server_name VARCHAR(255),
+			mount_point TEXT,
+			fstype VARCHAR(32),
+			source TEXT,
+			size_bytes BIGINT,
+			used_bytes BIGINT,
+			avail_bytes BIGINT,
+			use_percent NUMERIC(5,1),
+			inodes_total BIGINT,
+			inodes_used BIGINT,
+			inode_percent NUMERIC(5,1)
+		)""",
+        """
+		CREATE TABLE IF NOT EXISTS server_disk_io (
+			id BIGSERIAL PRIMARY KEY,
+			timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			server_name VARCHAR(255),
+			device VARCHAR(64),
+			name VARCHAR(255),
+			reads BIGINT, sectors_read BIGINT, ms_reading BIGINT,
+			writes BIGINT, sectors_written BIGINT, ms_writing BIGINT, ms_doing_io BIGINT,
+			read_bps BIGINT,
+			write_bps BIGINT,
+			read_iops NUMERIC(12,2),
+			write_iops NUMERIC(12,2),
+			util_percent NUMERIC(5,1),
+			await_ms NUMERIC(12,2)
+		)""",
+        """
+		CREATE TABLE IF NOT EXISTS server_network (
+			id BIGSERIAL PRIMARY KEY,
+			timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			server_name VARCHAR(255),
+			interface VARCHAR(64),
+			rx_bytes BIGINT, tx_bytes BIGINT, rx_packets BIGINT, tx_packets BIGINT,
+			rx_errors BIGINT, tx_errors BIGINT, rx_dropped BIGINT, tx_dropped BIGINT,
+			rx_bps BIGINT,
+			tx_bps BIGINT,
+			rx_errors_delta BIGINT,
+			tx_errors_delta BIGINT,
+			rx_dropped_delta BIGINT,
+			tx_dropped_delta BIGINT
+		)""",
+        # top_users keeps only the latest row per account; this keeps who was
+        # active over time (rows below the HISTORY_MIN_* thresholds are skipped)
+        """
+		CREATE TABLE IF NOT EXISTS top_users_history (
+			id BIGSERIAL PRIMARY KEY,
+			timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			server_name VARCHAR(255),
+			uid BIGINT,
+			username VARCHAR(255),
+			cpu NUMERIC(9,2),
+			mem NUMERIC(7,2),
+			rss_kb BIGINT,
+			process_count INT,
+			top_process VARCHAR(255),
+			io_read_bps BIGINT,
+			io_write_bps BIGINT
+		)""",
+        "CREATE INDEX IF NOT EXISTS idx_server_metrics_server_time ON server_metrics (server_name, timestamp)",
+        "CREATE INDEX IF NOT EXISTS idx_server_filesystems_server_time ON server_filesystems (server_name, timestamp)",
+        "CREATE INDEX IF NOT EXISTS idx_server_disk_io_device_time ON server_disk_io (server_name, device, timestamp)",
+        "CREATE INDEX IF NOT EXISTS idx_server_network_iface_time ON server_network (server_name, interface, timestamp)",
+        "CREATE INDEX IF NOT EXISTS idx_top_users_history_user_time ON top_users_history (username, timestamp)",
+        "CREATE INDEX IF NOT EXISTS idx_top_users_history_server_time ON top_users_history (server_name, timestamp)",
     ]
 
     # Widen numeric columns that overflowed at 999.99 (table, column, precision)
@@ -152,6 +248,8 @@ def init_db():
             logger.info("Initializing database tables")
             cursor.execute(create_table_query)
             cursor.execute(create_table_query_2)
+            for statement in detail_tables:
+                cursor.execute(statement)
             for migration in migration_queries:
                 try:
                     cursor.execute(migration)
@@ -258,7 +356,9 @@ def store_metrics(metrics: Dict):
 		last_boot, tcp_connections, logged_users, active_vnc_users, active_ssh_users,
 		cpu_usage_percent, swap_used_mb, swap_total_mb, swap_percentage,
 		net_rx_bytes, net_tx_bytes,
-		cpu_iowait_percent, cpu_steal_percent, ram_available_mb, net_interface
+		cpu_iowait_percent, cpu_steal_percent, ram_available_mb, net_interface,
+		procs_running, procs_blocked, psi_cpu_some_avg60, psi_memory_some_avg60,
+		psi_memory_full_avg60, psi_io_some_avg60, psi_io_full_avg60
 	) VALUES (
 		%(server_name)s, %(architecture)s, %(operating_system)s, %(physical_cpus)s, %(virtual_cpus)s,
 		%(ram_used)s, %(ram_total)s, %(ram_percentage)s, %(disk_used)s, %(disk_total)s,
@@ -266,7 +366,9 @@ def store_metrics(metrics: Dict):
 		%(last_boot)s, %(tcp_connections)s, %(logged_users)s, %(active_vnc_users)s, %(active_ssh_users)s,
 		%(cpu_usage_percent)s, %(swap_used_mb)s, %(swap_total_mb)s, %(swap_percentage)s,
 		%(net_rx_bytes)s, %(net_tx_bytes)s,
-		%(cpu_iowait_percent)s, %(cpu_steal_percent)s, %(ram_available_mb)s, %(net_interface)s
+		%(cpu_iowait_percent)s, %(cpu_steal_percent)s, %(ram_available_mb)s, %(net_interface)s,
+		%(procs_running)s, %(procs_blocked)s, %(psi_cpu_some_avg60)s, %(psi_memory_some_avg60)s,
+		%(psi_memory_full_avg60)s, %(psi_io_some_avg60)s, %(psi_io_full_avg60)s
 	)
 	"""
 
@@ -274,6 +376,11 @@ def store_metrics(metrics: Dict):
         with psycopg2.connect(**DB_CONFIG) as conn:
             with conn.cursor() as cursor:
                 cursor.execute(insert_query, metrics)
+                store_filesystems(cursor, metrics["server_name"], metrics.get("filesystems", []))
+                store_counter_rows(cursor, metrics["server_name"], "server_disk_io", "device",
+                                   ["name"], DISK_COUNTERS, disk_rates, metrics.get("block_devices", []))
+                store_counter_rows(cursor, metrics["server_name"], "server_network", "interface",
+                                   [], NETWORK_COUNTERS, network_rates, metrics.get("network", []))
                 conn.commit()
         logger.info(
             f"Successfully stored metrics in database for {metrics['server_name']}"
@@ -283,6 +390,48 @@ def store_metrics(metrics: Dict):
             f"Database error storing metrics for {metrics['server_name']}: {e}"
         )
         raise
+
+
+def store_filesystems(cursor, server_name: str, filesystems: List[Dict]):
+    """Append this run's per-mount capacity rows."""
+    for fs in filesystems:
+        cursor.execute("""
+			INSERT INTO server_filesystems (server_name, mount_point, fstype, source, size_bytes,
+				used_bytes, avail_bytes, use_percent, inodes_total, inodes_used, inode_percent)
+			VALUES (%(server_name)s, %(mount_point)s, %(fstype)s, %(source)s, %(size_bytes)s,
+				%(used_bytes)s, %(avail_bytes)s, %(use_percent)s, %(inodes_total)s, %(inodes_used)s,
+				%(inode_percent)s)
+		""", dict(fs, server_name=server_name))
+
+
+def store_counter_rows(cursor, server_name: str, table: str, key: str, labels: List[str],
+                       counters: List[str], rate_fn, rows: List[Dict]):
+    """Append counter rows, with rates computed against each key's previous row.
+
+    `table`, `key`, `labels` and `counters` are code constants, never user input.
+    """
+    if not rows:
+        return
+    cursor.execute(f"""
+		SELECT DISTINCT ON ({key}) {key}, {", ".join(counters)},
+			EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - timestamp))
+		FROM {table}
+		WHERE server_name = %s AND timestamp > CURRENT_TIMESTAMP - INTERVAL '1 day'
+		ORDER BY {key}, timestamp DESC
+	""", (server_name,))
+    previous = {}
+    for row in cursor.fetchall():
+        previous[row[0]] = (dict(zip(counters, row[1:-1])), float(row[-1]))
+
+    for row in rows:
+        prev, elapsed = previous.get(row[key], (None, None))
+        values = dict(row, **rate_fn(prev, row, elapsed), server_name=server_name)
+        columns = ["server_name", key, *labels, *counters, *rate_fn(None, row, None).keys()]
+        cursor.execute(
+            f"INSERT INTO {table} ({', '.join(columns)}) "
+            f"VALUES ({', '.join(f'%({c})s' for c in columns)})",
+            values,
+        )
 
 
 def store_top_users(server_name: str, top_users_dict: Dict):
@@ -327,6 +476,14 @@ def store_top_users(server_name: str, top_users_dict: Dict):
                     if not row["disk_collected"]:
                         row["disk"] = None
                     cursor.execute(upsert_query, row)
+                    if (row["cpu"] >= HISTORY_MIN_CPU or row["rss_kb"] >= HISTORY_MIN_RSS_KB
+                            or (row["io_read_bps"] or 0) + (row["io_write_bps"] or 0) >= HISTORY_MIN_IO_BPS):
+                        cursor.execute("""
+							INSERT INTO top_users_history (server_name, uid, username, cpu, mem, rss_kb,
+								process_count, top_process, io_read_bps, io_write_bps)
+							VALUES (%(server_name)s, %(uid)s, %(user)s, %(cpu)s, %(mem)s, %(rss_kb)s,
+								%(process_count)s, %(top_process)s, %(io_read_bps)s, %(io_write_bps)s)
+						""", row)
                 # Remove users not in the current top_users list
                 if usernames:
                     delete_query = f"""
@@ -373,35 +530,23 @@ def cleanup_old_data():
 
         with psycopg2.connect(**DB_CONFIG) as conn:
             with conn.cursor() as cursor:
-                # Calculate the cutoff date
-                cutoff_date = f"NOW() - INTERVAL '{data_retention_days} days'"
-
-                # Clean up old server_metrics data
-                delete_metrics_query = f"""
-					DELETE FROM server_metrics
-					WHERE timestamp < {cutoff_date}
-				"""
-                cursor.execute(delete_metrics_query)
-                deleted_metrics = cursor.rowcount
-
-                # Clean up old top_users data
-                delete_users_query = f"""
-					DELETE FROM top_users
-					WHERE timestamp < {cutoff_date}
-				"""
-                cursor.execute(delete_users_query)
-                deleted_users = cursor.rowcount
-
+                deleted = {}
+                for table in RETENTION_TABLES:
+                    cursor.execute(
+                        f"DELETE FROM {table} WHERE timestamp < NOW() - %s * INTERVAL '1 day'",
+                        (data_retention_days,),
+                    )
+                    deleted[table] = cursor.rowcount
                 conn.commit()
 
                 logger.info("Data retention cleanup completed:")
-                logger.info(f"  - Removed {deleted_metrics} server_metrics records")
-                logger.info(f"  - Removed {deleted_users} top_users records")
+                for table, count in deleted.items():
+                    logger.info(f"  - Removed {count} {table} records")
 
-                if deleted_metrics > 0 or deleted_users > 0:
+                if any(deleted.values()):
                     # Run VACUUM to reclaim disk space
                     conn.autocommit = True
-                    cursor.execute("VACUUM ANALYZE server_metrics, top_users")
+                    cursor.execute(f"VACUUM ANALYZE {', '.join(RETENTION_TABLES)}")
                     conn.autocommit = False
                     logger.info("Database vacuum completed to reclaim disk space")
 

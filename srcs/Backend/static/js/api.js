@@ -107,6 +107,15 @@
 
         async getServerHealth(serverName) {
             return fetchWithRetry(`${API_BASE}/health/${encodeURIComponent(serverName)}`);
+        },
+
+        // detail: 'filesystems' | 'disk-io' | 'network' (latest collection run)
+        async getServerDetail(serverName, detail) {
+            return fetchWithRetry(`${API_BASE}/servers/${encodeURIComponent(serverName)}/${encodeURIComponent(detail)}`);
+        },
+
+        async getUserHistory(username, hours = 24) {
+            return fetchWithRetry(`${API_BASE}/users/${encodeURIComponent(username)}/history/${encodeURIComponent(hours)}`);
         }
     };
 

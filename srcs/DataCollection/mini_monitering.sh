@@ -75,10 +75,71 @@ LAST_BOOT=$(uptime -s 2>/dev/null || who -b | awk '{print $3 " " $4}')
 TCP=$(awk '/^TCP:/ {print $3}' /proc/net/sockstat)
 USER_LOG=$(who | awk '{print $1}' | sort -u | wc -l)
 
-# Established sshd/Xvnc sockets. Without root, lsof sees only the caller's own sockets.
-ACTIVE_CONNECTIONS=$(timeout 20 lsof -n -iTCP -sTCP:ESTABLISHED 2>/dev/null | grep -E '^(sshd|Xvnc)')
-ACTIVE_VNC=$(echo "$ACTIVE_CONNECTIONS" | grep -c '^Xvnc')
-ACTIVE_SSH=$(echo "$ACTIVE_CONNECTIONS" | grep -c '^sshd')
+# Distinct people, not sockets: VNC = owners of Xvnc servers (visible without
+# root); SSH = users with a login session from a remote host in utmp.
+ACTIVE_VNC=$(ps -C Xvnc -o user= 2>/dev/null | sort -u | grep -c .)
+ACTIVE_SSH=$(who | awk '$NF ~ /^\(/ && $NF !~ /^\(:/ {print $1}' | sort -u | grep -c .)
+read -r PROCS_RUNNING PROCS_BLOCKED < <(awk '/^procs_running/ {r=$2} /^procs_blocked/ {b=$2} END {print r, b}' /proc/stat)
+
+# Pressure stall information: share of the last 60 s that tasks waited on a
+# resource. Empty when the kernel lacks PSI (before 4.20, or booted without psi=1).
+psi() { awk -v kind="$2" '$1 == kind {sub("avg60=", "", $3); print $3}' "/proc/pressure/$1" 2>/dev/null; }
+PSI_CPU_SOME=$(psi cpu some)
+PSI_MEM_SOME=$(psi memory some)
+PSI_MEM_FULL=$(psi memory full)
+PSI_IO_SOME=$(psi io some)
+PSI_IO_FULL=$(psi io full)
+
+# Per-mount capacity and inodes (local and network; network mounts may hang, so
+# fall back to local-only on timeout). Line: mount fstype source size used avail inodes inodes_used
+SKIP_FS='^(tmpfs|devtmpfs|squashfs|overlay|efivarfs|iso9660|udf|proc|sysfs|autofs)$'
+df_all() {
+	local out
+	out=$(timeout 15 df -P "$@" 2>/dev/null)
+	[ $? -eq 124 ] && out=$(timeout 15 df -P -l "$@" 2>/dev/null)
+	printf '%s\n' "$out"
+}
+# The mount point is everything after the 6th (-T) or 5th (-i) column and may contain spaces
+FILESYSTEMS=$(awk -v skip="$SKIP_FS" '
+	FNR == 1 { next }
+	FILENAME == "-" || NR == FNR {
+		m = $0; for (i = 1; i <= 6; i++) sub(/^[^ ]+ +/, "", m)
+		if ($2 ~ skip || $1 ~ /^\/dev\/loop/) next
+		order[++n] = m; src[m] = $1; type[m] = $2; size[m] = $3; used[m] = $4; avail[m] = $5
+		next
+	}
+	{ m = $0; for (i = 1; i <= 5; i++) sub(/^[^ ]+ +/, "", m); itot[m] = $2; iused[m] = $3 }
+	END {
+		for (k = 1; k <= n; k++) {
+			m = order[k]
+			printf "fs=%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", m, type[m], src[m], size[m], used[m], avail[m], itot[m], iused[m]
+		}
+	}' <(df_all -T -B1) <(df_all -i))
+
+# Per-device I/O counters for whole block devices. Line: device name reads
+# sectors_read ms_reading writes sectors_written ms_writing ms_doing_io (sectors are 512 B)
+BLOCK_DEVICES=$(awk '
+	$3 ~ /^(loop|ram|sr|fd|zram)/ { next }
+	{
+		dev = $3; sysdir = "/sys/block/" dev
+		if (system("test -d " sysdir) != 0) next    # partitions are not under /sys/block
+		name = dev
+		if ((getline line < (sysdir "/dm/name")) > 0) name = line
+		close(sysdir "/dm/name")
+		printf "blk=%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", dev, name, $4, $6, $7, $8, $10, $11, $13
+	}' /proc/diskstats)
+
+# Per-interface counters for physical NICs and bonds (no lo, veth, bridges, docker)
+NETWORK=$(for dir in /sys/class/net/*; do
+	iface=${dir##*/}
+	[ -e "$dir/device" ] || [[ $iface == bond* || $iface == team* ]] || continue
+	st="$dir/statistics"
+	printf 'net=%s' "$iface"
+	for c in rx_bytes tx_bytes rx_packets tx_packets rx_errors tx_errors rx_dropped tx_dropped; do
+		printf '\t%s' "$(cat "$st/$c" 2>/dev/null)"
+	done
+	printf '\n'
+done)
 
 # Cumulative RX/TX counters of the default-route interface
 NET_IFACE=$(ip route get 8.8.8.8 2>/dev/null | awk '{for (i = 1; i <= NF; i++) if ($i == "dev") {print $(i+1); exit}}')
@@ -123,6 +184,16 @@ if $kv; then
 		echo "net_interface=$NET_IFACE"
 		echo "net_rx_bytes=$NET_RX_BYTES"
 		echo "net_tx_bytes=$NET_TX_BYTES"
+		echo "procs_running=$PROCS_RUNNING"
+		echo "procs_blocked=$PROCS_BLOCKED"
+		echo "psi_cpu_some_avg60=$PSI_CPU_SOME"
+		echo "psi_memory_some_avg60=$PSI_MEM_SOME"
+		echo "psi_memory_full_avg60=$PSI_MEM_FULL"
+		echo "psi_io_some_avg60=$PSI_IO_SOME"
+		echo "psi_io_full_avg60=$PSI_IO_FULL"
+		[ -n "$FILESYSTEMS" ] && echo "$FILESYSTEMS"
+		[ -n "$BLOCK_DEVICES" ] && echo "$BLOCK_DEVICES"
+		[ -n "$NETWORK" ] && echo "$NETWORK"
 	}
 else
 	printf "%-25s: %s\n" "Architecture" "${ARCH}"
@@ -137,7 +208,11 @@ else
 	printf "%-25s: %s\n" "Last Boot" "${LAST_BOOT}"
 	printf "%-25s: %s\n" "TCP Connections" "${TCP}"
 	printf "%-25s: %s\n" "User Logins" "${USER_LOG}"
-	printf "%-25s: %s\n" "Active VNC Sessions" "${ACTIVE_VNC}"
-	printf "%-25s: %s\n" "Active SSH Sessions" "${ACTIVE_SSH}"
+	printf "%-25s: %s\n" "VNC Users" "${ACTIVE_VNC}"
+	printf "%-25s: %s\n" "SSH Users" "${ACTIVE_SSH}"
+	printf "%-25s: %s running, %s blocked\n" "Tasks" "${PROCS_RUNNING}" "${PROCS_BLOCKED}"
+	printf "%-25s: cpu %s, memory %s/%s, io %s/%s (some/full, %% of 60 s)\n" "Pressure" \
+		"${PSI_CPU_SOME:-n/a}" "${PSI_MEM_SOME:-n/a}" "${PSI_MEM_FULL:-n/a}" "${PSI_IO_SOME:-n/a}" "${PSI_IO_FULL:-n/a}"
+	printf "%s\n" "${FILESYSTEMS}" | awk -F'\t' 'NF {sub("fs=", "", $1); printf "%-25s: %s %s, %.0f%% used\n", "Filesystem " $1, $2, $3, ($4 > 0 ? $5 / $4 * 100 : 0)}'
 	printf "%-25s: %s (RX: %s bytes, TX: %s bytes)\n" "Network" "${NET_IFACE}" "${NET_RX_BYTES}" "${NET_TX_BYTES}"
 fi

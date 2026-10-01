@@ -62,16 +62,43 @@ SERVER_METRIC_TYPES = {
     "net_interface": _str,
     "net_rx_bytes": _int,
     "net_tx_bytes": _int,
+    "procs_running": _int,
+    "procs_blocked": _int,
+    "psi_cpu_some_avg60": _float,
+    "psi_memory_some_avg60": _float,
+    "psi_memory_full_avg60": _float,
+    "psi_io_some_avg60": _float,
+    "psi_io_full_avg60": _float,
 }
+
+# Repeated records in the key=value output: key -> (result list name, TSV columns).
+# The first column is text, the rest are integer counters (empty = unknown).
+RECORD_TYPES = {
+    "fs": ("filesystems", ["mount_point", "fstype", "source", "size_bytes", "used_bytes",
+                           "avail_bytes", "inodes_total", "inodes_used"]),
+    "blk": ("block_devices", ["device", "name", "reads", "sectors_read", "ms_reading", "writes",
+                              "sectors_written", "ms_writing", "ms_doing_io"]),
+    "net": ("network", ["interface", "rx_bytes", "tx_bytes", "rx_packets", "tx_packets",
+                        "rx_errors", "tx_errors", "rx_dropped", "tx_dropped"]),
+}
+# Columns besides the first that hold text rather than numbers
+TEXT_COLUMNS = {"fstype", "source", "name"}
 
 
 def parse_monitoring_data(data: str) -> Dict:
     """Parse `mini_monitering.sh --kv` output into a dict keyed by server_metrics column."""
     raw = {}
+    records = {name: [] for name, _ in RECORD_TYPES.values()}
     for line in data.splitlines():
-        if "=" in line:
-            key, value = line.split("=", 1)
-            raw[key.strip()] = value.strip()
+        if "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        if key in RECORD_TYPES:
+            name, columns = RECORD_TYPES[key]
+            records[name].append(_parse_record(key, value, columns))
+        else:
+            raw[key] = value.strip()
 
     if raw.get("format_version") != FORMAT_VERSION:
         raise ParseError(
@@ -84,7 +111,26 @@ def parse_monitoring_data(data: str) -> Dict:
             metrics[key] = convert(raw.get(key, ""))
         except ValueError as e:
             raise ParseError(f"bad value for {key}: {raw.get(key)!r}") from e
+    metrics.update(records)
     return metrics
+
+
+def _parse_record(key: str, value: str, columns: List[str]) -> Dict:
+    fields = value.split("\t")
+    if len(fields) != len(columns):
+        raise ParseError(f"{key}= record: expected {len(columns)} fields, got {len(fields)}")
+    record = {}
+    for column, field in zip(columns, fields):
+        try:
+            record[column] = field if column == columns[0] or column in TEXT_COLUMNS else _int(field)
+        except ValueError as e:
+            raise ParseError(f"{key}= record: bad {column} {field!r}") from e
+    if key == "fs":
+        used, avail, inodes, iused = (record[c] for c in ("used_bytes", "avail_bytes", "inodes_total", "inodes_used"))
+        # Same basis as df's Use%: space reserved for root counts as unavailable
+        record["use_percent"] = round(used / (used + avail) * 100, 1) if used is not None and avail and used + avail else None
+        record["inode_percent"] = round(iused / inodes * 100, 1) if inodes and iused is not None else None
+    return record
 
 
 def parse_top_users(data: str) -> Dict:

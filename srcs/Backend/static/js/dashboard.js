@@ -808,7 +808,10 @@
         }
 
         tableBody.innerHTML = users.map(user => {
-            const cpuVal = Math.min(100, Math.max(0, parseFloat(user.cpu || 0)));
+            // cpu is percent of one CPU (400 = four cores); the bar caps at one core
+            const cpuRaw = Math.max(0, parseFloat(user.cpu || 0));
+            const cpuVal = Math.min(100, cpuRaw);
+            const cpuLabel = cpuRaw >= 100 ? `${(cpuRaw / 100).toFixed(1)} cores` : `${cpuRaw.toFixed(1)}%`;
             const memVal = Math.min(100, Math.max(0, parseFloat(user.mem || 0)));
             const cpuClass = cpuVal > 90 ? 'danger' : cpuVal > 70 ? 'warning' : 'good';
             const memClass = memVal > 90 ? 'danger' : memVal > 70 ? 'warning' : 'good';
@@ -818,7 +821,7 @@
             // Inline mini-bar for CPU
             const cpuBar = `<div class="cell-bar">
                 <div class="bar-track"><div class="bar-fill ${cpuClass}" style="width:${cpuVal}%"></div></div>
-                <span class="bar-label">${cpuVal.toFixed(1)}%</span>
+                <span class="bar-label">${cpuLabel}</span>
             </div>`;
 
             // Inline mini-bar for Memory

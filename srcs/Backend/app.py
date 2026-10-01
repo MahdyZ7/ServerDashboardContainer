@@ -12,6 +12,7 @@ import logging
 import os
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
+from decimal import Decimal
 import requests
 
 from flask_config import Config, KU_COLORS, DASHBOARD_CONFIG, FONTS, PERFORMANCE_THRESHOLDS
@@ -548,6 +549,32 @@ def create_app(config_class=Config):
         columns = [desc[0] for desc in cursor.description]
         return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
+    # Rows from one collection run share a timestamp (one transaction), so the
+    # latest run per server is the rows at that server's newest timestamp.
+    DETAIL_TABLES = {"filesystems": "server_filesystems", "disk-io": "server_disk_io",
+                     "network": "server_network"}
+
+    def _latest_detail_rows(cursor, table, server_name=None):
+        return _fetch_dicts(cursor, f"""
+            SELECT d.* FROM {table} d
+            JOIN (SELECT server_name, MAX(timestamp) AS ts FROM {table}
+                  WHERE timestamp > NOW() - INTERVAL '1 day'
+                  {"AND server_name = %s" if server_name else ""}
+                  GROUP BY server_name) latest
+              ON d.server_name = latest.server_name AND d.timestamp = latest.ts
+            ORDER BY d.server_name, d.id
+        """, (server_name,) if server_name else None)
+
+    def _group_by_server(rows):
+        grouped = {}
+        for row in rows:
+            grouped.setdefault(row["server_name"], []).append(row)
+        return grouped
+
+    def _jsonable(row):
+        return {k: float(v) if isinstance(v, Decimal) else v.isoformat() if isinstance(v, datetime) else v
+                for k, v in row.items()}
+
     @app.route("/api/insights/attention", methods=["GET"])
     def get_attention_items():
         """Ranked list of issues that need an admin, each with a suggested action."""
@@ -574,8 +601,16 @@ def create_app(config_class=Config):
             for row in _fetch_dicts(cursor, "SELECT server_name, username, cpu, mem, disk FROM top_users"):
                 users_by_server.setdefault(row["server_name"], []).append(row)
 
+            details = {key: _group_by_server(_latest_detail_rows(cursor, table))
+                       for key, table in DETAIL_TABLES.items()}
+
             now = datetime.now()
-            items = build_attention_items(servers, disk_growth, users_by_server, PERFORMANCE_THRESHOLDS, now)
+            items = build_attention_items(
+                servers, disk_growth, users_by_server, PERFORMANCE_THRESHOLDS, now,
+                filesystems_by_server=details["filesystems"],
+                disk_io_by_server=details["disk-io"],
+                network_by_server=details["network"],
+            )
             return jsonify({
                 "success": True,
                 "data": items,
@@ -647,6 +682,68 @@ def create_app(config_class=Config):
             })
         except Exception as e:
             logger.error(f"Error fetching footprint for {username}: {e}", exc_info=True)
+            return jsonify({"success": False, "error": str(e)}), 500
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+
+    @app.route("/api/servers/<server_name>/<any(filesystems, 'disk-io', network):detail>", methods=["GET"])
+    def get_server_detail(server_name, detail):
+        """Latest per-mount, per-device or per-interface rows for one server.
+
+        Disk I/O and network rates are averages since the previous collection run.
+        """
+        conn = None
+        cursor = None
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            rows = [_jsonable(r) for r in _latest_detail_rows(cursor, DETAIL_TABLES[detail], server_name)]
+            return jsonify({
+                "success": True,
+                "data": rows,
+                "server_name": server_name,
+                "collected_at": rows[0]["timestamp"] if rows else None,
+                "count": len(rows),
+            })
+        except Exception as e:
+            logger.error(f"Error fetching {detail} for {server_name}: {e}", exc_info=True)
+            return jsonify({"success": False, "error": str(e)}), 500
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+
+    @app.route("/api/users/<username>/history", methods=["GET"])
+    @app.route("/api/users/<username>/history/<int:hours>", methods=["GET"])
+    def get_user_history(username, hours=24):
+        """When and where an account was active (CPU, memory or I/O above the
+        collector's history thresholds), newest first. Up to 90 days."""
+        hours = max(1, min(hours, 90 * 24))
+        conn = None
+        cursor = None
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            rows = _fetch_dicts(cursor, """
+                SELECT timestamp, server_name, username, cpu, mem, rss_kb, process_count,
+                       top_process, io_read_bps, io_write_bps
+                FROM top_users_history
+                WHERE LOWER(username) = LOWER(%s) AND timestamp > NOW() - %s * INTERVAL '1 hour'
+                ORDER BY timestamp DESC
+            """, (username, hours))
+            return jsonify({
+                "success": True,
+                "data": [_jsonable(r) for r in rows],
+                "username": username,
+                "hours": hours,
+                "count": len(rows),
+            })
+        except Exception as e:
+            logger.error(f"Error fetching history for {username}: {e}", exc_info=True)
             return jsonify({"success": False, "error": str(e)}), 500
         finally:
             if cursor:
