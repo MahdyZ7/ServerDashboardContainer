@@ -1,0 +1,64 @@
+{#
+  Site navigation, identical on the dashboard and on server pages.
+  Dashboard (active_tab set): section tabs are buttons that tabs.js switches in place.
+  Server page (current_server set): the same tabs are links back to those sections,
+  and "Servers" is the active item.
+#}
+{% set sections = [
+    ('overview', '01', 'Usage Overview', 'dashboard.usage_overview'),
+    ('servers', '02', 'Server Details', 'dashboard.server_details'),
+    ('users', '03', 'User Activity', 'dashboard.user_activity'),
+    ('analytics', '04', 'Performance Analytics', 'dashboard.performance_analytics'),
+    ('network', '05', 'Network Monitor', 'dashboard.network_monitor'),
+] %}
+<div class="tabs-nav-wrap tabs-nav-wrap--menu">
+    {% if current_server %}
+    <nav class="tabs-nav" aria-label="Dashboard sections">
+        {% for id, num, label, endpoint in sections %}
+        <a class="tab-button" href="{{ url_for(endpoint) }}">
+            <span class="tab-num">{{ num }}</span>
+            <span class="tab-label">{{ label }}</span>
+        </a>
+        {% endfor %}
+    </nav>
+    {% else %}
+    <nav class="tabs-nav" role="tablist" aria-label="Dashboard sections">
+        {% for id, num, label, endpoint in sections %}
+        <button class="tab-button {% if active_tab == id %}active{% endif %}"
+                id="{{ id }}-tab"
+                data-tab="{{ id }}"
+                role="tab"
+                aria-selected="{% if active_tab == id %}true{% else %}false{% endif %}"
+                aria-controls="{{ id }}-panel">
+            <span class="tab-num">{{ num }}</span>
+            <span class="tab-label">{{ label }}</span>
+        </button>
+        {% endfor %}
+        <!-- Sliding indicator will be inserted by JS -->
+    </nav>
+    {% endif %}
+    {% if monitored_servers %}
+    <!-- Gateway to each server's own page (/server/<name>). Outside the scrolling
+         tab row so the menu is not clipped; links use .server-link, not .tab-button -->
+    <div class="servers-menu{% if current_server %} is-active{% endif %}">
+        <button type="button" class="servers-menu-button" id="servers-menu-button"
+                aria-haspopup="true" aria-expanded="false" aria-controls="servers-menu">
+            <span>Servers</span><i class="fas fa-chevron-down" aria-hidden="true"></i>
+        </button>
+        <div class="servers-menu-list" id="servers-menu" role="menu" aria-labelledby="servers-menu-button">
+            <p class="servers-menu-head" aria-hidden="true">Server pages</p>
+            {% for s in monitored_servers %}
+            <a class="servers-menu-item server-link{% if current_server and s.name == current_server.name %} is-current{% endif %}"
+               role="menuitem" tabindex="-1"
+               href="{{ url_for('dashboard.server_page', server_key=s.name) }}"
+               data-server="{{ s.name }}"
+               {% if current_server and s.name == current_server.name %}aria-current="page"{% endif %}>
+                <span class="status-dot" aria-hidden="true"></span>
+                <span class="servers-menu-name">{{ s.name }}</span>
+                <span class="servers-menu-host">{{ s.host or '' }}</span>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>

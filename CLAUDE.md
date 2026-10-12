@@ -26,7 +26,13 @@ The system uses Docker Compose to orchestrate **three services**:
 
 ### Database Schema
 - `server_metrics`: System metrics (CPU, RAM, disk usage, connections, users)
-- `top_users`: Per-user resource consumption data
+- `top_users`: Per-user resource consumption data (one row per server+user; `cpu` is percent of ONE logical CPU over a short sample, so 400 = four cores; `disk` NULL = unknown)
+- `top_users_history`: Append-only per-user activity (only rows above the activity thresholds in `backend.py`)
+- `server_filesystems`, `server_disk_io`, `server_network`: Per-mount / per-device / per-interface rows for each collection run; I/O and network rates are averages since the previous run (`srcs/DataCollection/rates.py`)
+- `server_services`: Per-run service states (active / inactive / failed / missing) per server
+- `server_sessions`, `server_mount_checks`: Per-run open SSH/VNC sessions and required-mount states; rows share the run's `server_metrics` timestamp, so no session rows means none were open
+- `license_snapshots`, `license_features`, `license_usage_history`, `license_checkouts`: EDA license pool status, current per-feature usage, in-use history and checkout owners (parsed by `srcs/DataCollection/license_parser.py`)
+- `license_expiry`: every feature in each vendor's license file with its expiry (`lmstat -i`, via `LicenseUsage.sh --expiry`), replaced on each successful read; `license_validity()` in `utils/insights.py` turns it into valid / expiring / partly_expired / expired
 
 ## Dashboard Architecture (Unified Flask App)
 
@@ -35,13 +41,16 @@ The dashboard is a unified Flask application (`srcs/Backend/app.py`) combining A
 ### Backend Structure
 - **`app.py`** - Application factory with all API endpoints and error handlers
 - **`flask_config.py`** - KU brand colors, dashboard config, fonts, thresholds
-- **`blueprints/dashboard.py`** - Dashboard page routes (5 tabs)
+- **`blueprints/dashboard.py`** - Dashboard page routes (5 tabs). Server Details has a per-machine detail section (mounts, disks, network, services); User Activity opens a user detail drawer (per-server usage, licenses, activity history) from a username
+- **Server pages** - `/server/<name|host|ip>` (`templates/server/index.html`, `static/js/server.js`, `static/css/server.css`, rules in `utils/server_page.py`): one tab per server with free CPU/RAM, required mounts, VNC desktops, SSH logins and top users. Both page types share one navbar, `templates/partials/nav.html` (section tabs + a "Servers" menu, `static/js/servers-menu.js`); on server pages the tabs are links back to the dashboard sections and "Servers" is the active item. The menu sits outside the scrolling `.tabs-nav` so it is not clipped; its items use `.server-link`, not `.tab-button`, which `tabs.js` binds. Each server's port 80 redirects to its page (not KSRC7, which hosts the dashboard). Setup: `Docs/Project-Overview/SERVER_PAGES.md`
 
 ### Frontend Structure (Vanilla HTML/CSS/JS)
 - **Templates** (`templates/`) - Jinja2 templates
   - `base.html` - Base layout with header, theme toggle, scripts
+  - `partials/nav.html` - Site navbar shared by the dashboard and server pages
   - `dashboard/index.html` - Main dashboard with tab navigation
   - `dashboard/panels/` - Tab panel templates (overview, servers, users, analytics, network)
+    - `overview.html` is a one-screen status board: fleet table (8/12 columns) beside a compact Needs attention list and an EDA license summary (4/12)
   - `errors/` - 404 and 500 error pages
 - **Static CSS** (`static/css/`) - Modular stylesheets
   - `main.css` - Core design system (variables, header, buttons, cards, footer)
@@ -52,6 +61,7 @@ The dashboard is a unified Flask application (`srcs/Backend/app.py`) combining A
   - `tables.css` - Data tables with alternating rows, search, pagination
   - `charts.css` - Chart containers, controls, network grids
   - `animations.css` - Skeleton loading, stagger animations, micro-interactions
+  - `server.css` - Server page (tab strip, capacity figures, session tables)
 - **Static JS** (`static/js/`) - Modular JavaScript
   - `api.js` - API client with retry logic (3 attempts, exponential backoff, 10s timeout)
   - `dashboard.js` - Main data loading, rendering (progress rings, trend arrows)
@@ -125,7 +135,7 @@ This project uses **UV** (https://docs.astral.sh/uv/), a fast Python package man
 
 **Managing Dependencies:**
 ```bash
-cd srcs/Backend  # or DataCollection or schema
+cd srcs/Backend  # or DataCollection
 uv sync
 
 # Add/remove dependencies
@@ -155,10 +165,17 @@ psql -h localhost -U postgres -d server_db
 ### Environment Variables
 Create `.env` file with:
 - `POSTGRES_PASSWORD`: Database password
-- `SERVER{1-7}_NAME`: Server display names
-- `SERVER{1-7}_HOST`: Server IP addresses
-- `SERVER{1-7}_USERNAME`: SSH usernames
-- `SERVER{1-7}_PASSWORD`: SSH passwords
+- `SECRET_KEY`: Flask secret key
+- `SERVER{1-9}_NAME`: Server display names
+- `SERVER{1-9}_HOST`: Server hostnames (e.g. `ksrc2.kunet.ae`; server pages also resolve by it)
+- `SERVER{1-9}_IP`: Address the collector connects to over SSH
+- `SERVER{1-9}_USERNAME`: SSH usernames
+- `SERVER{1-9}_PASSWORD`: SSH passwords (being replaced by keys)
+- `SERVER{1-9}_KEY_FILE`: SSH private key path inside the container (used instead of the password; see `Docs/Project-Overview/SSH_KEY_MIGRATION.md`)
+- `MONITORED_SERVICES`: services checked on every server (default `sshd crond`); other failed systemd units are reported too
+- `REQUIRED_MOUNTS`: filesystems that must be mounted on every server, by mount point or export name (default `KSRC_lab_share`)
+- `LICENSE_QUERY_SERVER`: name of a monitored server with the EDA vendor tools; `LicenseUsage.sh` runs there over SSH every 5 min (unset = license collection off)
+- `LICENSE_CADENCE_SERVER` / `LICENSE_SYNOPSYS_SERVER`: `port@host` license endpoints; `LICENSE_CADENCE_LMUTIL` / `LICENSE_SYNOPSYS_LMUTIL`: absolute `lmutil` paths on that server
 - `DEBUG`: Set to "True" for debug mode
 
 ### Dashboard Configuration
@@ -188,9 +205,15 @@ The unified dashboard (`srcs/Backend/app.py`) provides REST endpoints at `/api/`
 - `GET /api/health` - Health check
 
 ### Actionable Insights (rules in `utils/insights.py`, tests in `tests/test_insights.py`)
-- `GET /api/insights/attention` - Ranked issues with a suggested next step (offline, disk incl. 14-day fill forecast, memory, swap, CPU oversubscription); thresholds from `PERFORMANCE_THRESHOLDS`
+- `GET /api/insights/attention` - Ranked issues with a suggested next step (offline, per-mount fill and inodes with shared NFS reported once, 14-day fill forecast, memory, swap, CPU oversubscription, pressure stalls, saturated disks, NIC errors); thresholds from `PERFORMANCE_THRESHOLDS`
 - `GET /api/insights/placement` - Servers ranked by free cores (5-min load vs. logical CPUs) and free RAM
-- `GET /api/users/<username>/footprint` - One account's recorded usage across all servers (404 if unknown)
+- `GET /api/overview/fleet` - Overview table: every configured server ranked by free capacity (placement order), with CPU/memory/disk, VNC/SSH counts and required-mount state; never-reported servers last
+- `GET /api/users/<username>/footprint` - One account's recorded usage across all servers, plus the licenses it holds (404 if unknown)
+- `GET /api/users/<username>/history/<hours>` - When and where an account was active (default 24 h, max 90 days)
+- `GET /api/servers/<server_name>/filesystems|disk-io|network|services` - Latest per-mount, per-device, per-interface or per-service rows
+- `GET /api/servers/<name|host|ip>/summary` - Everything a server page shows (capacity, mounts, sessions, top users) from the latest run
+- `GET /api/licenses/summary` - Per-vendor query status, validity (expiry dates, from the license file, even with nothing checked out) and features in use with holders
+- `GET /api/licenses/history/<feature>?hours=24&vendor=` - In-use count over time for one feature
 
 ## Common Development Tasks
 

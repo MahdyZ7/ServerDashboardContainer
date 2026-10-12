@@ -73,6 +73,15 @@ class LicenseUsageTests(unittest.TestCase):
             "lmstat", "-c", "27030@explicit", "-S", "snpslmd", "-t", "4",
         ])
 
+    def test_expiry_adds_license_file_section_without_changing_status(self):
+        result = self.run_script("--expiry", SNPSLMD_LICENSE_FILE="27030@host")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("=== Synopsys license file | 27030@host |", result.stdout)
+        self.assertEqual(self.log.read_text().splitlines(), [
+            "lmstat", "-c", "27030@host", "-S", "snpslmd", "-t", "30",
+            "lmstat", "-i", "-c", "27030@host",
+        ])
+
     def test_one_vendor_failure_does_not_hide_other_report(self):
         result = self.run_script(CDS_LIC_FILE="5280@host", SNPSLMD_LICENSE_FILE="27030@host",
                                  FAIL_CADENCE="1")

@@ -7,3 +7,6 @@ dist
 server/public
 vite.config.ts.*
 .vscode
+
+# SSH private keys for the collector (Docs/Project-Overview/SSH_KEY_MIGRATION.md)
+keys/

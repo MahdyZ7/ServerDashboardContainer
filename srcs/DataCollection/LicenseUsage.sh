@@ -18,6 +18,8 @@ Run on a machine with vendor-provided lmutil and access to the license servers.
   --synopsys-lmutil PATH        Default: SYNOPSYS_LMUTIL, then LMUTIL, then lmutil
   --timeout SECONDS            Whole-query deadline per vendor (default: 30)
   --active-only                Hide feature blocks reporting zero checkouts
+  --expiry                     Also list every feature's expiry date (lmstat -i), in a
+                               "license file" section after each vendor's checkouts
   -h, --help                   Show this help
 
 SPEC may also be a license file or FlexNet server list; quote the entire value.
@@ -36,11 +38,13 @@ cadence_lmutil=${CADENCE_LMUTIL:-${LMUTIL:-lmutil}}
 synopsys_lmutil=${SYNOPSYS_LMUTIL:-${LMUTIL:-lmutil}}
 query_timeout=30
 active_only=false
+expiry=false
 
 while (( $# )); do
     case "$1" in
         -h|--help) usage; exit 0 ;;
         --active-only) active_only=true; shift ;;
+        --expiry) expiry=true; shift ;;
         --vendor|--cadence-server|--synopsys-server|--cadence-lmutil|--synopsys-lmutil|--timeout)
             (( $# >= 2 )) && [[ -n $2 && $2 != --* ]] || die "Missing value for $1"
             case "$1" in
@@ -67,6 +71,17 @@ elif [[ -z $cadence_server && -z $synopsys_server ]]; then
     die 'No servers configured; set CDS_LIC_FILE and/or SNPSLMD_LICENSE_FILE'
 fi
 
+# Every feature in the served license file with its expiry, whether or not it is
+# checked out. Supplementary: a failure here leaves expiry unknown and does not
+# change the exit status, which reports on usage.
+query_expiry() {
+    local label=$1 server=$2 binary=$3
+    printf '\n=== %s license file | %s | %s ===\n' \
+        "$label" "$server" "$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+    timeout --kill-after=2s "${query_timeout}s" "$binary" lmstat -i -c "$server" 2>&1 ||
+        printf 'LicenseUsage: %s expiry query failed; expiry is unknown.\n' "$label" >&2
+}
+
 query_vendor() {
     local label=$1 daemon=$2 server=$3 binary=$4 output result
     printf '\n=== %s license checkouts | %s | %s ===\n' \
@@ -87,6 +102,9 @@ query_vendor() {
         '
     else
         printf '%s\n' "$output"
+    fi
+    if $expiry && command -v "$binary" >/dev/null 2>&1; then
+        query_expiry "$label" "$server" "$binary"
     fi
     if (( result != 0 )); then
         printf 'LicenseUsage: %s query failed (exit %s); usage is unknown.\n' \

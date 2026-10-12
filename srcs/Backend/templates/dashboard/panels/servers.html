@@ -21,6 +21,21 @@
         <div class="skeleton-card skeleton" style="min-height: 360px;"></div>
         {% endfor %}
     </div>
+
+    <!-- Per-machine detail: health, mounts, disks, network from the latest collection -->
+    <section class="machine-detail" aria-labelledby="machine-detail-heading">
+        <h3 class="section-title" id="machine-detail-heading"><span class="kicker">02.2</span>Machine detail</h3>
+        <div class="table-controls">
+            <div class="filter-group">
+                <label for="machine-select">Server</label>
+                <select id="machine-select" aria-controls="machine-detail-body"></select>
+            </div>
+            <span class="table-result-count" id="machine-collected" aria-live="polite"></span>
+        </div>
+        <div id="machine-detail-body" aria-live="polite">
+            <p class="cell-muted">Loading…</p>
+        </div>
+    </section>
 </section>
 
 <script>

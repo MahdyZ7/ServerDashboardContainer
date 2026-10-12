@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}{{ server.name }} · {{ DASHBOARD_CONFIG.header_title }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/tabs.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/cards.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/tables.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/server.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-tabs">
+    {% include 'partials/nav.html' %}
+
+    <section class="server-page" id="server-page" data-server="{{ server.name }}" aria-labelledby="server-heading">
+        <header class="section-head server-head">
+            <div>
+                <p class="kicker">{{ server.host or 'Server' }}</p>
+                <h2 id="server-heading">{{ server.name }}</h2>
+                <p class="section-deck" id="server-lede" aria-live="polite">Loading the latest collection…</p>
+            </div>
+            <div class="server-head-meta">
+                <span class="status-badge status-offline" id="server-status"><span class="status-dot"></span>Loading</span>
+                <span class="server-collected" id="server-collected"></span>
+            </div>
+        </header>
+
+        <div id="server-figures" class="server-figures-row" aria-label="Spare capacity and shared storage">
+            {% for i in range(4) %}
+            <div class="server-figure skeleton" style="min-height: 120px;"></div>
+            {% endfor %}
+        </div>
+
+        <h3 class="section-title"><span class="kicker">01</span>VNC desktops</h3>
+        <div id="vnc-sessions" aria-live="polite"><p class="cell-muted">Loading…</p></div>
+
+        <h3 class="section-title"><span class="kicker">02</span>SSH logins</h3>
+        <div id="ssh-sessions" aria-live="polite"><p class="cell-muted">Loading…</p></div>
+
+        <h3 class="section-title"><span class="kicker">03</span>Top users</h3>
+        <div id="server-top-users" aria-live="polite"><p class="cell-muted">Loading…</p></div>
+    </section>
+</div>
+
+<footer class="dashboard-footer" role="contentinfo">
+    <div class="footer-controls">
+        <div class="footer-left">
+            <button class="btn btn-primary" id="server-refresh" aria-label="Refresh this server's data">
+                <i class="fas fa-sync-alt" aria-hidden="true"></i>
+                <span>Refresh</span>
+            </button>
+        </div>
+        <div class="footer-meta">
+            <span>Servers report every 15 minutes · this page re-reads every minute</span>
+        </div>
+    </div>
+    <p class="colophon">Khalifa University of Science and Technology · KSRC infrastructure telemetry · ku.ac.ae</p>
+</footer>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/api.js') }}"></script>
+<script src="{{ url_for('static', filename='js/servers-menu.js') }}"></script>
+<script src="{{ url_for('static', filename='js/server.js') }}"></script>
+{% endblock %}

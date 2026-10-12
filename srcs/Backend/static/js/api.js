@@ -97,6 +97,11 @@
             return fetchWithRetry(`${API_BASE}/insights/attention`);
         },
 
+        // Overview table: servers ranked by free capacity with sessions and mounts
+        async getFleet() {
+            return fetchWithRetry(`${API_BASE}/overview/fleet`);
+        },
+
         async getPlacement() {
             return fetchWithRetry(`${API_BASE}/insights/placement`);
         },
@@ -107,6 +112,28 @@
 
         async getServerHealth(serverName) {
             return fetchWithRetry(`${API_BASE}/health/${encodeURIComponent(serverName)}`);
+        },
+
+        // detail: 'filesystems' | 'disk-io' | 'network' (latest collection run)
+        async getServerDetail(serverName, detail) {
+            return fetchWithRetry(`${API_BASE}/servers/${encodeURIComponent(serverName)}/${encodeURIComponent(detail)}`);
+        },
+
+        // One server's page: capacity, required mounts, SSH/VNC sessions, top users
+        async getServerSummary(serverName) {
+            return fetchWithRetry(`${API_BASE}/servers/${encodeURIComponent(serverName)}/summary`);
+        },
+
+        async getLicenseSummary() {
+            return fetchWithRetry(`${API_BASE}/licenses/summary`);
+        },
+
+        async getLicenseHistory(feature, hours = 24) {
+            return fetchWithRetry(`${API_BASE}/licenses/history/${encodeURIComponent(feature)}?hours=${encodeURIComponent(hours)}`);
+        },
+
+        async getUserHistory(username, hours = 24) {
+            return fetchWithRetry(`${API_BASE}/users/${encodeURIComponent(username)}/history/${encodeURIComponent(hours)}`);
         }
     };
 

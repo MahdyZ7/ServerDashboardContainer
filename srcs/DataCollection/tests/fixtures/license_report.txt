@@ -1,0 +1,50 @@
+
+=== Cadence license checkouts | 5280@ku1bpaawv043.kunet.ae | 2026-10-01T16:20:10Z ===
+lmutil - Copyright (c) 1989-2023 Flexera. All Rights Reserved.
+Flexible License Manager status on Thu 10/1/2026 20:20
+
+License server status: 5280@ku1bpaawv043
+    License file(s) on ku1bpaawv043: C:\Cadence\LicenseManager\license.dat:
+
+ku1bpaawv043: license server UP (MASTER) v11.19.1
+
+Vendor daemon status (on ku1bpaawv043):
+
+    cdslmd: UP v11.19.1
+Feature usage info:
+
+Users of 111:  (Error: 195 licenses, unsupported by licensed server)
+
+Users of 12141:  (Error: 15 licenses, unsupported by licensed server)
+
+Users of FIDELITY_AUTOBLADE:  (Total of 5 licenses issued;  Total of 0 licenses in use)
+
+Users of Virtuoso_Schematic_Editor_L:  (Total of 20 licenses issued;  Total of 0 licenses in use)
+
+
+=== Synopsys license checkouts | 27030@ku1bpaawv043.kunet.ae | 2026-10-01T16:20:10Z ===
+lmutil - Copyright (c) 1989-2024 Flexera. All Rights Reserved.
+Flexible License Manager status on Thu 10/1/2026 20:20
+
+License server status: 27030@ku1bpaawv043
+    License file(s) on ku1bpaawv043: C:\Synopsys\SCL\2025.03\admin\license\Synopsys_2026.lic:
+
+ku1bpaawv043: license server UP (MASTER) v11.19.7
+
+Vendor daemon status (on ku1bpaawv043):
+
+   snpslmd: UP v11.19.7
+Feature usage info:
+
+Users of SSS:  (Total of 100000 licenses issued;  Total of 0 licenses in use)
+
+Users of DC-Expert:  (Total of 15 licenses issued;  Total of 3 licenses in use)
+
+  "DC-Expert" v2025.06, vendor: snpslmd, expiry: 06-nov-2026
+  vendor_string: ^1+S
+  floating license
+
+    user_a ksrc6.kunet.ae :1 la0aa11377346_1 (v2018.09) (ku1bpaawv043/27030 701), start Tue 9/29 23:31
+    user_b ksrc2.kunet.ae :5.0 la0a4a135713_1 (v2016.06) (ku1bpaawv043/27030 1201), start Tue 9/29 23:36
+    user_c ksrc2.kunet.ae :20.0 la0a4a1328635_1 (v2016.06) (ku1bpaawv043/27030 3418), start Thu 10/1 6:21
+

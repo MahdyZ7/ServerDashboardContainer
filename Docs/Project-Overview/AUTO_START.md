@@ -360,9 +360,9 @@ make status
 # 4. Check auto-start logs
 make autostart-logs
 
-# 5. Test dashboard
-curl http://localhost:3000
-curl http://localhost:5000/api/health
+# 5. Test dashboard (port 80; the container's 5000 is not published)
+curl -I http://localhost/
+curl http://localhost/api/health
 
 # 6. Verify auto-start is enabled
 make autostart-status
@@ -398,7 +398,6 @@ make down  # Stop now
 ## Related Documentation
 
 - [TROUBLESHOOTING.md](TROUBLESHOOTING.md) - Common issues and solutions
-- [QUICK_REFERENCE.md](QUICK_REFERENCE.md) - Quick command reference
 - [Docs/INDEX.md](../INDEX.md) - Documentation index
 
 ---
@@ -429,10 +428,10 @@ sudo systemctl cat server-dashboard      # View full config
 # Verification
 make ps                     # Check containers running
 make status                 # Check services status
-curl http://localhost:3000  # Test frontend
+curl http://localhost/api/health  # Test dashboard
 ```
 
 ---
 
-**Last Updated:** 2025-12-04
+**Last Updated:** 2026-10-12
 **Tested On:** RHEL 9.7, Docker Compose v2.20+

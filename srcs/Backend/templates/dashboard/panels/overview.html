@@ -1,62 +1,65 @@
-<!-- Usage Overview Panel -->
+<!-- Usage Overview Panel: one-screen status board -->
 <section class="overview-container" role="region" aria-labelledby="overview-heading">
-    <header class="section-head">
+    <header class="section-head board-head">
         <div>
             <p class="kicker">Section 01</p>
             <h2 id="overview-heading">Usage Overview</h2>
-            <p class="section-deck">Live resource load across every monitored server. Tick marks on each bar sit at the 70% warning and 90% critical thresholds.</p>
         </div>
+        <p class="board-summary" id="overview-lede" aria-live="polite"></p>
     </header>
 
-    <p class="lede" id="overview-lede" aria-live="polite"></p>
-
-    <!-- Action band: what needs fixing (admins) and where to run (users) -->
-    <div class="action-band">
-        <section class="action-panel attention-panel" aria-labelledby="attention-heading">
-            <header class="action-head">
-                <p class="kicker">For administrators</p>
-                <h3 id="attention-heading">Needs attention</h3>
-                <span class="attention-counts" id="attention-counts" aria-live="polite"></span>
+    <div class="board">
+        <!-- Fleet: every server, most free capacity first (top row = best place for a new job) -->
+        <section class="board-panel board-fleet" aria-labelledby="fleet-heading">
+            <header class="board-panel-head">
+                <h3 id="fleet-heading">Fleet</h3>
+                <span class="board-note">Most free capacity first · <span class="best-star" aria-hidden="true">★</span> best place for a new job</span>
             </header>
-            <ol class="attention-list" id="attention-list" aria-live="polite">
-                <li class="skeleton" style="min-height: 72px;"></li>
-                <li class="skeleton" style="min-height: 72px;"></li>
-            </ol>
+            <div class="table-wrapper">
+                <table class="data-table fleet-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">Server</th>
+                            <th scope="col" title="CPU busy now. Bars turn orange at 70% and red at 90%">CPU</th>
+                            <th scope="col" title="Memory in use. Bars turn orange at 70% and red at 90%">Memory</th>
+                            <th scope="col" title="Local disk in use. Bars turn orange at 70% and red at 90%">Disk</th>
+                            <th scope="col" class="col-numeric" title="Logical CPUs minus the 5-minute load">Free cores</th>
+                            <th scope="col" class="col-numeric" title="Memory available for new work">Free RAM</th>
+                            <th scope="col" class="col-numeric" title="VNC desktops open (in brackets: with a viewer connected)">VNC</th>
+                            <th scope="col" class="col-numeric" title="SSH terminals (in brackets: input in the last 30 minutes)">SSH</th>
+                            <th scope="col" class="col-center">Lab share</th>
+                        </tr>
+                    </thead>
+                    <tbody id="fleet-body" aria-live="polite">
+                        {% for i in range(6) %}
+                        <tr><td colspan="9"><div class="skeleton" style="height: 18px;"></div></td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </section>
 
-        <section class="action-panel placement-panel" aria-labelledby="placement-heading">
-            <header class="action-head">
-                <p class="kicker">For users</p>
-                <h3 id="placement-heading">Where to run a new job</h3>
-            </header>
-            <ol class="placement-list" id="placement-list">
-                <li class="skeleton" style="min-height: 56px;"></li>
-                <li class="skeleton" style="min-height: 56px;"></li>
-            </ol>
-            <p class="action-note">Ranked by spare cores (5-minute load vs. logical CPUs) and free memory, relative to the roomiest server.</p>
-        </section>
-    </div>
+        <div class="board-side">
+            <section class="board-panel" aria-labelledby="attention-heading">
+                <header class="board-panel-head">
+                    <h3 id="attention-heading">Needs attention</h3>
+                    <span class="attention-counts" id="attention-counts" aria-live="polite"></span>
+                </header>
+                <div id="attention-list" aria-live="polite">
+                    <div class="skeleton" style="height: 120px;"></div>
+                </div>
+            </section>
 
-    <h3 class="section-title"><span class="kicker">01.1</span>All servers</h3>
-
-    <!-- Loading State - Skeleton Cards -->
-    <div id="overview-loading" class="server-grid">
-        {% for i in range(4) %}
-        <div class="skeleton-card skeleton"></div>
-        {% endfor %}
-    </div>
-
-    <!-- Server Grid -->
-    <div id="server-grid" class="server-grid" hidden aria-label="Server cards grid"></div>
-
-    <!-- Empty State -->
-    <div id="overview-empty" class="empty-state" hidden role="status">
-        <i class="fas fa-server" aria-hidden="true"></i>
-        <h3>No servers available</h3>
-        <p>No server data is currently available. Please check your connection.</p>
-        <button class="btn btn-primary" onclick="loadServerGrid()" aria-label="Retry loading server data">
-            <i class="fas fa-sync-alt" aria-hidden="true"></i> Retry
-        </button>
+            <section class="board-panel" aria-labelledby="licenses-overview-heading">
+                <header class="board-panel-head">
+                    <h3 id="licenses-overview-heading">EDA licenses</h3>
+                    <a class="board-link" href="{{ url_for('dashboard.user_activity', _anchor='licenses-heading') }}">All checkouts →</a>
+                </header>
+                <div id="overview-licenses" aria-live="polite">
+                    <div class="skeleton" style="height: 90px;"></div>
+                </div>
+            </section>
+        </div>
     </div>
 </section>
 

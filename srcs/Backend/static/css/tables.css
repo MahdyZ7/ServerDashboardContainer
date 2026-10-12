@@ -199,7 +199,7 @@ select option {
 }
 
 .cell-truncate {
-    max-width: 200px;
+    max-width: 140px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -216,7 +216,7 @@ select option {
 /* Inline bar cells */
 .cell-bar {
     display: grid;
-    grid-template-columns: minmax(60px, 1fr) 3.5em;
+    grid-template-columns: minmax(40px, 1fr) auto;
     align-items: center;
     gap: 0.6rem;
 }
@@ -276,3 +276,72 @@ select option {
 }
 
 .pagination:empty { display: none; }
+
+/* Sortable column headers: the whole label is a button; arrow shows direction */
+.th-sort {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    color: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.th-sort::after {
+    content: "↕";
+    opacity: 0.35;
+    font-size: 0.75rem;
+}
+
+.th-sort:hover,
+.th-sort:focus-visible { color: var(--ink); }
+
+.th-sort:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+th[aria-sort="ascending"] .th-sort,
+th[aria-sort="descending"] .th-sort { color: var(--accent); }
+
+th[aria-sort="ascending"] .th-sort::after  { content: "↑"; opacity: 1; }
+th[aria-sort="descending"] .th-sort::after { content: "↓"; opacity: 1; }
+
+.col-numeric .th-sort { flex-direction: row-reverse; }
+
+/* Licenses a user holds: a vendor subheading, then one line per feature */
+.cell-licenses { line-height: 1.45; min-width: 9rem; }
+.license-group + .license-group { margin-top: 0.5rem; }
+.license-vendor {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+}
+.license-chip { display: block; }
+
+/* Username with the account's full name beneath it */
+.cell-user strong { display: block; }
+.cell-subline {
+    display: block;
+    max-width: 9rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.75rem;
+    color: var(--ink-faint);
+}
+.cell-date { white-space: nowrap; }
+
+/* Many-column tables: tighter cell padding so every header fits */
+.data-table--compact th,
+.data-table--compact td { padding-left: 0.5rem; padding-right: 0.5rem; }
+.data-table--compact .cell-truncate { max-width: 110px; }
