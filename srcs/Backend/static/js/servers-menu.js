@@ -1,7 +1,8 @@
 /**
  * Servers menu (navigation, partials/nav.html)
  * Click or Enter/Space/ArrowDown opens it, arrows move, Escape or Tab closes it.
- * Status dots: ServersMenu.mark(latestMetrics), or fetched on first open.
+ * Status dots: ServersMenu.mark(rows) with {server_name, online} or latest-metrics
+ * rows (judged by timestamp); otherwise fetched on first open.
  */
 
 (function() {
@@ -16,7 +17,8 @@
         const latest = Object.fromEntries((servers || []).map(s => [s.server_name, s]));
         document.querySelectorAll('.server-link[data-server]').forEach(link => {
             const m = latest[link.dataset.server];
-            const online = !!m && (Date.now() - new Date(m.timestamp).getTime()) / 60000 <= STALE_MINUTES;
+            const online = !!m && ('online' in m ? m.online
+                : (Date.now() - new Date(m.timestamp).getTime()) / 60000 <= STALE_MINUTES);
             link.classList.toggle('is-online', online);
             link.classList.toggle('is-offline', !online);
         });

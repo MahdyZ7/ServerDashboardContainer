@@ -190,90 +190,110 @@
     // Lede combines connectivity (from latest metrics) with the attention queue
     const ledeState = { total: null, reporting: null, issues: null };
 
-    function renderOverviewLede(servers) {
-        const stale = servers.filter(s => getServerStatus(s).class === 'status-offline').length;
-        ledeState.total = servers.length;
-        ledeState.reporting = servers.length - stale;
+    function renderOverviewLede(rows) {
+        ledeState.total = rows.length;
+        ledeState.reporting = rows.filter(r => r.status !== 'offline').length;
         updateLede();
     }
-
     function updateLede() {
         const lede = document.getElementById('overview-lede');
         if (!lede || ledeState.total === null) return;
 
         const { total, reporting, issues } = ledeState;
-        let text = reporting === total
-            ? `All <strong>${total}</strong> servers are reporting`
-            : `<strong>${reporting} of ${total}</strong> servers are reporting; <strong class="lede-crit">${total - reporting}</strong> ${total - reporting === 1 ? 'has' : 'have'} gone quiet`;
-
+        const parts = [reporting === total
+            ? `All <strong>${total}</strong> servers reporting`
+            : `<strong>${reporting} of ${total}</strong> servers reporting`];
         if (issues) {
-            const parts = [];
             if (issues.critical) parts.push(`<strong class="lede-crit">${issues.critical} critical</strong>`);
             if (issues.warning) parts.push(`<strong class="lede-warn">${issues.warning} ${issues.warning === 1 ? 'warning' : 'warnings'}</strong>`);
-            text += parts.length
-                ? `, with ${parts.join(' and ')} below.`
-                : ', and nothing needs attention.';
-        } else {
-            text += '.';
+            if (!issues.critical && !issues.warning) parts.push('nothing needs attention');
         }
-        lede.innerHTML = text;
+        lede.innerHTML = parts.join(' · ');
     }
-
     /**
-     * Load server grid (overview tab)
+     * Overview: fleet table, attention list and license summary
      */
     async function loadServerGrid() {
-        const container = document.getElementById('server-grid');
-        const loading = document.getElementById('overview-loading');
-        const empty = document.getElementById('overview-empty');
-
-        if (!container) return;
+        const body = document.getElementById('fleet-body');
+        if (!body) return;
+        loadAttention();
+        loadOverviewLicenses();
 
         try {
-            if (loading) loading.hidden = false;
-            container.hidden = true;
-            if (empty) empty.hidden = true;
-
-            loadActionBand();
-            const response = await API.getLatestMetrics();
-
-            if (!response.success || !response.data || response.data.length === 0) {
-                if (loading) loading.hidden = true;
-                if (empty) empty.hidden = false;
-                return;
-            }
-
-            renderOverviewLede(response.data);
-            window.ServersMenu?.mark(response.data);
-            container.innerHTML = response.data.map((server, i) => renderSimplifiedServerCard(server, i)).join('');
-
-            if (loading) loading.hidden = true;
-            container.hidden = false;
-
+            const response = await API.getFleet();
+            if (!response.success) throw new Error(response.error || 'Bad response');
+            const rows = response.data || [];
+            renderOverviewLede(rows);
+            window.ServersMenu?.mark(rows.map(r => ({ server_name: r.server_name, online: r.status !== 'offline' })));
+            body.innerHTML = rows.length ? rows.map(renderFleetRow).join('') : `
+                <tr><td colspan="9" class="table-empty">No server data yet.</td></tr>`;
         } catch (error) {
-            console.error('Error loading server grid:', error);
-            if (loading) loading.hidden = true;
-            if (empty) {
-                empty.hidden = false;
-                empty.innerHTML = `
-                    <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
-                    <h3>Failed to load data</h3>
-                    <p>Could not connect to the server. Please try again.</p>
-                    <button class="btn btn-primary" onclick="loadServerGrid()">
-                        <i class="fas fa-sync-alt" aria-hidden="true"></i> Retry
-                    </button>
-                `;
-            }
+            console.error('Error loading fleet:', error);
+            body.innerHTML = `<tr><td colspan="9" class="table-empty">
+                Failed to load server data.
+                <button class="btn btn-secondary" onclick="loadServerGrid()"><i class="fas fa-sync-alt" aria-hidden="true"></i> Retry</button>
+            </td></tr>`;
             Toast.error('Failed to load server metrics');
         }
     }
 
-    /**
-     * Load the overview action band: attention queue (admins) + placement (users)
-     */
-    async function loadActionBand() {
-        await Promise.all([loadAttention(), loadPlacement()]);
+    function fleetBar(pct) {
+        if (pct == null) return '<span class="cell-muted">—</span>';
+        const p = Math.min(100, Math.max(0, parseFloat(pct)));
+        return `<div class="fleet-bar">
+            <div class="fleet-bar-track"><i style="width:${p}%;background:${getPercentageColor(p)}"></i></div>
+            <span>${p.toFixed(0)}%</span>
+        </div>`;
     }
+
+    function ageText(minutes) {
+        if (minutes == null) return 'never reported';
+        if (minutes < 120) return `${minutes} min ago`;
+        if (minutes < 48 * 60) return `${Math.round(minutes / 60)} h ago`;
+        return `${Math.round(minutes / 1440)} days ago`;
+    }
+
+    const MOUNT_MARK = {
+        mounted: ['fa-check', 'is-ok', 'mounted'],
+        missing: ['fa-xmark', 'is-crit', 'not mounted'],
+        unresponsive: ['fa-triangle-exclamation', 'is-warn', 'not responding'],
+    };
+
+    function renderFleetRow(r) {
+        const name = escapeHtml(r.server_name);
+        const link = `<a class="server-page-link" href="/server/${encodeURIComponent(r.server_name)}">${name}</a>`;
+        if (r.status === 'offline') {
+            return `<tr class="fleet-row is-offline">
+                <td class="fleet-server"><span class="status-dot status-offline" aria-hidden="true"></span>${link}</td>
+                <td colspan="8" class="cell-muted">Not reporting — last data ${ageText(r.minutes_since_update)}</td>
+            </tr>`;
+        }
+        const dot = r.status === 'warning' ? 'status-warning' : '';
+        const star = r.best_for ? `<span class="best-star" title="Best place for a new job">★</span>` : '';
+        const lab = !r.detail_collected ? '<span class="cell-muted" title="Checked from the next collection">—</span>'
+            : r.mounts.length ? r.mounts.map(m => {
+                const [icon, tone, label] = MOUNT_MARK[m.state] || ['fa-question', 'is-warn', m.state];
+                return `<i class="fas ${icon} mount-mark ${tone}" title="${escapeHtml(m.name)}: ${escapeHtml(label)}"></i><span class="visually-hidden">${escapeHtml(m.name)} ${escapeHtml(label)}</span>`;
+            }).join(' ') : '<span class="cell-muted">—</span>';
+        const count = (n, inUse, word) => !r.detail_collected ? '<span class="cell-muted">—</span>'
+            : `${n}${n ? `<small title="${inUse} ${word}"> (${inUse})</small>` : ''}`;
+        return `<tr class="fleet-row">
+            <td class="fleet-server"><span class="status-dot ${dot}" aria-hidden="true"></span>${link}${star}</td>
+            <td>${fleetBar(r.cpu_usage_percent)}</td>
+            <td>${fleetBar(r.ram_percentage)}</td>
+            <td>${fleetBar(r.disk_percentage)}</td>
+            <td class="cell-numeric"><strong>${r.free_cores}</strong><small> / ${r.virtual_cpus}</small></td>
+            <td class="cell-numeric">${r.free_ram_gb != null ? `<strong>${Math.round(r.free_ram_gb)}</strong><small> / ${Math.round(r.ram_total_gb)} GB</small>` : '—'}</td>
+            <td class="cell-numeric">${count(r.vnc, r.vnc_in_use, 'viewed')}</td>
+            <td class="cell-numeric">${count(r.ssh, r.ssh_in_use, 'active')}</td>
+            <td class="col-center">${lab}</td>
+        </tr>`;
+    }
+    /**
+     * Needs attention: critical and warning items as one-line entries (detail on
+     * expand); beyond ATTENTION_VISIBLE, and all info items, behind toggles
+     */
+    const ATTENTION_VISIBLE = 5;
 
     async function loadAttention() {
         const list = document.getElementById('attention-list');
@@ -297,75 +317,131 @@
             }
 
             if (items.length === 0) {
-                list.innerHTML = `
-                    <li class="attention-clear">
-                        <strong>Nothing needs attention.</strong>
-                        Every reporting server is within its disk, memory and CPU thresholds.
-                    </li>`;
+                list.innerHTML = `<p class="attention-clear"><strong>Nothing needs attention.</strong>
+                    Every reporting server is within its thresholds.</p>`;
                 return;
             }
 
-            list.innerHTML = items.map((item, i) => `
-                <li class="attention-item sev-${escapeHtml(item.severity)}" style="--i:${i}">
-                    <div class="attention-meta">
-                        <span class="sev-label">${escapeHtml(item.severity)}</span>
-                        <span class="attention-cat">${escapeHtml(item.category)}</span>
-                    </div>
-                    <div class="attention-body">
-                        <p class="attention-title">${escapeHtml(item.title)}</p>
-                        <p class="attention-detail">${escapeHtml(item.detail)}</p>
-                        <p class="attention-action"><span>Next step</span>${escapeHtml(item.action)}</p>
-                    </div>
-                </li>`).join('');
+            const item = i => `
+                <li class="attention-line sev-${escapeHtml(i.severity)}">
+                    <details>
+                        <summary>
+                            <span class="sev-dot" aria-hidden="true"></span>
+                            <span class="attention-line-title">${escapeHtml(i.title)}</span>
+                            <span class="visually-hidden">(${escapeHtml(i.severity)})</span>
+                        </summary>
+                        <p class="attention-detail">${escapeHtml(i.detail)}</p>
+                        <p class="attention-action"><span>Next step</span>${escapeHtml(i.action)}</p>
+                    </details>
+                </li>`;
+            const urgent = items.filter(i => i.severity !== 'info');
+            const info = items.filter(i => i.severity === 'info');
+            const shown = urgent.slice(0, ATTENTION_VISIBLE);
+            const more = urgent.slice(ATTENTION_VISIBLE);
+            const group = (label, rows) => rows.length ? `
+                <details class="attention-more">
+                    <summary>${label}</summary>
+                    <ol class="attention-lines">${rows.map(item).join('')}</ol>
+                </details>` : '';
+
+            list.innerHTML = `
+                ${shown.length ? `<ol class="attention-lines">${shown.map(item).join('')}</ol>` : ''}
+                ${group(`${more.length} more`, more)}
+                ${group(`${info.length} info item${info.length === 1 ? '' : 's'}`, info)}`;
         } catch (error) {
             console.error('Error loading attention items:', error);
-            list.innerHTML = `
-                <li class="attention-clear">
-                    Could not load the attention queue.
-                    <button class="btn btn-secondary" onclick="loadActionBand()">Retry</button>
-                </li>`;
+            list.innerHTML = `<p class="attention-clear">Could not load the attention queue.
+                <button class="btn btn-secondary" onclick="loadServerGrid()">Retry</button></p>`;
         }
     }
 
-    async function loadPlacement() {
-        const list = document.getElementById('placement-list');
-        if (!list) return;
+    /**
+     * EDA licenses: per vendor, whether the license is valid (server answering,
+     * features not expired, next expiry), then seats in use and the features
+     * closest to their limit
+     */
+    const LICENSE_FEATURES_SHOWN = 2;
 
+    function formatDay(iso) {
+        if (!iso) return '—';
+        const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
+        return new Date(y, m - 1, d).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+
+    function plural(n, word) {
+        return `${n} ${word}${n === 1 ? '' : 's'}`;
+    }
+
+    // [tone, verdict, explanation] for one vendor
+    function licenseVerdict(v) {
+        if (v.status === 'failed') return ['crit', 'Server not answering', 'Last query failed; showing the last good data'];
+        if (v.daemon_status && v.daemon_status !== 'UP') return ['crit', 'Daemon down', `Vendor daemon reports ${v.daemon_status}`];
+        if (v.stale) return ['warn', 'Out of date', `No update for ${v.minutes_since_query} min`];
+        const x = v.validity;
+        if (!x) return ['muted', 'Server up', 'Expiry dates are read from the next collection'];
+        const days = x.days_left === 0 ? 'today' : `in ${plural(x.days_left, 'day')}`;
+        const nextNote = x.next_expiry && x.next_expiry !== x.valid_until
+            ? `${plural(x.next_expiry_features, 'feature')} end ${formatDay(x.next_expiry)} (${x.days_left} d)` : '';
+        const until = x.permanent ? 'No expiry date' : `Valid until ${formatDay(x.valid_until)}`;
+        switch (x.state) {
+            case 'expired':
+                return ['crit', 'Expired', `All ${x.features} features expired`];
+            case 'partly_expired':
+                return ['warn', `${x.expired} expired`, `${plural(x.expired, 'feature')} of ${x.features} expired · ${until}`];
+            case 'expiring':
+                return ['warn', `Expires ${days}`, x.next_expiry_features === x.features
+                    ? `All ${x.features} features end ${formatDay(x.next_expiry)}`
+                    : `${plural(x.next_expiry_features, 'feature')} end ${formatDay(x.next_expiry)} · ${until}`];
+            default:
+                return ['ok', 'Valid', [until, nextNote].filter(Boolean).join(' · ')];
+        }
+    }
+
+    async function loadOverviewLicenses() {
+        const el = document.getElementById('overview-licenses');
+        if (!el) return;
         try {
-            const response = await API.getPlacement();
+            const response = await API.getLicenseSummary();
             if (!response.success) throw new Error(response.error || 'Bad response');
-            const servers = response.data || [];
-
-            const badge = {
-                both: 'Best for CPU &amp; memory',
-                cpu: 'Most free cores',
-                memory: 'Most free memory'
-            };
-
-            list.innerHTML = servers.map((s, i) => `
-                <li class="placement-item ${s.available ? '' : 'is-unavailable'}" style="--i:${i}">
-                    <span class="placement-rank">${s.available ? String(i + 1).padStart(2, '0') : '—'}</span>
-                    <div class="placement-main">
-                        <div class="placement-name">
-                            ${escapeHtml(s.server_name)}
-                            ${s.best_for ? `<span class="placement-badge">${badge[s.best_for]}</span>` : ''}
-                            ${s.available ? '' : '<span class="placement-badge is-off">Unavailable</span>'}
-                        </div>
-                        <div class="placement-facts">
-                            <span><strong>${s.free_cores}</strong> of ${s.virtual_cpus} cores free</span>
-                            <span><strong>${s.free_ram_gb ?? '?'} GB</strong> of ${s.ram_total_gb ?? '?'} GB RAM free</span>
-                            <span>${s.sessions} session${s.sessions === 1 ? '' : 's'}</span>
-                        </div>
-                        <div class="placement-bar" aria-hidden="true"><i style="width:${s.score}%"></i></div>
-                    </div>
-                    <span class="placement-score" title="Headroom score">${s.available ? s.score : ''}</span>
-                </li>`).join('');
+            const { vendors, features } = response.data;
+            if (!vendors.length) {
+                el.innerHTML = '<p class="cell-muted">License collection is not configured.</p>';
+                return;
+            }
+            el.innerHTML = vendors.map(v => {
+                const name = v.vendor === 'all' ? 'License query' : v.vendor.charAt(0).toUpperCase() + v.vendor.slice(1);
+                const [tone, verdict, note] = licenseVerdict(v);
+                const own = features.filter(f => f.vendor === v.vendor);
+                const holders = [...new Set(own.flatMap(f => f.holders.map(h => h.username)))];
+                // Busiest relative to the pool, so a nearly exhausted feature surfaces first
+                const busiest = own.slice().sort((a, b) => (b.in_use / (b.issued || Infinity)) - (a.in_use / (a.issued || Infinity)))
+                    .slice(0, LICENSE_FEATURES_SHOWN);
+                const rows = busiest.map(f => {
+                    const pct = f.issued ? Math.min(100, f.in_use / f.issued * 100) : 0;
+                    return `<li class="license-line ${pct >= 90 ? 'is-near' : ''}">
+                        <span class="license-feature" title="${escapeHtml(f.feature)}">${escapeHtml(f.feature)}</span>
+                        <span class="fleet-bar-track"><i style="width:${pct}%;background:${getPercentageColor(pct)}"></i></span>
+                        <span class="license-count">${f.in_use}/${f.issued ?? '?'}</span>
+                    </li>`;
+                }).join('');
+                const use = own.length
+                    ? `${v.licenses_in_use ?? 0} seats in use across ${plural(own.length, 'feature')}${holders.length ? ` · ${holders.slice(0, 3).map(escapeHtml).join(', ')}${holders.length > 3 ? ` +${holders.length - 3}` : ''}` : ''}`
+                    : 'No licenses checked out';
+                return `<div class="license-vendor is-${tone}">
+                    <p class="license-vendor-head">
+                        <span class="license-vendor-name">${escapeHtml(name)}</span>
+                        <span class="license-verdict" title="${escapeHtml(v.error || '')}">${escapeHtml(verdict)}</span>
+                    </p>
+                    <p class="license-vendor-validity">${escapeHtml(note)}</p>
+                    <p class="license-vendor-use">${use}<span class="license-vendor-state"> · updated ${v.minutes_since_query} min ago</span></p>
+                    ${rows ? `<ul class="license-lines">${rows}</ul>` : ''}
+                </div>`;
+            }).join('');
         } catch (error) {
-            console.error('Error loading placement:', error);
-            list.innerHTML = `<li class="attention-clear">Could not rank servers right now.</li>`;
+            console.error('Error loading license overview:', error);
+            el.innerHTML = '<p class="cell-muted">Could not load license usage.</p>';
         }
     }
-
     /**
      * "Look up your usage" — one user's footprint across servers
      */
@@ -477,7 +553,6 @@
             </div>`;
     }
 
-    window.loadActionBand = loadActionBand;
 
     /**
      * Format bytes into human-readable string (KB, MB, GB, TB)
@@ -490,62 +565,6 @@
         if (b < 1073741824) return (b / 1048576).toFixed(1) + ' MB';
         if (b < 1099511627776) return (b / 1073741824).toFixed(2) + ' GB';
         return (b / 1099511627776).toFixed(2) + ' TB';
-    }
-
-    /**
-     * Build a gauge row: label + figure, hairline track with threshold ticks
-     */
-    function gaugeBar(label, valueHtml, pct, color) {
-        const clampedPct = Math.min(100, Math.max(0, pct));
-        return `
-            <div class="gauge-row">
-                <span class="gauge-label">${label}</span>
-                <span class="gauge-value">${valueHtml}</span>
-                <div class="gauge-track" role="meter" aria-label="${label}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${clampedPct.toFixed(0)}">
-                    <div class="gauge-fill" style="width:${clampedPct}%;background:${color};"></div>
-                </div>
-            </div>`;
-    }
-
-    /**
-     * Render overview entry for one server
-     */
-    function renderSimplifiedServerCard(server, index = 0) {
-        const cpuLoad = parseFloat(server.cpu_load_5min || 0);
-        const cpuUsage = server.cpu_usage_percent != null ? parseFloat(server.cpu_usage_percent) : null;
-        const ramUsage = parseFloat(server.ram_percentage || 0);
-        const diskUsage = parseFloat(server.disk_percentage || 0);
-        const swapPerc = parseFloat(server.swap_percentage || 0);
-
-        const cpuPct = cpuUsage !== null ? cpuUsage : Math.min(cpuLoad * 10, 100);
-        const cpuDisplay = cpuUsage !== null ? pctFigure(cpuUsage, 1) : cpuLoad.toFixed(2);
-        const cpuLabel = cpuUsage !== null ? 'CPU' : 'Load (5m)';
-
-        const status = getServerStatus(server);
-        const hasNet = server.net_rx_bytes > 0 || server.net_tx_bytes > 0;
-
-        return `
-            <article class="sc-overview ${status.class}" style="--i:${index}">
-                <header class="sc-head">
-                    <span class="sc-index">${String(index + 1).padStart(2, '0')}</span>
-                    <h3 class="sc-name" title="${escapeHtml(server.server_name)}"><a class="server-page-link" href="/server/${encodeURIComponent(server.server_name)}">${escapeHtml(server.server_name)}</a></h3>
-                    <span class="sc-badge ${status.class}"><span class="sc-status-dot"></span>${status.label}</span>
-                </header>
-                <div class="sc-gauges">
-                    ${gaugeBar(cpuLabel, cpuDisplay, cpuPct, getPercentageColor(cpuPct))}
-                    ${gaugeBar('Memory', pctFigure(ramUsage), ramUsage, getPercentageColor(ramUsage))}
-                    ${gaugeBar('Disk', pctFigure(diskUsage), diskUsage, getPercentageColor(diskUsage))}
-                    ${swapPerc > 0 ? gaugeBar('Swap', pctFigure(swapPerc), swapPerc, getPercentageColor(swapPerc)) : ''}
-                </div>
-                <footer class="sc-footer">
-                    <span class="sc-pill"><strong>${server.logged_users || 0}</strong> users</span>
-                    <span class="sc-pill"><strong>${server.tcp_connections || 0}</strong> TCP</span>
-                    ${hasNet ? `
-                    <span class="sc-pill" title="Received (cumulative)"><i class="fas fa-arrow-down" aria-hidden="true"></i><strong>${formatBytes(server.net_rx_bytes)}</strong></span>
-                    <span class="sc-pill" title="Transmitted (cumulative)"><i class="fas fa-arrow-up" aria-hidden="true"></i><strong>${formatBytes(server.net_tx_bytes)}</strong></span>` : ''}
-                </footer>
-            </article>
-        `;
     }
 
     /**

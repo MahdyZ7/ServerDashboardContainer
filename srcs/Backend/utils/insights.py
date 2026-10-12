@@ -6,7 +6,7 @@ what needs an admin's attention, and where a user should run a job.
 Pure functions only (no database access) so the rules are easy to test.
 """
 import re
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 # A server that has not reported for two collection cycles (2 x 15 min) is offline.
@@ -371,11 +371,89 @@ def format_held(start_at: Optional[datetime], now: datetime) -> Optional[str]:
     return f"{minutes / 1440:.0f} d"
 
 
+# Days before a license feature expires at which it becomes a warning / critical
+LICENSE_EXPIRY_WARNING_DAYS = 30
+LICENSE_EXPIRY_CRITICAL_DAYS = 7
+
+
+def license_validity(rows: List[Dict[str, Any]], today: date) -> Optional[Dict[str, Any]]:
+    """
+    Whether a vendor's license file is still valid, from `lmstat -i` rows
+    (license_expiry: one row per increment). A feature is valid while any of its
+    increments is; permanent increments never expire. None when never read.
+
+    state: valid | expiring (a feature ends within LICENSE_EXPIRY_WARNING_DAYS)
+           | partly_expired (some features ended) | expired (every feature ended)
+    """
+    if not rows:
+        return None
+    latest: Dict[str, date] = {}
+    for r in rows:
+        until = date.max if r.get("permanent") else r.get("expires")
+        if until is not None and (r["feature"] not in latest or until > latest[r["feature"]]):
+            latest[r["feature"]] = until
+    if not latest:
+        return None
+    expired = sorted(f for f, d in latest.items() if d < today)
+    remaining = sorted(d for d in latest.values() if d >= today)
+    next_expiry = remaining[0] if remaining else None
+    days_left = (next_expiry - today).days if next_expiry and next_expiry != date.max else None
+    soon = [f for f, d in latest.items() if today <= d <= today + timedelta(days=LICENSE_EXPIRY_WARNING_DAYS)]
+    if not remaining:
+        state = "expired"
+    elif expired:
+        state = "partly_expired"
+    elif days_left is not None and days_left <= LICENSE_EXPIRY_WARNING_DAYS:
+        state = "expiring"
+    else:
+        state = "valid"
+    final = max(latest.values())
+    return {
+        "state": state,
+        "features": len(latest),
+        "expired": len(expired),
+        "expired_examples": expired[:5],
+        "next_expiry": next_expiry.isoformat() if next_expiry and next_expiry != date.max else None,
+        "next_expiry_features": sum(1 for d in latest.values() if d == next_expiry) if next_expiry else 0,
+        "days_left": days_left,
+        "expiring_soon": len(soon),
+        "valid_until": None if final == date.max else final.isoformat(),
+        "permanent": final == date.max,
+        "checked_at": max((r["observed_at"] for r in rows if r.get("observed_at")), default=None),
+    }
+
+
+def _license_expiry_items(vendor: str, v: Dict[str, Any]) -> List[Dict[str, Any]]:
+    label = vendor.title()
+    items = []
+    renew = (f"Confirm the {label} renewal with the license administrator and install the new "
+             "license file on the license server before then; jobs needing these features will fail after it.")
+    if v["expired"]:
+        examples = ", ".join(v["expired_examples"]) + (" …" if v["expired"] > len(v["expired_examples"]) else "")
+        items.append(("critical" if v["state"] == "expired" else "warning", label,
+                      f"{v['expired']} of {v['features']} {label} features have expired",
+                      f"Expired: {examples}.",
+                      f"Renew them, or remove them from the {label} license file if no longer needed.",
+                      {"expired": v["expired"]}))
+    if v["days_left"] is not None and v["days_left"] <= LICENSE_EXPIRY_WARNING_DAYS:
+        expiry = date.fromisoformat(v["next_expiry"])
+        when = f"{expiry.day} {expiry:%b %Y}"
+        scope = (f"All {v['features']}" if v["next_expiry_features"] == v["features"]
+                 else f"{v['next_expiry_features']} of {v['features']}")
+        days = "today" if v["days_left"] == 0 else f"in {v['days_left']} day{'s' if v['days_left'] != 1 else ''}"
+        items.append(("critical" if v["days_left"] <= LICENSE_EXPIRY_CRITICAL_DAYS else "warning", label,
+                      f"{label} licenses expire {days}",
+                      f"{scope} {label} features expire on {when}.",
+                      renew, {"days_left": v["days_left"], "features": v["next_expiry_features"]}))
+    return items
+
+
 def build_license_items(
     snapshots: List[Dict[str, Any]],
     features: List[Dict[str, Any]],
     checkouts: List[Dict[str, Any]],
     now: datetime,
+    validity: Optional[Dict[str, Dict[str, Any]]] = None,
 ) -> List[Dict[str, Any]]:
     """
     License issues with a suggested next step.
@@ -383,6 +461,7 @@ def build_license_items(
     snapshots  latest license_snapshots row per vendor ("all" = the whole query failed)
     features   license_features rows with licenses in use
     checkouts  checkouts from the latest successful snapshot per vendor
+    validity   license_validity() per vendor (expired or soon-expiring features)
     """
     items: List[Dict[str, Any]] = []
 
@@ -411,6 +490,11 @@ def build_license_items(
                 snap.get("error") or "Some features reported errors.",
                 "Ask the license administrator why lmstat reports these errors; "
                 "usage for the affected features is unknown, not zero.")
+
+    for vendor, v in (validity or {}).items():
+        if v:
+            for severity, server, title, detail, action, metric in _license_expiry_items(vendor, v):
+                add(severity, server, title, detail, action, **metric)
 
     holders: Dict[tuple, List[Dict[str, Any]]] = {}
     for c in checkouts:

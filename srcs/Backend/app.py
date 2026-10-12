@@ -18,9 +18,9 @@ import requests
 from flask_config import Config, KU_COLORS, DASHBOARD_CONFIG, FONTS, PERFORMANCE_THRESHOLDS
 from blueprints.dashboard import dashboard_bp
 from utils.insights import (SEVERITY_ORDER, build_attention_items, build_license_items,
-                            format_held, rank_placement)
-from utils.server_page import (build_capacity, build_sessions, configured_servers, resolve_server,
-                               server_status, top_accounts)
+                            format_held, license_validity, rank_placement)
+from utils.server_page import (build_capacity, build_fleet, build_sessions, configured_servers,
+                               resolve_server, server_status, top_accounts)
 
 # Load environment variables
 load_dotenv(".env")
@@ -632,6 +632,16 @@ def create_app(config_class=Config):
         """)
         return snapshots, features, checkouts
 
+    def _license_validity(cursor, today):
+        """license_validity() per vendor from the stored lmstat -i rows."""
+        rows = _fetch_dicts(cursor, """
+            SELECT vendor, feature, expires, permanent, observed_at FROM license_expiry
+        """)
+        by_vendor = {}
+        for r in rows:
+            by_vendor.setdefault(r["vendor"], []).append(r)
+        return {vendor: license_validity(vrows, today) for vendor, vrows in by_vendor.items()}
+
     def _jsonable(row):
         return {k: float(v) if isinstance(v, Decimal) else v.isoformat() if isinstance(v, datetime) else v
                 for k, v in row.items()}
@@ -672,7 +682,8 @@ def create_app(config_class=Config):
                 disk_io_by_server=details["disk-io"],
                 network_by_server=details["network"],
                 services_by_server=details["services"],
-            ) + build_license_items(*_current_licenses(cursor), now)
+            ) + build_license_items(*_current_licenses(cursor), now,
+                                    validity=_license_validity(cursor, now.date()))
             items.sort(key=lambda i: (SEVERITY_ORDER[i["severity"]], i["server"]))
             return jsonify({
                 "success": True,
@@ -701,6 +712,38 @@ def create_app(config_class=Config):
             return jsonify({"success": True, "data": rank_placement(servers, datetime.now())})
         except Exception as e:
             logger.error(f"Error ranking placement: {e}", exc_info=True)
+            return jsonify({"success": False, "error": str(e)}), 500
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+
+    @app.route("/api/overview/fleet", methods=["GET"])
+    def get_fleet():
+        """Overview table: every server ranked by free capacity, with load, open
+        sessions and required mounts from its latest collection run."""
+        conn = None
+        cursor = None
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            servers = _fetch_dicts(cursor, LATEST_METRICS_SQL)
+            # Session and mount rows share their run's server_metrics timestamp
+            latest_run = """
+                JOIN (SELECT DISTINCT ON (server_name) server_name, timestamp FROM server_metrics
+                      ORDER BY server_name, timestamp DESC) run
+                  ON d.server_name = run.server_name AND d.timestamp = run.timestamp
+            """
+            sessions = _fetch_dicts(cursor, f"SELECT d.* FROM server_sessions d {latest_run}")
+            mounts = _fetch_dicts(cursor, f"SELECT d.* FROM server_mount_checks d {latest_run} ORDER BY d.id")
+            now = datetime.now()
+            rows = build_fleet(servers, _group_by_server(sessions), _group_by_server(mounts),
+                               now, PERFORMANCE_THRESHOLDS, [c["name"] for c in configured_servers()])
+            return jsonify({"success": True, "data": rows, "count": len(rows),
+                            "generated_at": now.isoformat()})
+        except Exception as e:
+            logger.error(f"Error building fleet overview: {e}", exc_info=True)
             return jsonify({"success": False, "error": str(e)}), 500
         finally:
             if cursor:
@@ -908,6 +951,7 @@ def create_app(config_class=Config):
             cursor = conn.cursor()
             snapshots, features, checkouts = _current_licenses(cursor)
             now = datetime.now()
+            validity = _license_validity(cursor, now.date())
             holders = {}
             for c in checkouts:
                 holders.setdefault((c["vendor"], c["feature"]), []).append(
@@ -918,6 +962,9 @@ def create_app(config_class=Config):
                 age = (now - snap["timestamp"]).total_seconds() / 60
                 row["minutes_since_query"] = round(age)
                 row["stale"] = snap["status"] == "failed" or age > 20
+                # Expiry from the license file; None = not read yet (unknown, not invalid)
+                v = validity.get(snap["vendor"])
+                row["validity"] = _jsonable(v) if v else None
                 vendors.append(row)
             return jsonify({
                 "success": True,

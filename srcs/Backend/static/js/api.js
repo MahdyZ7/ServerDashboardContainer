@@ -97,6 +97,11 @@
             return fetchWithRetry(`${API_BASE}/insights/attention`);
         },
 
+        // Overview table: servers ranked by free capacity with sessions and mounts
+        async getFleet() {
+            return fetchWithRetry(`${API_BASE}/overview/fleet`);
+        },
+
         async getPlacement() {
             return fetchWithRetry(`${API_BASE}/insights/placement`);
         },

@@ -10,7 +10,7 @@ import os
 from datetime import datetime
 from typing import Any, Dict, List, Mapping, Optional
 
-from utils.insights import STALE_AFTER_MINUTES, _num, minutes_since, parse_size_gb
+from utils.insights import STALE_AFTER_MINUTES, _num, minutes_since, parse_size_gb, rank_placement
 
 # An SSH terminal with no input for this long is idle rather than in use
 SESSION_IDLE_MINUTES = 30
@@ -147,3 +147,36 @@ def top_accounts(users: List[Dict[str, Any]], limit: int = TOP_USERS_LIMIT) -> L
     running = [u for u in users if (u.get("process_count") or 0) > 0 and not is_service_account(u.get("uid"))]
     running.sort(key=lambda u: (-_num(u.get("cpu")), -_num(u.get("rss_kb"))))
     return running[:limit]
+
+
+def build_fleet(servers: List[Dict[str, Any]], sessions_by_server: Dict[str, List[Dict[str, Any]]],
+                mounts_by_server: Dict[str, List[Dict[str, Any]]], now: datetime,
+                thresholds: Dict[str, float], configured: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+    """One overview row per server, most free capacity first (the placement ranking),
+    with load, session counts and required-mount state from its latest run.
+    Configured servers that have never reported are listed last."""
+    by_name = {m["server_name"]: m for m in servers}
+    rows = []
+    for rank in rank_placement(servers, now):
+        m = by_name[rank["server_name"]]
+        sessions = sessions_by_server.get(rank["server_name"], [])
+        mounts = mounts_by_server.get(rank["server_name"], [])
+        s = build_sessions(sessions, {})
+        rows.append(dict(
+            rank,
+            **server_status(m, now, thresholds),
+            cpu_usage_percent=_num(m["cpu_usage_percent"]) if m.get("cpu_usage_percent") is not None else None,
+            ram_percentage=m.get("ram_percentage"),
+            # Collectors older than the session/mount checks write neither
+            detail_collected=bool(sessions or mounts),
+            vnc=len(s["vnc"]),
+            vnc_in_use=s["vnc_in_use"],
+            ssh=sum(1 for x in s["ssh"] if x["terminal"]),
+            ssh_in_use=s["ssh_in_use"],
+            mounts=[{"name": x["name"], "state": x["state"]} for x in mounts],
+        ))
+    for name in configured or []:
+        if name not in by_name:
+            rows.append({"server_name": name, "status": "offline", "minutes_since_update": None,
+                         "available": False, "detail_collected": False, "mounts": []})
+    return rows

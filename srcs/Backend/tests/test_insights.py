@@ -193,3 +193,44 @@ def test_stopped_service_and_failed_units_and_zombies():
         ("info", "a has 250 zombie processes"),
         ("warning", "sshd is not running on a"),
     ]
+
+
+from datetime import date  # noqa: E402
+
+from utils.insights import license_validity  # noqa: E402
+
+TODAY = date(2026, 10, 12)
+
+
+def expiry(feature, expires=None, permanent=False):
+    return {"feature": feature, "expires": expires, "permanent": permanent, "observed_at": NOW}
+
+
+def test_license_validity_states():
+    assert license_validity([], TODAY) is None  # never read: unknown, not invalid
+    valid = license_validity([expiry("a", date(2028, 5, 17)), expiry("b", date(2026, 12, 12))], TODAY)
+    assert (valid["state"], valid["next_expiry"], valid["days_left"], valid["valid_until"]) == \
+        ("valid", "2026-12-12", 61, "2028-05-17")
+    expiring = license_validity([expiry("a", date(2026, 11, 6)), expiry("b", date(2026, 11, 6))], TODAY)
+    assert (expiring["state"], expiring["days_left"], expiring["next_expiry_features"]) == ("expiring", 25, 2)
+    partly = license_validity([expiry("old", date(2026, 1, 1)), expiry("new", date(2028, 1, 1))], TODAY)
+    assert (partly["state"], partly["expired"], partly["expired_examples"]) == ("partly_expired", 1, ["old"])
+    assert license_validity([expiry("old", date(2026, 1, 1))], TODAY)["state"] == "expired"
+
+
+def test_license_validity_newest_increment_and_permanent_win():
+    v = license_validity([expiry("a", date(2026, 1, 1)), expiry("a", date(2027, 1, 1)),
+                          expiry("p", permanent=True)], TODAY)
+    assert (v["state"], v["expired"], v["features"], v["permanent"], v["valid_until"]) == \
+        ("valid", 0, 2, True, None)
+
+
+def test_license_expiry_attention_items():
+    soon = {"synopsys": license_validity([expiry(f"f{i}", date(2026, 11, 6)) for i in range(3)], TODAY),
+            "cadence": license_validity([expiry("x", date(2026, 10, 15)), expiry("y", date(2028, 1, 1))], TODAY),
+            "never": None}
+    items = build_license_items([snap("synopsys"), snap("cadence")], [], [], NOW, validity=soon)
+    assert [(i["severity"], i["title"], i["detail"]) for i in items] == [
+        ("critical", "Cadence licenses expire in 3 days", "1 of 2 Cadence features expire on 15 Oct 2026."),
+        ("warning", "Synopsys licenses expire in 25 days", "All 3 Synopsys features expire on 6 Nov 2026."),
+    ]

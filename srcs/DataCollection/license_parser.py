@@ -11,6 +11,17 @@ Each section yields a snapshot with a query status:
   failed   no feature totals at all (server down, unreachable, unknown format)
 A failed query must never be read as zero usage.
 
+With LicenseUsage.sh --expiry, each vendor also has a "license file" section
+(`lmstat -i`) listing every feature with its expiry, checked out or not:
+
+    === Synopsys license file | 27030@host | 2026-10-01T16:20:10Z ===
+    Feature          Version     #licenses    Vendor        Expires
+    _______          _________   _________    ______        ________
+    DC-Expert        2025.06      15          snpslmd       06-nov-2026
+
+It becomes the snapshot's `expiries` (None when the section is missing or has no
+rows, so an unknown expiry is never read as "nothing licensed").
+
 lmstat checkout start times carry no year ("start Tue 9/29 23:31"). The raw
 text is kept; `start_at` is resolved to the most recent date on or before the
 query time whose weekday matches, and left None when it does not.
@@ -20,6 +31,10 @@ from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
 SECTION_RE = re.compile(r"^=== (?P<vendor>\S+) license checkouts \| (?P<endpoint>.*) \| (?P<queried>\S+) ===$")
+EXPIRY_SECTION_RE = re.compile(r"^=== (?P<vendor>\S+) license file \| (?P<endpoint>.*) \| (?P<queried>\S+) ===$")
+# feature version #licenses vendor-daemon expires   (rows follow the "_______" rule)
+EXPIRY_ROW_RE = re.compile(r"^(?P<feature>\S+)\s+(?P<version>\S+)\s+(?P<licenses>\d+|uncounted)\s+"
+                           r"(?P<daemon>\S+)\s+(?P<expires>\S+)\s*$", re.IGNORECASE)
 USERS_OF_RE = re.compile(r"^Users of (?P<feature>[^:]+):\s+\((?P<body>.*)\)\s*$")
 TOTALS_RE = re.compile(
     r"Total of (?P<issued>\d+) licenses? issued;\s+Total of (?P<in_use>\d+) licenses? in use"
@@ -44,16 +59,58 @@ ERROR_LINE_RE = re.compile(
 def parse_license_report(text: str) -> List[Dict]:
     """Split a LicenseUsage.sh report into per-vendor snapshots."""
     sections: List[Dict] = []
-    current: Optional[Dict] = None
+    expiry_lines: Dict[tuple, List[str]] = {}
+    current: Optional[List[str]] = None
     for line in text.splitlines():
         match = SECTION_RE.match(line)
+        expiry = EXPIRY_SECTION_RE.match(line)
         if match:
-            current = {"vendor": match["vendor"].lower(), "endpoint": match["endpoint"],
+            section = {"vendor": match["vendor"].lower(), "endpoint": match["endpoint"],
                        "queried_at": _parse_iso_utc(match["queried"]), "lines": []}
-            sections.append(current)
+            sections.append(section)
+            current = section["lines"]
+        elif expiry:
+            current = expiry_lines.setdefault((expiry["vendor"].lower(), expiry["endpoint"]), [])
         elif current is not None:
-            current["lines"].append(line)
-    return [_parse_section(s) for s in sections]
+            current.append(line)
+    snapshots = [_parse_section(s) for s in sections]
+    for snap in snapshots:
+        snap["expiries"] = parse_expiry_rows(expiry_lines.get((snap["vendor"], snap["endpoint"]), []))
+    return snapshots
+
+
+def parse_expiry_rows(lines: List[str]) -> Optional[List[Dict]]:
+    """Feature rows of `lmstat -i`. expires is a date, or None with permanent=True
+    ("permanent", or year 0 as FlexNet writes it). Returns None if no rows parsed."""
+    rows: List[Dict] = []
+    in_table = False
+    for line in lines:
+        if line.startswith("_______"):
+            in_table = True
+            continue
+        m = EXPIRY_ROW_RE.match(line) if in_table else None
+        if not m:
+            continue
+        raw = m["expires"].lower()
+        expires, permanent = None, raw == "permanent"
+        if not permanent:
+            try:
+                day, month, year = raw.split("-")
+                if int(year) == 0:
+                    permanent = True
+                else:
+                    expires = datetime.strptime(f"{day}-{month}-{int(year):04d}", "%d-%b-%Y").date()
+            except ValueError:
+                continue  # unknown expiry text: skip the row rather than guess
+        rows.append({
+            "feature": m["feature"],
+            "version": m["version"],
+            "licenses": int(m["licenses"]) if m["licenses"].isdigit() else None,
+            "daemon": m["daemon"],
+            "expires": expires,
+            "permanent": permanent,
+        })
+    return rows or None
 
 
 def _parse_section(section: Dict) -> Dict:

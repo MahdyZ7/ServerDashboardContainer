@@ -7,7 +7,8 @@ import unittest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from utils.server_page import (  # noqa: E402
-    build_capacity, build_sessions, configured_servers, resolve_server, server_status, top_accounts,
+    build_capacity, build_fleet, build_sessions, configured_servers, resolve_server, server_status,
+    top_accounts,
 )
 
 NOW = datetime(2026, 10, 12, 12, 0)
@@ -104,6 +105,30 @@ class CapacityAndStatusTests(unittest.TestCase):
                                 ("polkitd", 998), ("rhel9user", 1000), ("nobody", 65534)]]
         self.assertEqual({u["username"] for u in top_accounts(users)},
                          {"root", "rhel6user", "person", "rhel9user"})
+
+
+class FleetTests(unittest.TestCase):
+    def metrics(self, name, vcpus, load, minutes_ago=5):
+        return {"server_name": name, "timestamp": NOW - timedelta(minutes=minutes_ago),
+                "virtual_cpus": vcpus, "cpu_load_5min": load, "ram_total": "64G", "ram_used": "32G",
+                "ram_percentage": 50, "disk_percentage": 40, "cpu_usage_percent": 10}
+
+    def test_ranked_by_free_capacity_with_sessions_and_mounts(self):
+        servers = [self.metrics("small", 8, 7), self.metrics("big", 64, 4), self.metrics("gone", 64, 0, 90)]
+        rows = build_fleet(servers,
+                           {"big": [vnc("a", ":1", 1), vnc("a", ":2", 0), ssh("b", "pts/0", 10),
+                                    ssh("b", "notty", None)]},
+                           {"big": [{"name": "KSRC_lab_share", "state": "mounted"}],
+                            "small": [{"name": "KSRC_lab_share", "state": "missing"}]},
+                           NOW, THRESHOLDS, configured=["small", "never", "big"])
+        self.assertEqual([r["server_name"] for r in rows], ["big", "small", "gone", "never"])
+        self.assertEqual((rows[3]["status"], rows[3]["minutes_since_update"]), ("offline", None))
+        big = rows[0]
+        self.assertEqual((big["vnc"], big["vnc_in_use"], big["ssh"], big["ssh_in_use"]), (2, 1, 1, 1))
+        self.assertEqual((big["free_cores"], big["status"], big["detail_collected"]), (60.0, "online", True))
+        self.assertEqual(rows[1]["mounts"], [{"name": "KSRC_lab_share", "state": "missing"}])
+        self.assertEqual((rows[2]["status"], rows[2]["available"], rows[2]["detail_collected"]),
+                         ("offline", False, False))
 
 
 if __name__ == "__main__":

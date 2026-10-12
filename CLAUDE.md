@@ -32,6 +32,7 @@ The system uses Docker Compose to orchestrate **three services**:
 - `server_services`: Per-run service states (active / inactive / failed / missing) per server
 - `server_sessions`, `server_mount_checks`: Per-run open SSH/VNC sessions and required-mount states; rows share the run's `server_metrics` timestamp, so no session rows means none were open
 - `license_snapshots`, `license_features`, `license_usage_history`, `license_checkouts`: EDA license pool status, current per-feature usage, in-use history and checkout owners (parsed by `srcs/DataCollection/license_parser.py`)
+- `license_expiry`: every feature in each vendor's license file with its expiry (`lmstat -i`, via `LicenseUsage.sh --expiry`), replaced on each successful read; `license_validity()` in `utils/insights.py` turns it into valid / expiring / partly_expired / expired
 
 ## Dashboard Architecture (Unified Flask App)
 
@@ -49,6 +50,7 @@ The dashboard is a unified Flask application (`srcs/Backend/app.py`) combining A
   - `partials/nav.html` - Site navbar shared by the dashboard and server pages
   - `dashboard/index.html` - Main dashboard with tab navigation
   - `dashboard/panels/` - Tab panel templates (overview, servers, users, analytics, network)
+    - `overview.html` is a one-screen status board: fleet table (8/12 columns) beside a compact Needs attention list and an EDA license summary (4/12)
   - `errors/` - 404 and 500 error pages
 - **Static CSS** (`static/css/`) - Modular stylesheets
   - `main.css` - Core design system (variables, header, buttons, cards, footer)
@@ -203,11 +205,12 @@ The unified dashboard (`srcs/Backend/app.py`) provides REST endpoints at `/api/`
 ### Actionable Insights (rules in `utils/insights.py`, tests in `tests/test_insights.py`)
 - `GET /api/insights/attention` - Ranked issues with a suggested next step (offline, per-mount fill and inodes with shared NFS reported once, 14-day fill forecast, memory, swap, CPU oversubscription, pressure stalls, saturated disks, NIC errors); thresholds from `PERFORMANCE_THRESHOLDS`
 - `GET /api/insights/placement` - Servers ranked by free cores (5-min load vs. logical CPUs) and free RAM
+- `GET /api/overview/fleet` - Overview table: every configured server ranked by free capacity (placement order), with CPU/memory/disk, VNC/SSH counts and required-mount state; never-reported servers last
 - `GET /api/users/<username>/footprint` - One account's recorded usage across all servers, plus the licenses it holds (404 if unknown)
 - `GET /api/users/<username>/history/<hours>` - When and where an account was active (default 24 h, max 90 days)
 - `GET /api/servers/<server_name>/filesystems|disk-io|network|services` - Latest per-mount, per-device, per-interface or per-service rows
 - `GET /api/servers/<name|host|ip>/summary` - Everything a server page shows (capacity, mounts, sessions, top users) from the latest run
-- `GET /api/licenses/summary` - Per-vendor query status and features in use with holders
+- `GET /api/licenses/summary` - Per-vendor query status, validity (expiry dates, from the license file, even with nothing checked out) and features in use with holders
 - `GET /api/licenses/history/<feature>?hours=24&vendor=` - In-use count over time for one feature
 
 ## Common Development Tasks

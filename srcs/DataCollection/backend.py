@@ -346,6 +346,21 @@ def init_db():
 			start_at TIMESTAMP,
 			licenses INT
 		)""",
+        # Every feature in the served license file with its expiry (lmstat -i), replaced
+        # per vendor on each successful read; one row per increment
+        """
+		CREATE TABLE IF NOT EXISTS license_expiry (
+			vendor VARCHAR(32),
+			endpoint TEXT,
+			feature VARCHAR(255),
+			daemon VARCHAR(64),
+			version VARCHAR(64),
+			licenses INT,
+			expires DATE,
+			permanent BOOLEAN,
+			observed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		)""",
+        "CREATE INDEX IF NOT EXISTS idx_license_expiry_vendor ON license_expiry (vendor, endpoint)",
         "CREATE INDEX IF NOT EXISTS idx_license_snapshots_vendor_time ON license_snapshots (vendor, timestamp)",
         "CREATE INDEX IF NOT EXISTS idx_license_usage_feature_time ON license_usage_history (feature, timestamp)",
         "CREATE INDEX IF NOT EXISTS idx_license_checkouts_snapshot ON license_checkouts (snapshot_id)",
@@ -673,7 +688,7 @@ def read_license_config() -> Dict:
         "--cadence-lmutil": os.getenv("LICENSE_CADENCE_LMUTIL"),
         "--synopsys-lmutil": os.getenv("LICENSE_SYNOPSYS_LMUTIL"),
     }
-    args = []
+    args = ["--expiry"]
     for option, value in options.items():
         if value:
             args += [option, value]
@@ -738,6 +753,16 @@ def store_license_snapshots(snapshots: List[Dict], servers: List[Dict], query_ho
                       sum(bool(f["error"]) for f in features),
                       sum(f["in_use"] or 0 for f in features), query_host))
                 snapshot_id = cursor.fetchone()[0]
+                if snap.get("expiries") is not None:  # None = not read: keep the last good list
+                    cursor.execute("DELETE FROM license_expiry WHERE vendor = %s AND endpoint = %s",
+                                   (snap["vendor"], snap["endpoint"]))
+                    for e in snap["expiries"]:
+                        cursor.execute("""
+							INSERT INTO license_expiry (vendor, endpoint, feature, daemon, version,
+								licenses, expires, permanent)
+							VALUES (%(vendor)s, %(endpoint)s, %(feature)s, %(daemon)s, %(version)s,
+								%(licenses)s, %(expires)s, %(permanent)s)
+						""", dict(e, vendor=snap["vendor"], endpoint=snap["endpoint"]))
                 if snap["status"] == "failed":
                     continue  # keep the last good feature state
 

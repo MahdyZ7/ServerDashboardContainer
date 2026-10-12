@@ -1,12 +1,12 @@
 """License report parsing against an anonymised capture of this installation's lmstat output."""
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 import sys
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from license_parser import match_server, parse_license_report, resolve_start  # noqa: E402
+from license_parser import match_server, parse_expiry_rows, parse_license_report, resolve_start  # noqa: E402
 
 FIXTURE = (Path(__file__).parent / "fixtures" / "license_report.txt").read_text()
 
@@ -63,6 +63,37 @@ class LicenseReportTests(unittest.TestCase):
         jan = datetime(2027, 1, 2, 8, 0, tzinfo=timezone.utc)
         self.assertEqual(resolve_start("Thu 12/31 23:00", jan, timezone.utc), datetime(2026, 12, 31, 23, 0))
         self.assertIsNone(resolve_start("Mon 12/31 23:00", jan, timezone.utc))  # weekday mismatch
+
+    def test_expiry_section_attaches_to_its_vendor(self):
+        report = FIXTURE + """
+=== Synopsys license file | 27030@ku1bpaawv043.kunet.ae | 2026-10-01T16:20:10Z ===
+lmutil - Copyright (c) 1989-2024 Flexera. All Rights Reserved.
+NOTE: lmstat -i does not give information from the server,
+Feature                         Version     #licenses    Vendor        Expires
+_______                         _________   _________    ______        ________
+SSS                             1.0          100000      snpslmd       06-Nov-2026
+DC-Expert                       2025.06      15          snpslmd       06-nov-2026
+"""
+        snaps = {s["vendor"]: s for s in parse_license_report(report)}
+        self.assertIsNone(snaps["cadence"]["expiries"])  # not read: unknown, not "nothing licensed"
+        rows = snaps["synopsys"]["expiries"]
+        self.assertEqual([(r["feature"], r["licenses"], r["expires"]) for r in rows],
+                         [("SSS", 100000, date(2026, 11, 6)), ("DC-Expert", 15, date(2026, 11, 6))])
+        # Expiry rows do not disturb the usage section
+        self.assertEqual(snaps["synopsys"]["status"], "ok")
+
+    def test_expiry_permanent_uncounted_and_unparseable(self):
+        rows = parse_expiry_rows([
+            "Feature   Version   #licenses   Vendor   Expires",
+            "SSS 1.0 5 snpslmd 06-Nov-2026",     # before the rule: header area, ignored
+            "_______   _________   _________   ______   ________",
+            "Forever   1.0   uncounted   cdslmd   permanent",
+            "YearZero  1.0   10          cdslmd   1-jan-0",
+            "Odd       1.0   10          cdslmd   someday",
+        ])
+        self.assertEqual([(r["feature"], r["licenses"], r["expires"], r["permanent"]) for r in rows],
+                         [("Forever", None, None, True), ("YearZero", 10, None, True)])
+        self.assertIsNone(parse_expiry_rows(["no table here"]))
 
     def test_match_server_by_short_hostname(self):
         servers = [{"name": "KSRC6", "host": None, "ip": "10.0.0.6"}]
