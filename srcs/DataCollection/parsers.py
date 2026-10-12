@@ -83,9 +83,15 @@ RECORD_TYPES = {
                         "rx_errors", "tx_errors", "rx_dropped", "tx_dropped"]),
     # monitored: 1 = requested service, 0 = some other failed systemd unit
     "svc": ("services", ["service", "state", "monitored"]),
+    # kind ssh: session = tty or "notty", idle_seconds since terminal input;
+    # kind vnc: session = display, viewers = clients connected now, remote_host = their addresses
+    "sess": ("sessions", ["kind", "username", "session", "remote_host", "started_epoch",
+                          "idle_seconds", "viewers"]),
+    # state: mounted, unresponsive or missing
+    "mnt": ("mount_checks", ["name", "state", "mount_point", "source", "fstype"]),
 }
 # Columns besides the first that hold text rather than numbers
-TEXT_COLUMNS = {"fstype", "source", "name", "state"}
+TEXT_COLUMNS = {"fstype", "source", "name", "state", "username", "session", "remote_host", "mount_point"}
 
 
 def parse_monitoring_data(data: str) -> Dict:

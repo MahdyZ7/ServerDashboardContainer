@@ -67,6 +67,37 @@ class HostMetricsTests(unittest.TestCase):
         self.assertTrue(all(s["monitored"] == 0 for name, s in states.items()
                             if name not in ("sshd", "no-such-svc")))
 
+    def test_required_mounts_by_name_or_path(self):
+        metrics = parse_monitoring_data(run_script("mini_monitering.sh", "--kv", "--mounts", "/ no_such_share"))
+        mounts = {m["name"]: m for m in metrics["mount_checks"]}
+        self.assertEqual(mounts["/"]["state"], "mounted")
+        self.assertEqual(mounts["/"]["mount_point"], "/")
+        self.assertEqual(mounts["no_such_share"]["state"], "missing")
+        self.assertEqual(mounts["no_such_share"]["mount_point"], "")
+
+    def test_live_sessions_parse(self):
+        metrics = parse_monitoring_data(run_script("mini_monitering.sh", "--kv"))
+        for sess in metrics["sessions"]:
+            self.assertIn(sess["kind"], ("ssh", "vnc"))
+            self.assertTrue(sess["username"])
+            if sess["kind"] == "ssh" and sess["session"] != "notty":
+                self.assertGreaterEqual(sess["idle_seconds"], 0)
+
+    def test_session_records(self):
+        metrics = parse_monitoring_data(
+            "format_version=2\n"
+            "sess=vnc\talice\t:3\t10.0.0.5,10.0.0.6\t1791787016\t\t2\n"
+            "sess=vnc\tbob\t\t\t1791787016\t\t\n"
+            "sess=ssh\tcarol\tpts/1\tlaptop.kunet.ae\t1791787016\t75\t\n"
+            "mnt=KSRC_lab_share\tunresponsive\t/KSRC_lab_share\tnfs:/KSRC_lab_share\tnfs4\n"
+        )
+        vnc, no_port, ssh = metrics["sessions"]
+        self.assertEqual((vnc["session"], vnc["viewers"], vnc["idle_seconds"]), (":3", 2, None))
+        self.assertIsNone(no_port["viewers"])  # unknown, not "nobody connected"
+        self.assertEqual((ssh["remote_host"], ssh["idle_seconds"], ssh["started_epoch"]),
+                         ("laptop.kunet.ae", 75, 1791787016))
+        self.assertEqual(metrics["mount_checks"][0]["state"], "unresponsive")
+
     def test_records_parse_mount_with_spaces_and_unknown_inodes(self):
         metrics = parse_monitoring_data(
             "format_version=2\n"

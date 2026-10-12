@@ -244,6 +244,7 @@
             }
 
             renderOverviewLede(response.data);
+            window.ServersMenu?.mark(response.data);
             container.innerHTML = response.data.map((server, i) => renderSimplifiedServerCard(server, i)).join('');
 
             if (loading) loading.hidden = true;
@@ -527,7 +528,7 @@
             <article class="sc-overview ${status.class}" style="--i:${index}">
                 <header class="sc-head">
                     <span class="sc-index">${String(index + 1).padStart(2, '0')}</span>
-                    <h3 class="sc-name" title="${escapeHtml(server.server_name)}">${escapeHtml(server.server_name)}</h3>
+                    <h3 class="sc-name" title="${escapeHtml(server.server_name)}"><a class="server-page-link" href="/server/${encodeURIComponent(server.server_name)}">${escapeHtml(server.server_name)}</a></h3>
                     <span class="sc-badge ${status.class}"><span class="sc-status-dot"></span>${status.label}</span>
                 </header>
                 <div class="sc-gauges">
@@ -589,7 +590,7 @@
                 <header class="server-card-header">
                     <div>
                         <p class="kicker">Server ${String(index + 1).padStart(2, '0')}</p>
-                        <h3>${escapeHtml(server.server_name)}</h3>
+                        <h3><a class="server-page-link" href="/server/${encodeURIComponent(server.server_name)}">${escapeHtml(server.server_name)}</a></h3>
                     </div>
                     <span class="status-badge ${status.class}">
                         <span class="status-dot"></span>

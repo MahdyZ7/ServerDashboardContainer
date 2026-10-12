@@ -1,0 +1,100 @@
+/**
+ * Server page — one machine's status (templates/server/index.html)
+ * Spare-capacity figures and session tables; navigation is partials/nav.html.
+ */
+
+/* ── Head ────────────────────────────────────────────────────────────── */
+.server-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--spacing-md) var(--spacing-xl);
+}
+
+.server-head .section-deck strong { font-weight: 600; color: var(--ink); }
+.server-head .lede-crit { color: var(--crit); }
+
+.server-head-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.4rem;
+}
+
+.server-collected {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+}
+
+/* ── Figures: square segments on a hairline grid ─────────────────────── */
+.server-figures-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    border-top: 2px solid var(--rule-strong);
+    border-left: 1px solid var(--rule);
+}
+
+.server-figure {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: var(--spacing-lg);
+    border-right: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    min-width: 0;
+}
+
+.server-figure .fig-value {
+    font-size: 2.25rem;
+    overflow-wrap: anywhere;
+}
+
+.server-figure .fig-bar > i { background: var(--ok); }
+.server-figure.is-warn .fig-bar > i { background: var(--warn); }
+
+.server-figure.is-warn .fig-value { color: var(--warn); }
+.server-figure.is-crit { background: color-mix(in srgb, var(--crit) 7%, transparent); }
+.server-figure.is-crit .fig-value { color: var(--crit); font-weight: 400; }
+
+.server-figure-note {
+    font-size: 0.8125rem;
+    color: var(--ink-soft);
+    overflow-wrap: anywhere;
+}
+
+/* ── Sessions ────────────────────────────────────────────────────────── */
+.server-callout {
+    margin-bottom: var(--spacing-md);
+    padding: 0.75rem 1rem;
+    border-left: 3px solid var(--warn);
+    background: var(--paper-sunk);
+    font-size: 0.9375rem;
+}
+
+.multi-badge {
+    display: inline-block;
+    margin-left: 0.5rem;
+    padding: 0.05rem 0.4rem;
+    border: 1px solid var(--warn);
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--warn);
+    vertical-align: 1px;
+}
+
+.data-table .cell-user strong { display: inline; }
+.data-table .cell-user .cell-subline { max-width: 14rem; }
+.data-table tr.row-multi td:first-child { box-shadow: inset 3px 0 0 var(--warn); padding-left: 0.75rem; }
+
+@media (max-width: 599px) {
+    .server-head-meta { align-items: flex-start; }
+    .server-figure { padding: var(--spacing-md); }
+    .server-figure .fig-value { font-size: 1.75rem; }
+}

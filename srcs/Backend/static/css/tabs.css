@@ -54,6 +54,9 @@
     transition: color var(--transition-fast);
 }
 
+/* Server pages render the same tabs as links back to the dashboard sections */
+a.tab-button { text-decoration: none; }
+
 .tab-button:hover { color: var(--ink); }
 
 .tab-button.active {
@@ -100,3 +103,153 @@
     animation: panelIn 620ms var(--ease) both;
 }
 .tab-panel.active .section-head > *:nth-child(2) { animation-delay: 80ms; }
+
+/* ========================================
+   Servers menu — gateway to each server's page, right end of the tab row
+   ======================================== */
+.tabs-nav-wrap--menu {
+    display: flex;
+    align-items: stretch;
+}
+
+.tabs-nav-wrap--menu .tabs-nav {
+    flex: 1;
+    min-width: 0;
+}
+
+.servers-menu {
+    position: relative;
+    flex-shrink: 0;
+    display: flex;
+    margin-left: clamp(1rem, 3vw, 2.75rem);
+    padding-left: clamp(1rem, 3vw, 2.75rem);
+    border-left: 1px solid var(--rule);
+}
+
+.servers-menu-button {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1rem 0 0.9rem;
+    background: none;
+    border: none;
+    font: 500 0.875rem var(--font-sans);
+    letter-spacing: 0.01em;
+    color: var(--accent);
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.servers-menu-button i {
+    font-size: 0.6875rem;
+    transition: transform var(--transition-fast);
+}
+
+.servers-menu-button[aria-expanded="true"] i { transform: rotate(180deg); }
+
+/* On a server page "Servers" is the active item: same ink and 2px rule as an active tab */
+.servers-menu.is-active .servers-menu-button { color: var(--ink); }
+.servers-menu.is-active .servers-menu-button i { color: var(--accent); }
+.servers-menu.is-active .servers-menu-button::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 2px;
+    background: var(--accent);
+}
+
+.servers-menu-button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+}
+
+.servers-menu-list {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    min-width: 260px;
+    max-height: min(70vh, 480px);
+    overflow-y: auto;
+    padding: 0.25rem 0;
+    background: var(--paper-raised);
+    border: 1px solid var(--ink);
+    border-top: 2px solid var(--accent);
+    box-shadow: var(--shadow-pop);
+    z-index: 100;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-6px);
+    transition: opacity var(--transition-base), transform var(--transition-base), visibility var(--transition-base);
+}
+
+.servers-menu-list.show {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+}
+
+.servers-menu-head {
+    padding: 0.6rem 1rem 0.4rem;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+}
+
+.servers-menu-item {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.55rem 1rem;
+    border-top: 1px solid var(--rule-faint);
+    font: 500 0.875rem var(--font-sans);
+    color: var(--ink);
+    text-decoration: none;
+}
+
+.servers-menu-item:hover,
+.servers-menu-item:focus-visible {
+    background: var(--accent-wash);
+    color: var(--accent);
+    outline: none;
+}
+
+.servers-menu-item.is-current {
+    color: var(--accent);
+    box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.servers-menu-host {
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: var(--ink-faint);
+}
+
+/* Dot: grey until the overview data shows the server reporting */
+.servers-menu-item .status-dot { background: var(--idle); }
+.servers-menu-item.is-online .status-dot { background: var(--ok); }
+.servers-menu-item.is-offline .servers-menu-host::after {
+    content: ' · not reporting';
+    color: var(--warn);
+}
+
+@media (max-width: 599px) {
+    .servers-menu { margin-left: 0.75rem; padding-left: 0.75rem; }
+    .servers-menu-item.is-current {
+    color: var(--accent);
+    box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.servers-menu-host { display: none; }
+    .servers-menu-item.is-offline .servers-menu-name::after {
+        content: ' · off';
+        color: var(--warn);
+        font-weight: 400;
+    }
+}

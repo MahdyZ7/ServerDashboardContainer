@@ -114,6 +114,11 @@
             return fetchWithRetry(`${API_BASE}/servers/${encodeURIComponent(serverName)}/${encodeURIComponent(detail)}`);
         },
 
+        // One server's page: capacity, required mounts, SSH/VNC sessions, top users
+        async getServerSummary(serverName) {
+            return fetchWithRetry(`${API_BASE}/servers/${encodeURIComponent(serverName)}/summary`);
+        },
+
         async getLicenseSummary() {
             return fetchWithRetry(`${API_BASE}/licenses/summary`);
         },

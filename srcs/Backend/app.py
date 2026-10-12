@@ -19,6 +19,8 @@ from flask_config import Config, KU_COLORS, DASHBOARD_CONFIG, FONTS, PERFORMANCE
 from blueprints.dashboard import dashboard_bp
 from utils.insights import (SEVERITY_ORDER, build_attention_items, build_license_items,
                             format_held, rank_placement)
+from utils.server_page import (build_capacity, build_sessions, configured_servers, resolve_server,
+                               server_status, top_accounts)
 
 # Load environment variables
 load_dotenv(".env")
@@ -777,6 +779,80 @@ def create_app(config_class=Config):
             })
         except Exception as e:
             logger.error(f"Error fetching {detail} for {server_name}: {e}", exc_info=True)
+            return jsonify({"success": False, "error": str(e)}), 500
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+
+    @app.route("/api/servers/<server_key>/summary", methods=["GET"])
+    def get_server_summary(server_key):
+        """Everything one server's status page shows, from its latest collection run:
+        spare CPU and memory, required mounts, open SSH/VNC sessions, heaviest accounts.
+
+        server_key may be the display name, hostname, short hostname or IP.
+        """
+        conn = None
+        cursor = None
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            server_name = resolve_server(server_key, configured_servers())
+            if server_name is None:
+                cursor.execute("SELECT DISTINCT server_name FROM server_metrics")
+                server_name = resolve_server(server_key, [{"name": r[0]} for r in cursor.fetchall()])
+            if server_name is None:
+                return jsonify({"success": False, "message": f"Unknown server '{server_key}'"}), 404
+
+            rows = _fetch_dicts(cursor, """
+                SELECT * FROM server_metrics WHERE server_name = %s ORDER BY timestamp DESC LIMIT 1
+            """, (server_name,))
+            if not rows:
+                return jsonify({"success": False, "message": f"No data collected for {server_name} yet"}), 404
+            metrics = rows[0]
+
+            # Sessions and mount checks are written in the same transaction as the
+            # metrics row, so they share its timestamp; no rows means none were open.
+            run = (server_name, metrics["timestamp"])
+            sessions = _fetch_dicts(cursor, """
+                SELECT kind, username, session, remote_host, started_at, idle_seconds, viewers
+                FROM server_sessions WHERE server_name = %s AND timestamp = %s
+            """, run)
+            mounts = _fetch_dicts(cursor, """
+                SELECT name, state, mount_point, source, fstype
+                FROM server_mount_checks WHERE server_name = %s AND timestamp = %s ORDER BY id
+            """, run)
+            users = _fetch_dicts(cursor, """
+                SELECT username, uid, full_name, cpu, mem, rss_kb, process_count, top_process, timestamp
+                FROM top_users WHERE server_name = %s
+            """, (server_name,))
+
+            now = datetime.now()
+            full_names = {u["username"]: u["full_name"] for u in users
+                          if u["full_name"] and u["full_name"] != "N/A"}
+            session_data = build_sessions(sessions, full_names)
+            for group in ("vnc", "ssh"):
+                session_data[group] = [_jsonable(s) for s in session_data[group]]
+            server = next((s for s in configured_servers() if s["name"] == server_name), {"name": server_name})
+            return jsonify({
+                "success": True,
+                "data": {
+                    "server_name": server_name,
+                    "host": server.get("host"),
+                    **server_status(metrics, now, PERFORMANCE_THRESHOLDS),
+                    "collected_at": metrics["timestamp"].isoformat(),
+                    "capacity": build_capacity(metrics),
+                    "mounts": mounts,
+                    # Collectors older than the session/mount checks write neither
+                    "detail_collected": bool(mounts or sessions),
+                    "sessions": session_data,
+                    "top_users": [_jsonable(u) for u in top_accounts(users)],
+                    "metrics": _jsonable(metrics),
+                },
+            })
+        except Exception as e:
+            logger.error(f"Error building summary for {server_key}: {e}", exc_info=True)
             return jsonify({"success": False, "error": str(e)}), 500
         finally:
             if cursor:

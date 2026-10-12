@@ -6,6 +6,9 @@
 #   --services "a b"   services to report (default "sshd crond"); state is active,
 #                      inactive, failed or missing (not installed). Other failed
 #                      systemd units are reported too, flagged as not monitored.
+#   --mounts "a b"     filesystems that must be mounted, matched by name against the
+#                      mount point or source (default "KSRC_lab_share"); state is
+#                      mounted, unresponsive (stat timed out) or missing
 # Diagnostics go to stderr; stdout carries only the report.
 
 export LC_ALL=C
@@ -13,11 +16,13 @@ export LC_ALL=C
 kv=false
 SAMPLE_SECONDS=1
 SERVICES="sshd crond"
+MOUNTS="KSRC_lab_share"
 while [ $# -ne 0 ]; do
 	case "$1" in
 		--kv) kv=true ;;
 		--sample-seconds) SAMPLE_SECONDS="$2"; shift ;;
 		--services) SERVICES="$2"; shift ;;
+		--mounts) MOUNTS="$2"; shift ;;
 	esac
 	shift
 done
@@ -120,6 +125,109 @@ SERVICE_LINES=$(for name in $SERVICES; do printf 'svc=%s\t%s\t1\n' "$name" "$(se
 				case " $SERVICES " in *" $unit "*) ;; *) printf 'svc=%s\tfailed\t0\n' "$unit" ;; esac
 			done
 	fi)
+
+# Login sessions, one line each: kind user session from started_epoch idle_seconds viewers
+BTIME=$(awk '/^btime/ {print $2}' /proc/stat)
+HZ=$(getconf CLK_TCK)
+NOW=$(date +%s)
+proc_start() {
+	awk -v b="$BTIME" -v hz="$HZ" '{rest = $0; sub(/^.*\) /, "", rest); split(rest, f, " "); printf "%d", b + f[20] / hz}' \
+		"/proc/$1/stat" 2>/dev/null
+}
+# The sshd process serving this collector, so its own connection is not reported
+SELF_SSHD=""
+p=$$
+while [ -n "$p" ] && [ "$p" -gt 1 ]; do
+	case "$(tr '\0' ' ' < "/proc/$p/cmdline" 2>/dev/null)" in sshd*) SELF_SSHD=$p; break ;; esac
+	p=$(awk '/^PPid:/ {print $2}' "/proc/$p/status" 2>/dev/null)
+done
+# SSH with a terminal: utmp entries from a remote host (":0"/":1" are X displays,
+# tmux registers its panes too). Idle = time since the terminal last saw input.
+# `who -u` ends with "idle pid (host)"; the date in between has 2 or 3 words.
+SSH_TTY_LINES=$(who -u 2>/dev/null | while read -r -a f; do
+	n=${#f[@]}
+	[ "$n" -ge 4 ] || continue
+	last=${f[n-1]}
+	[[ $last == \(*\) ]] || continue
+	host=${last:1:${#last}-2} pid=${f[n-2]} tty=${f[1]}
+	[[ -z $host || $host == :* || $host == tmux* ]] && continue
+	atime=$(stat -c %X "/dev/$tty" 2>/dev/null)
+	idle=""
+	[ -n "$atime" ] && idle=$((NOW > atime ? NOW - atime : 0))
+	printf 'sess=ssh\t%s\t%s\t%s\t%s\t%s\t\n' "${f[0]}" "$tty" "$host" "$(proc_start "$pid")" "$idle"
+done)
+# SSH without a terminal (VS Code, sftp, scp, port forwards): "sshd: user@notty"
+SSH_NOTTY_LINES=$(ps -e -o pid= -o args= 2>/dev/null | awk -v self="$SELF_SSHD" '
+	$1 != self && $2 ~ /^sshd(-session)?:$/ && $3 ~ /@notty$/ { sub(/@notty$/, "", $3); print $1, $3 }' |
+	while read -r pid user; do
+		printf 'sess=ssh\t%s\tnotty\t\t%s\t\t\n' "$user" "$(proc_start "$pid")"
+	done)
+# Established TCP connections as "local_port remote_addr" (IPv4 and v4-mapped IPv6)
+ESTABLISHED=$(awk '
+	function hex(s,   i, n) { n = 0; s = toupper(s); for (i = 1; i <= length(s); i++) n = n * 16 + index("0123456789ABCDEF", substr(s, i, 1)) - 1; return n }
+	function ip4(h) { return hex(substr(h, 7, 2)) "." hex(substr(h, 5, 2)) "." hex(substr(h, 3, 2)) "." hex(substr(h, 1, 2)) }
+	FNR > 1 && $4 == "01" {
+		split($2, l, ":"); split($3, r, ":"); a = r[1]
+		if (length(a) == 8) addr = ip4(a)
+		else if (substr(a, 1, 24) == "0000000000000000FFFF0000") addr = ip4(substr(a, 25))
+		else if (a == "00000000000000000000000001000000") addr = "::1"
+		else addr = "ipv6"
+		print hex(l[2]), addr
+	}' /proc/net/tcp /proc/net/tcp6 2>/dev/null)
+# VNC: one Xvnc per desktop. Its port is -rfbport, else 5900 + display number;
+# viewers = clients connected to that port now (127.0.0.1 = through an SSH tunnel).
+VNC_LINES=$(ps -C Xvnc,Xtigervnc,Xvnc-core -o pid= -o uid= -o args= 2>/dev/null | while read -r pid uid args; do
+	user=$(getent passwd "$uid" | cut -d: -f1)
+	read -r display port < <(awk '{
+		d = ""; p = ""
+		for (i = 1; i <= NF; i++) {
+			if (d == "" && $i ~ /^:[0-9]+$/) d = $i
+			if ($i == "-rfbport" && i < NF) p = $(i + 1)
+			else if ($i ~ /^-?rfbport=/) { p = $i; sub(/^-?rfbport=/, "", p) }
+		}
+		if (p == "" && d != "") p = 5900 + substr(d, 2)
+		print (d == "" ? "-" : d), (p ~ /^[0-9]+$/ && p > 0 ? p : "-")
+	}' <<< "$args")
+	viewers="" from=""
+	if [ "$port" != "-" ]; then
+		viewers=$(printf '%s\n' "$ESTABLISHED" | awk -v p="$port" '$1 == p' | grep -c .)
+		from=$(printf '%s\n' "$ESTABLISHED" | awk -v p="$port" '$1 == p {print $2}' | sort -u | paste -sd, -)
+	fi
+	[ "$display" = "-" ] && display=""
+	printf 'sess=vnc\t%s\t%s\t%s\t%s\t\t%s\n' "${user:-$uid}" "$display" "$from" "$(proc_start "$pid")" "$viewers"
+done)
+SESSION_LINES=$(printf '%s\n' "$VNC_LINES" "$SSH_TTY_LINES" "$SSH_NOTTY_LINES" | grep .)
+
+# Required mounts, read from /proc/mounts (never hangs). A name matches a mount
+# point or export path exactly or as its last component ("lab" matches /x/lab and
+# nfs:/x/lab). An automount point is touched once to mount it; a mount that does
+# not answer statfs within 10 s is unresponsive (SIGKILL: coreutils 8.4 on RHEL 6
+# has no timeout -k).
+find_mount() {
+	awk -v n="$1" -v want="$2" '
+		function ends(s, t) { return length(s) >= length(t) && substr(s, length(s) - length(t) + 1) == t }
+		($3 == "autofs") == want && ($2 == n || ends($2, "/" n) || ends($1, ":" n) || ends($1, "/" n)) {
+			print $2 "\t" $1 "\t" $3; exit
+		}' /proc/mounts
+}
+MOUNT_LINES=$(for name in $MOUNTS; do
+	found=$(find_mount "$name" 0)
+	if [ -z "$found" ]; then
+		auto=$(find_mount "$name" 1 | cut -f1)
+		if [ -n "$auto" ]; then
+			timeout -s KILL 10 stat -f -- "$auto/." >/dev/null 2>&1
+			found=$(find_mount "$name" 0)
+		fi
+	fi
+	if [ -z "$found" ]; then
+		printf 'mnt=%s\tmissing\t\t\t\n' "$name"
+		continue
+	fi
+	IFS=$'\t' read -r mp src fstype <<< "$found"
+	state=unresponsive
+	timeout -s KILL 10 stat -f -- "$mp" >/dev/null 2>&1 && state=mounted
+	printf 'mnt=%s\t%s\t%s\t%s\t%s\n' "$name" "$state" "$mp" "$src" "$fstype"
+done)
 
 # Pressure stall information: share of the last 60 s that tasks waited on a
 # resource. Empty when the kernel lacks PSI (before 4.20, or booted without psi=1).
@@ -236,6 +344,8 @@ if $kv; then
 		[ -n "$BLOCK_DEVICES" ] && echo "$BLOCK_DEVICES"
 		[ -n "$NETWORK" ] && echo "$NETWORK"
 		[ -n "$SERVICE_LINES" ] && echo "$SERVICE_LINES"
+		[ -n "$SESSION_LINES" ] && echo "$SESSION_LINES"
+		[ -n "$MOUNT_LINES" ] && echo "$MOUNT_LINES"
 	}
 else
 	printf "%-25s: %s\n" "Architecture" "${ARCH}"
@@ -253,6 +363,8 @@ else
 	printf "%-25s: %s\n" "VNC Users" "${ACTIVE_VNC}"
 	printf "%-25s: %s\n" "SSH Users" "${ACTIVE_SSH}"
 	printf "%-25s: %s running, %s blocked, %s zombie\n" "Tasks" "${PROCS_RUNNING}" "${PROCS_BLOCKED}" "${PROCS_ZOMBIE}"
+	printf "%s\n" "${MOUNT_LINES}" | awk -F'\t' 'NF {sub("mnt=", "", $1); printf "%-25s: %s %s\n", "Mount " $1, $2, $3}'
+	printf "%s\n" "${SESSION_LINES}" | awk -F'\t' 'NF {sub("sess=", "", $1); printf "%-25s: %s %s %s viewers=%s idle=%ss\n", "Session " $1, $2, $3, $4, $7, $6}'
 	printf "%s\n" "${SERVICE_LINES}" | awk -F'\t' 'NF {sub("svc=", "", $1); printf "%-25s: %s\n", "Service " $1, $2}'
 	printf "%-25s: cpu %s, memory %s/%s, io %s/%s (some/full, %% of 60 s)\n" "Pressure" \
 		"${PSI_CPU_SOME:-n/a}" "${PSI_MEM_SOME:-n/a}" "${PSI_MEM_FULL:-n/a}" "${PSI_IO_SOME:-n/a}" "${PSI_IO_FULL:-n/a}"

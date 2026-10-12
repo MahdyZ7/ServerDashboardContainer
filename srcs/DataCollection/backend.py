@@ -6,6 +6,7 @@ from typing import Dict, List
 import os
 from dotenv import load_dotenv
 import time
+from datetime import datetime
 from parsers import DISK_NOT_COLLECTED, ParseError, parse_monitoring_data, parse_top_users
 from rates import DISK_COUNTERS, NETWORK_COUNTERS, disk_rates, network_rates
 from license_parser import match_server, parse_license_report
@@ -32,9 +33,11 @@ HISTORY_MIN_IO_BPS: int = 1024 * 1024  # 1 MiB/s
 RETENTION_TABLES = ["server_metrics", "top_users", "top_users_history",
                     "server_filesystems", "server_disk_io", "server_network",
                     "license_snapshots", "license_usage_history", "license_checkouts",
-                    "server_services"]
+                    "server_services", "server_sessions", "server_mount_checks"]
 # Services whose state is checked on every server (space separated)
 MONITORED_SERVICES: str = os.getenv("MONITORED_SERVICES", "sshd crond")
+# Filesystems that must be mounted on every server, by mount point or export name
+REQUIRED_MOUNTS: str = os.getenv("REQUIRED_MOUNTS", "KSRC_lab_share")
 LICENSE_TIMEOUT_SECONDS: int = 90
 retention_cleanup_interval: int = 7 * int(
     60 * 24 / data_collection_interval
@@ -244,6 +247,33 @@ def init_db():
 			state VARCHAR(16),
 			monitored BOOLEAN
 		)""",
+        # SSH and VNC sessions open at collection time; a run with no sessions has no rows
+        """
+		CREATE TABLE IF NOT EXISTS server_sessions (
+			id BIGSERIAL PRIMARY KEY,
+			timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			server_name VARCHAR(255),
+			kind VARCHAR(8),
+			username VARCHAR(255),
+			session VARCHAR(64),
+			remote_host TEXT,
+			started_at TIMESTAMP,
+			idle_seconds INT,
+			viewers INT
+		)""",
+        """
+		CREATE TABLE IF NOT EXISTS server_mount_checks (
+			id BIGSERIAL PRIMARY KEY,
+			timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			server_name VARCHAR(255),
+			name VARCHAR(255),
+			state VARCHAR(16),
+			mount_point TEXT,
+			source TEXT,
+			fstype VARCHAR(32)
+		)""",
+        "CREATE INDEX IF NOT EXISTS idx_server_sessions_server_time ON server_sessions (server_name, timestamp)",
+        "CREATE INDEX IF NOT EXISTS idx_server_mount_checks_server_time ON server_mount_checks (server_name, timestamp)",
         "CREATE INDEX IF NOT EXISTS idx_server_services_server_time ON server_services (server_name, timestamp)",
         "CREATE INDEX IF NOT EXISTS idx_server_metrics_server_time ON server_metrics (server_name, timestamp)",
         "CREATE INDEX IF NOT EXISTS idx_server_filesystems_server_time ON server_filesystems (server_name, timestamp)",
@@ -429,7 +459,8 @@ def run_remote_script(server: Dict, script: str, args: List[str], timeout: int,
 
 def run_monitoring_script(server: Dict) -> Dict:
     """Collect host metrics from one server."""
-    output = run_remote_script(server, "mini_monitering.sh", ["--kv", "--services", MONITORED_SERVICES],
+    output = run_remote_script(server, "mini_monitering.sh",
+                               ["--kv", "--services", MONITORED_SERVICES, "--mounts", REQUIRED_MOUNTS],
                                METRICS_TIMEOUT_SECONDS)
     return parse_monitoring_data(output)
 
@@ -481,6 +512,13 @@ def store_metrics(metrics: Dict):
                         "INSERT INTO server_services (server_name, service, state, monitored) VALUES (%s, %s, %s, %s)",
                         (metrics["server_name"], svc["service"], svc["state"], bool(svc["monitored"])),
                     )
+                store_sessions(cursor, metrics["server_name"], metrics.get("sessions", []))
+                for mnt in metrics.get("mount_checks", []):
+                    cursor.execute("""
+						INSERT INTO server_mount_checks (server_name, name, state, mount_point, source, fstype)
+						VALUES (%s, %s, %s, %s, %s, %s)
+					""", (metrics["server_name"], mnt["name"], mnt["state"],
+                          mnt["mount_point"] or None, mnt["source"] or None, mnt["fstype"] or None))
                 store_counter_rows(cursor, metrics["server_name"], "server_disk_io", "device",
                                    ["name"], DISK_COUNTERS, disk_rates, metrics.get("block_devices", []))
                 store_counter_rows(cursor, metrics["server_name"], "server_network", "interface",
@@ -506,6 +544,20 @@ def store_filesystems(cursor, server_name: str, filesystems: List[Dict]):
 				%(used_bytes)s, %(avail_bytes)s, %(use_percent)s, %(inodes_total)s, %(inodes_used)s,
 				%(inode_percent)s)
 		""", dict(fs, server_name=server_name))
+
+
+def store_sessions(cursor, server_name: str, sessions: List[Dict]):
+    """Append this run's open sessions. Rows share the server_metrics row's timestamp
+    (same transaction), which is how the dashboard tells "none open" from "not collected"."""
+    for sess in sessions:
+        epoch = sess["started_epoch"]
+        cursor.execute("""
+			INSERT INTO server_sessions (server_name, kind, username, session, remote_host,
+				started_at, idle_seconds, viewers)
+			VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+		""", (server_name, sess["kind"], sess["username"], sess["session"] or None,
+              sess["remote_host"] or None, datetime.fromtimestamp(epoch) if epoch else None,
+              sess["idle_seconds"], sess["viewers"]))
 
 
 def store_counter_rows(cursor, server_name: str, table: str, key: str, labels: List[str],
