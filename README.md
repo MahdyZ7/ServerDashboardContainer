@@ -1,199 +1,90 @@
 # Server Dashboard Container
 
-Containerized server monitoring dashboard for student-facing server status, usage, and activity visibility.
+Status dashboard for the KSRC research servers: which machine has room for a job, who is on
+it (SSH and VNC), whether the lab share is mounted, what needs an administrator, and the state
+of the Cadence and Synopsys license pools. Built to the Khalifa University 2020 brand
+guidelines (`DesginGuideLine/KU_Guidelines_2020_V7.pdf`).
 
-Last reviewed: 2026-05-04
+Live at `http://ksrc7.kunet.ae/`; each server has a page at `/server/<name>`.
 
-## Current State
-
-This repository currently runs as a three-service Docker Compose stack:
-
-| Service | Container | Purpose |
-| --- | --- | --- |
-| `postgres` | `postgres` | PostgreSQL database for server metrics and top-user records |
-| `datacollection` | `DataCollection` | Cron-driven Python collector that connects to remote Linux servers over SSH |
-| `dashboard` | `Dashboard` | Unified Flask app serving the REST API and the Jinja/HTML/CSS/JS dashboard |
-
-The active frontend is not Dash. It is served by Flask templates in `srcs/Backend/templates/` with static JavaScript and CSS in `srcs/Backend/static/`. Charts are rendered with Chart.js in the browser.
-
-## Architecture
+## How it works
 
 ```text
-Browser
-  |
-  | HTTP :80
-  v
-Dashboard container
-  Flask app on :5000
-  - Jinja dashboard pages
-  - REST API under /api
-  |
-  | PostgreSQL connection on backend Docker network
-  v
-PostgreSQL container
-  - server_metrics
-  - top_users
-
-DataCollection container
-  - cron schedules collection jobs
-  - backend.py reads SERVER*_ environment variables
-  - BashGetInfo.sh sends monitoring scripts to remote servers over SSH
-  - parsed metrics are inserted into PostgreSQL
+Monitored servers (RHEL 6–9)            KSRC7 (this stack, Docker Compose)
+  mini_monitering.sh  ◄── SSH ──┐   ┌──────────────────────────────────────────┐
+  TopUsers.sh         ◄── SSH ──┤   │ DataCollection  cron: metrics every 15 min,│
+  LicenseUsage.sh (KSRC7) ◄─────┘   │   licenses every 5 min, disk scan nightly  │
+                                    │        │ parsed rows                       │
+                                    │        ▼                                   │
+                                    │ postgres (server_db)                       │
+                                    │        ▲                                   │
+                                    │ Dashboard  Flask: REST API + pages, :80    │
+                                    └──────────────────────────────────────────┘
 ```
 
-## Repository Layout
+- **DataCollection** (`srcs/DataCollection/`): `backend.py` runs each script on each server
+  through `BashGetInfo.sh` (scripts are sent over SSH, nothing is installed remotely), parses
+  the versioned output (`parsers.py`, `license_parser.py`) and stores it. `init_db()` in
+  `backend.py` is the schema.
+- **Dashboard** (`srcs/Backend/`): `app.py` serves the API under `/api` and the pages
+  (Jinja templates, plain CSS/JS, Chart.js).
 
-```text
-.
-├── docker-compose.yml
-├── Makefile
-├── README.md
-├── CLAUDE.md
-├── fix-port-conflict.sh
-├── setup-autostart.sh
-├── DesginGuideLine/
-│   └── KU_Guidelines_2020_V7.pdf
-├── Docs/
-│   ├── INDEX.md
-│   ├── Frontend-Improvements/
-│   ├── Monitoring-Analysis/
-│   ├── Project-Overview/
-│   └── Schema-System/      # superseded, history only
-└── srcs/
-    ├── Backend/
-    │   ├── app.py
-    │   ├── api.py
-    │   ├── flask_config.py
-    │   ├── blueprints/
-    │   ├── static/
-    │   ├── templates/
-    │   └── utils/
-    └── DataCollection/
-        ├── backend.py
-        ├── BashGetInfo.sh
-        ├── TopUsers.sh
-        ├── LicenseUsage.sh
-        ├── run-collection.sh
-        ├── mini_monitering.sh
-        ├── crontab
-        └── start-cron.sh
-```
+## Pages
 
-## Features
+| Page | Shows |
+| --- | --- |
+| Usage Overview (`/`) | One-screen board: servers ranked by free capacity, what needs attention, license validity and use |
+| Server Details | Per-server specification sheets; mounts, disks, network and services per machine |
+| User Activity | Per-account CPU, memory, disk, I/O and licenses held; history per user |
+| Performance Analytics, Network Monitor | Historical charts and network figures |
+| Server page (`/server/<name>`) | Free CPU and memory, lab share, VNC desktops, SSH logins, top users |
 
-- Server overview cards with online, warning, and offline status.
-- Detailed server metrics for CPU, RAM, disk, swap, TCP connections, SSH, VNC, logged users, and cumulative network bytes.
-- Historical charts for individual servers.
-- User activity table with search, server filter, sorting, CPU/memory/disk/process data, top process, and I/O counters.
-- Network activity panel with connection summaries.
-- JSON and CSV export.
-- Light and dark themes.
-- Auto-refresh interval configured in `srcs/Backend/flask_config.py`.
+## Setup
 
-## Configuration
-
-Create a root `.env` file. At minimum:
+Create `.env` in the repository root (never committed):
 
 ```env
-POSTGRES_PASSWORD=change-this
-SECRET_KEY=change-this
-DEBUG=False
+POSTGRES_PASSWORD=...
+SECRET_KEY=...
 
-SERVER1_NAME=Example Server
-SERVER1_IP=192.0.2.10
-SERVER1_USERNAME=student-monitor
-SERVER1_PASSWORD=change-this
+SERVER1_NAME=KSRC1
+SERVER1_HOST=ksrc1.kunet.ae
+SERVER1_IP=10.10.19.73
+SERVER1_USERNAME=monitoring
+SERVER1_KEY_FILE=/keys/ksrc1_monitoring    # or SERVER1_PASSWORD=...
+
+LICENSE_QUERY_SERVER=KSRC7                 # optional: EDA license collection
 ```
 
-The collector reads `SERVER1_*` through `SERVER9_*` from environment variables. `SERVER*_IP`, `SERVER*_USERNAME`, and `SERVER*_PASSWORD` are currently required by `srcs/DataCollection/backend.py`.
-
-## Running The Stack
+All variables, including `REQUIRED_MOUNTS`, `MONITORED_SERVICES` and the license settings, are
+listed in [CLAUDE.md](CLAUDE.md#environment-variables). Prefer SSH keys over passwords:
+[SSH_KEY_MIGRATION.md](Docs/Project-Overview/SSH_KEY_MIGRATION.md).
 
 ```bash
-make build
-make ps
+make build          # build and start the three containers
+make ps             # status
+make collect-once   # run a collection now instead of waiting for cron
 ```
 
-Open:
+Open `http://localhost/`.
 
-```text
-http://localhost
-```
-
-Useful commands:
+## Everyday commands
 
 ```bash
-make logs
-make logs-follow
+make logs-DataCollection-tail    # collection runs and failures
 make logs-Dashboard-tail
-make logs-DataCollection-tail
-make db-stats
-make collect-once
-make collect-once-with-disk
-make cron-logs
-make down
+make restart-service SERVICE=dashboard        # after Python/template changes
+make restart-service SERVICE=datacollection   # after .env changes
+make enable-autostart            # start on boot (Docs/Project-Overview/AUTO_START.md)
 ```
 
-## API Endpoints
+## Tests
 
-The Flask app in `srcs/Backend/app.py` exposes:
-
-| Endpoint | Purpose |
-| --- | --- |
-| `GET /api/health` | Dashboard service health check |
-| `GET /api/health/<server_name>` | Basic HTTP health check for one configured server |
-| `GET /api/servers/metrics/latest` | Latest metric row per server |
-| `GET /api/servers/<server_name>/metrics/historical/<hours>` | Historical metrics for one server |
-| `GET /api/servers/<server_name>/status` | Latest status and metrics for one server |
-| `GET /api/servers/list` | Distinct server names found in metrics |
-| `GET /api/users/top` | Top users across all servers |
-| `GET /api/users/top/<server_name>` | Top users for one server |
-| `GET /api/system/overview` | Aggregate dashboard statistics |
-
-`srcs/Backend/api.py` is a legacy standalone API file. The Compose stack starts `srcs/Backend/app.py`.
-
-## Data Collection
-
-The DataCollection image installs cron and registers `srcs/DataCollection/crontab`.
-
-Current schedule:
-
-| Schedule | Action |
-| --- | --- |
-| Every 15 minutes | Collect server metrics |
-| Daily at 23:17 | Collect user disk usage |
-| Sundays at 23:00 | Run retention cleanup |
-
-Remote collection flow:
-
-1. `backend.py` reads server config from `.env`.
-2. `server_online()` pings each server.
-3. `BashGetInfo.sh` uses `sshpass` to run `mini_monitering.sh` and `TopUsers.sh` remotely.
-4. Python parsers convert script output into dictionaries.
-5. Records are stored in PostgreSQL.
-
-Security note: password-based SSH via `sshpass` is still active and should be replaced with SSH key authentication. See `Docs/Project-Overview/CODE_REVIEW_FIX_PLAN.md`.
+```bash
+python3 -m unittest discover -s srcs/DataCollection/tests   # runs the collectors locally
+python3 -m pytest -q srcs/Backend/tests
+```
 
 ## Documentation
 
-Start with:
-
-- `Docs/INDEX.md`
-- `Docs/Project-Overview/CODE_REVIEW_FIX_PLAN.md`
-- `Docs/Project-Overview/SSH_KEY_MIGRATION.md`
-- `Docs/Project-Overview/TROUBLESHOOTING.md`
-
-The database schema and its migrations are defined in `init_db()` in `srcs/DataCollection/backend.py`.
-
-## Known Gaps
-
-- The active Compose stack has no Nginx container and no separate Dash frontend container.
-- Several historical docs describe older or planned architecture. Treat this README and `Docs/INDEX.md` as the current entry points.
-
-## Improvement Plan
-
-The prioritized remediation plan is tracked in:
-
-```text
-Docs/Project-Overview/CODE_REVIEW_FIX_PLAN.md
-```
+See [Docs/INDEX.md](Docs/INDEX.md).

@@ -165,11 +165,13 @@ psql -h localhost -U postgres -d server_db
 ### Environment Variables
 Create `.env` file with:
 - `POSTGRES_PASSWORD`: Database password
-- `SERVER{1-7}_NAME`: Server display names
-- `SERVER{1-7}_HOST`: Server IP addresses
-- `SERVER{1-7}_USERNAME`: SSH usernames
-- `SERVER{1-7}_PASSWORD`: SSH passwords
-- `SERVER{1-7}_KEY_FILE`: optional SSH private key path (used instead of the password; see `Docs/Project-Overview/SSH_KEY_MIGRATION.md`)
+- `SECRET_KEY`: Flask secret key
+- `SERVER{1-9}_NAME`: Server display names
+- `SERVER{1-9}_HOST`: Server hostnames (e.g. `ksrc2.kunet.ae`; server pages also resolve by it)
+- `SERVER{1-9}_IP`: Address the collector connects to over SSH
+- `SERVER{1-9}_USERNAME`: SSH usernames
+- `SERVER{1-9}_PASSWORD`: SSH passwords (being replaced by keys)
+- `SERVER{1-9}_KEY_FILE`: SSH private key path inside the container (used instead of the password; see `Docs/Project-Overview/SSH_KEY_MIGRATION.md`)
 - `MONITORED_SERVICES`: services checked on every server (default `sshd crond`); other failed systemd units are reported too
 - `REQUIRED_MOUNTS`: filesystems that must be mounted on every server, by mount point or export name (default `KSRC_lab_share`)
 - `LICENSE_QUERY_SERVER`: name of a monitored server with the EDA vendor tools; `LicenseUsage.sh` runs there over SSH every 5 min (unset = license collection off)

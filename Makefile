@@ -171,17 +171,19 @@ db-stats:
 	FROM top_users;"
 
 # Single execution commands (for testing scheduled mode)
+# Same entry point as cron (uv environment, container env, per-job lock):
+# a manual run is skipped while the scheduled run of the same job is active.
 collect-once:
 	@echo -e "${GREEN}Running single data collection cycle...${NC}"
-	docker exec DataCollection /bin/bash -c "EXECUTION_MODE=scheduled python backend.py"
+	docker exec DataCollection /app/run-collection.sh metrics COLLECT_DISK_USAGE=false RUN_CLEANUP=false
 
 collect-once-with-disk:
 	@echo -e "${GREEN}Running single data collection cycle with disk usage...${NC}"
-	docker exec DataCollection /bin/bash -c "EXECUTION_MODE=scheduled COLLECT_DISK_USAGE=true python backend.py"
+	docker exec DataCollection /app/run-collection.sh disk COLLECT_DISK_USAGE=true RUN_CLEANUP=false
 
 collect-once-with-cleanup:
 	@echo -e "${GREEN}Running single data collection cycle with cleanup...${NC}"
-	docker exec DataCollection /bin/bash -c "EXECUTION_MODE=scheduled RUN_CLEANUP=true python backend.py"
+	docker exec DataCollection /app/run-collection.sh metrics COLLECT_DISK_USAGE=false RUN_CLEANUP=true
 
 # Cron management (for scheduled mode)
 show-cron:
