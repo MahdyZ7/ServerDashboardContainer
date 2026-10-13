@@ -31,6 +31,7 @@ The system uses Docker Compose to orchestrate **three services**:
 - `server_filesystems`, `server_disk_io`, `server_network`: Per-mount / per-device / per-interface rows for each collection run; I/O and network rates are averages since the previous run (`srcs/DataCollection/rates.py`)
 - `server_services`: Per-run service states (active / inactive / failed / missing) per server
 - `server_sessions`, `server_mount_checks`: Per-run open SSH/VNC sessions and required-mount states; rows share the run's `server_metrics` timestamp, so no session rows means none were open
+- `server_collection_status`: one row per server with the latest host-metrics attempt, last success and `last_error` (NULL after a success); the dashboard shows the error for servers that are not reporting
 - `license_snapshots`, `license_features`, `license_usage_history`, `license_checkouts`: EDA license pool status, current per-feature usage, in-use history and checkout owners (parsed by `srcs/DataCollection/license_parser.py`)
 - `license_expiry`: every feature in each vendor's license file with its expiry (`lmstat -i`, via `LicenseUsage.sh --expiry`), replaced on each successful read; `license_validity()` in `utils/insights.py` turns it into valid / expiring / partly_expired / expired
 

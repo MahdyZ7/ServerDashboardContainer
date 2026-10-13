@@ -20,19 +20,16 @@
                     <thead>
                         <tr>
                             <th scope="col">Server</th>
-                            <th scope="col" title="CPU busy now. Bars turn orange at 70% and red at 90%">CPU</th>
-                            <th scope="col" title="Memory in use. Bars turn orange at 70% and red at 90%">Memory</th>
-                            <th scope="col" title="Local disk in use. Bars turn orange at 70% and red at 90%">Disk</th>
-                            <th scope="col" class="col-numeric" title="Logical CPUs minus the 5-minute load">Free cores</th>
-                            <th scope="col" class="col-numeric" title="Memory available for new work">Free RAM</th>
-                            <th scope="col" class="col-numeric" title="VNC desktops open (in brackets: with a viewer connected)">VNC</th>
-                            <th scope="col" class="col-numeric" title="SSH terminals (in brackets: input in the last 30 minutes)">SSH</th>
+                            <th scope="col" title="Bar: share of logical CPUs in use (5-minute load). Free cores of the total. Orange from 70%, red from 90%">CPU cores</th>
+                            <th scope="col" title="Bar: share of memory in use. Free GB (available for new work) of the total. Orange from 70%, red from 90%">Memory</th>
+                            <th scope="col" class="col-numeric" title="Local disk in use. Orange from 70%, red from 90%">Disk</th>
+                            <th scope="col" title="VNC desktops and SSH terminals open (hover for how many are in use)">Sessions</th>
                             <th scope="col" class="col-center">Lab share</th>
                         </tr>
                     </thead>
                     <tbody id="fleet-body" aria-live="polite">
                         {% for i in range(6) %}
-                        <tr><td colspan="9"><div class="skeleton" style="height: 18px;"></div></td></tr>
+                        <tr><td colspan="6"><div class="skeleton" style="height: 18px;"></div></td></tr>
                         {% endfor %}
                     </tbody>
                 </table>

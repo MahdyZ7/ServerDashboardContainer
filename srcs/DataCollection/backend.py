@@ -2,7 +2,7 @@
 import subprocess
 import psycopg2
 import logging
-from typing import Dict, List
+from typing import Dict, List, Optional
 import os
 from dotenv import load_dotenv
 import time
@@ -281,6 +281,14 @@ def init_db():
         "CREATE INDEX IF NOT EXISTS idx_server_network_iface_time ON server_network (server_name, interface, timestamp)",
         "CREATE INDEX IF NOT EXISTS idx_top_users_history_user_time ON top_users_history (username, timestamp)",
         "CREATE INDEX IF NOT EXISTS idx_top_users_history_server_time ON top_users_history (server_name, timestamp)",
+        # Outcome of the latest host-metrics attempt per server; last_error is NULL after a success
+        """
+		CREATE TABLE IF NOT EXISTS server_collection_status (
+			server_name VARCHAR(255) PRIMARY KEY,
+			last_attempt_at TIMESTAMP,
+			last_success_at TIMESTAMP,
+			last_error TEXT
+		)""",
     ]
 
     # License pools are queried once (not per compute server). A failed query
@@ -423,8 +431,29 @@ logger = logging.getLogger(__name__)
 
 
 class CollectionError(Exception):
-    """A remote script failed. The message never contains credentials."""
+    """A remote script failed. The message never contains credentials.
 
+    `reason` is a short, plain description for dashboard visitors (no script
+    names or stderr); the full message is for the collector log.
+    """
+
+    def __init__(self, message: str, reason: str = "Monitoring check failed on the server"):
+        super().__init__(message)
+        self.reason = reason
+
+
+# ssh stderr fragments -> visitor-facing reason for a failed connection (exit 255)
+CONNECT_REASONS = [
+    ("No route to host", "Server unreachable on the network"),
+    ("timed out", "Connection timed out"),
+    ("Connection refused", "Connection refused"),
+]
+
+# Visitor-facing reasons for the other BashGetInfo.sh exit statuses
+PUBLIC_EXIT_REASONS = {
+    5: "Monitoring login rejected",
+    6: "Server identity check failed",
+}
 
 # Exit statuses from BashGetInfo.sh (ssh / sshpass)
 SSH_EXIT_REASONS = {
@@ -462,13 +491,21 @@ def run_remote_script(server: Dict, script: str, args: List[str], timeout: int,
             command, capture_output=True, text=True, env=env, timeout=timeout
         )
     except subprocess.TimeoutExpired:
-        raise CollectionError(f"{script} on {server['name']} timed out after {timeout}s") from None
+        raise CollectionError(f"{script} on {server['name']} timed out after {timeout}s",
+                              "Server took too long to respond") from None
 
     if result.returncode not in accept_status:
         reason = SSH_EXIT_REASONS.get(result.returncode, f"exit status {result.returncode}")
+        public = PUBLIC_EXIT_REASONS.get(result.returncode, "Monitoring check failed on the server")
+        if result.returncode == 255:
+            public = next((text for fragment, text in CONNECT_REASONS if fragment in result.stderr),
+                          "Could not connect to the server")
+        if result.returncode == 5:
+            # sshpass already names the cause; stderr holds only the login banner
+            raise CollectionError(f"{script} on {server['name']}: {reason}", public)
         # Login banners can be long; the last lines carry the actual error
         stderr_tail = " | ".join(result.stderr.strip().splitlines()[-3:])
-        raise CollectionError(f"{script} on {server['name']}: {reason}. stderr: {stderr_tail}")
+        raise CollectionError(f"{script} on {server['name']}: {reason}. stderr: {stderr_tail}", public)
     return result.stdout
 
 
@@ -547,6 +584,30 @@ def store_metrics(metrics: Dict):
             f"Database error storing metrics for {metrics['server_name']}: {e}"
         )
         raise
+
+
+def record_collection_status(server_name: str, error: Optional[str] = None):
+    """Record the outcome of a host-metrics attempt so the dashboard can say why a
+    server is not reporting. `error` is shown to visitors: a short reason, never
+    script names or stderr. Never raises: this must not mask the original failure."""
+    try:
+        with psycopg2.connect(**DB_CONFIG) as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+					INSERT INTO server_collection_status
+						(server_name, last_attempt_at, last_success_at, last_error)
+					VALUES (%(name)s, CURRENT_TIMESTAMP,
+						CASE WHEN %(error)s IS NULL THEN CURRENT_TIMESTAMP END, %(error)s)
+					ON CONFLICT (server_name) DO UPDATE SET
+						last_attempt_at = EXCLUDED.last_attempt_at,
+						last_success_at = COALESCE(EXCLUDED.last_success_at,
+						                           server_collection_status.last_success_at),
+						last_error = EXCLUDED.last_error
+				""", {"name": server_name,
+                      "error": error})
+                conn.commit()
+    except Exception as e:
+        logger.error(f"Could not record collection status for {server_name}: {e}")
 
 
 def store_filesystems(cursor, server_name: str, filesystems: List[Dict]):
@@ -892,11 +953,16 @@ def run_single_collection_cycle(collect_disk_usage=False, run_cleanup=False):
                 metrics["server_name"] = server["name"]
                 store_metrics(metrics)
                 success_count += 1
+                record_collection_status(server["name"])
             except (CollectionError, ParseError) as e:
                 logger.error(f"Host metrics failed for {server['name']}: {e}")
+                record_collection_status(
+                    server["name"],
+                    e.reason if isinstance(e, CollectionError) else "Server returned unreadable data")
                 continue  # unreachable or broken: skip the per-user run as well
             except Exception as e:
                 logger.error(f"Error storing host metrics for {server['name']}: {e}", exc_info=True)
+                record_collection_status(server["name"], "Collected data could not be saved")
                 continue
 
             try:

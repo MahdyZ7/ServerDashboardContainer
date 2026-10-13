@@ -17,8 +17,8 @@ import requests
 
 from flask_config import Config, KU_COLORS, DASHBOARD_CONFIG, FONTS, PERFORMANCE_THRESHOLDS
 from blueprints.dashboard import dashboard_bp
-from utils.insights import (SEVERITY_ORDER, build_attention_items, build_license_items,
-                            format_held, license_validity, rank_placement)
+from utils.insights import (SEVERITY_ORDER, STALE_AFTER_MINUTES, build_attention_items,
+                            build_license_items, format_held, license_validity, rank_placement)
 from utils.server_page import (build_capacity, build_fleet, build_sessions, configured_servers,
                                resolve_server, server_status, top_accounts)
 
@@ -48,6 +48,14 @@ def get_db_connection():
     except Exception as e:
         logger.error(f"Database connection error: {e}")
         raise
+
+
+# Newest server_metrics row per server (one row even when timestamps tie)
+LATEST_METRICS_SQL = """
+SELECT DISTINCT ON (server_name) *
+FROM server_metrics
+ORDER BY server_name, timestamp DESC
+"""
 
 
 def create_app(config_class=Config):
@@ -141,19 +149,7 @@ def create_app(config_class=Config):
             conn = get_db_connection()
             cursor = conn.cursor()
 
-            query = """
-            WITH latest_records AS (
-                SELECT server_name, MAX(timestamp) as max_timestamp
-                FROM server_metrics
-                GROUP BY server_name
-            )
-            SELECT sm.*
-            FROM server_metrics sm
-            JOIN latest_records lr ON sm.server_name = lr.server_name AND sm.timestamp = lr.max_timestamp
-            ORDER BY sm.server_name
-            """
-
-            cursor.execute(query)
+            cursor.execute(LATEST_METRICS_SQL)
             columns = [desc[0] for desc in cursor.description]
             metrics = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
@@ -175,7 +171,8 @@ def create_app(config_class=Config):
     @app.route("/api/servers/<server_name>/metrics/historical", methods=["GET"])
     @app.route("/api/servers/<server_name>/metrics/historical/<int:hours>", methods=["GET"])
     def get_historical_metrics(server_name, hours=24):
-        """Get historical metrics for a specific server."""
+        """Get historical metrics for a specific server. Up to 90 days."""
+        hours = max(1, min(hours, 90 * 24))
         conn = None
         cursor = None
         try:
@@ -188,11 +185,11 @@ def create_app(config_class=Config):
                    cpu_usage_percent, swap_used_mb, swap_total_mb, swap_percentage,
                    net_rx_bytes, net_tx_bytes
             FROM server_metrics
-            WHERE server_name = %s AND timestamp > NOW() - INTERVAL %s
+            WHERE server_name = %s AND timestamp > NOW() - %s * INTERVAL '1 hour'
             ORDER BY timestamp
             """
 
-            cursor.execute(query, (server_name, f"{hours} hours"))
+            cursor.execute(query, (server_name, hours))
             columns = [desc[0] for desc in cursor.description]
             metrics = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
@@ -392,12 +389,12 @@ def create_app(config_class=Config):
             # Use actual CPU utilization if available, otherwise fall back to load heuristic
             cpu_high = (float(cpu_usage) > 85) if cpu_usage is not None else (cpu_load > 5)
 
-            if ram_percentage > 90 or disk_percentage > 90 or cpu_high or swap_percentage > 90:
-                status = "warning"
-            elif datetime.now() - datetime.fromisoformat(metric["timestamp"]) > timedelta(
-                minutes=15
+            if datetime.now() - datetime.fromisoformat(metric["timestamp"]) > timedelta(
+                minutes=STALE_AFTER_MINUTES
             ):
                 status = "offline"
+            elif ram_percentage > 90 or disk_percentage > 90 or cpu_high or swap_percentage > 90:
+                status = "warning"
             else:
                 status = "online"
 
@@ -423,18 +420,7 @@ def create_app(config_class=Config):
             cursor = conn.cursor()
 
             # Get latest metrics for all servers
-            latest_query = """
-            WITH latest_records AS (
-                SELECT server_name, MAX(timestamp) as max_timestamp
-                FROM server_metrics
-                GROUP BY server_name
-            )
-            SELECT sm.*
-            FROM server_metrics sm
-            JOIN latest_records lr ON sm.server_name = lr.server_name AND sm.timestamp = lr.max_timestamp
-            """
-
-            cursor.execute(latest_query)
+            cursor.execute(LATEST_METRICS_SQL)
             columns = [desc[0] for desc in cursor.description]
             metrics = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
@@ -463,11 +449,12 @@ def create_app(config_class=Config):
 
                 cpu_high = (float(cpu_usage) > 85) if cpu_usage is not None else (cpu_load > 5)
 
-                # Check if server is offline (no data in last 15 minutes)
+                # Offline when no data within the stale window
                 timestamp = metric.get("timestamp")
                 if (
-                    timestamp and (datetime.now() - timestamp).total_seconds() > 900
-                ):  # 15 minutes
+                    timestamp
+                    and (datetime.now() - timestamp).total_seconds() > STALE_AFTER_MINUTES * 60
+                ):
                     offline_servers += 1
                 elif ram_percentage > 90 or disk_percentage > 90 or cpu_high or swap_percentage > 90:
                     warning_servers += 1
@@ -571,12 +558,6 @@ def create_app(config_class=Config):
     # Actionable insights
     # ==========================================
 
-    LATEST_METRICS_SQL = """
-    SELECT DISTINCT ON (server_name) *
-    FROM server_metrics
-    ORDER BY server_name, timestamp DESC
-    """
-
     def _fetch_dicts(cursor, query, params=None):
         cursor.execute(query, params)
         columns = [desc[0] for desc in cursor.description]
@@ -642,6 +623,15 @@ def create_app(config_class=Config):
             by_vendor.setdefault(r["vendor"], []).append(r)
         return {vendor: license_validity(vrows, today) for vendor, vrows in by_vendor.items()}
 
+    def _collection_errors(cursor):
+        """{server_name: reason} for servers whose latest collection attempt failed.
+        Empty until the collector has created its status table."""
+        cursor.execute("SELECT to_regclass('server_collection_status')")
+        if cursor.fetchone()[0] is None:
+            return {}
+        cursor.execute("SELECT server_name, last_error FROM server_collection_status WHERE last_error IS NOT NULL")
+        return dict(cursor.fetchall())
+
     def _jsonable(row):
         return {k: float(v) if isinstance(v, Decimal) else v.isoformat() if isinstance(v, datetime) else v
                 for k, v in row.items()}
@@ -682,6 +672,7 @@ def create_app(config_class=Config):
                 disk_io_by_server=details["disk-io"],
                 network_by_server=details["network"],
                 services_by_server=details["services"],
+                collection_errors=_collection_errors(cursor),
             ) + build_license_items(*_current_licenses(cursor), now,
                                     validity=_license_validity(cursor, now.date()))
             items.sort(key=lambda i: (SEVERITY_ORDER[i["severity"]], i["server"]))
@@ -739,7 +730,8 @@ def create_app(config_class=Config):
             mounts = _fetch_dicts(cursor, f"SELECT d.* FROM server_mount_checks d {latest_run} ORDER BY d.id")
             now = datetime.now()
             rows = build_fleet(servers, _group_by_server(sessions), _group_by_server(mounts),
-                               now, PERFORMANCE_THRESHOLDS, [c["name"] for c in configured_servers()])
+                               now, PERFORMANCE_THRESHOLDS, [c["name"] for c in configured_servers()],
+                               _collection_errors(cursor))
             return jsonify({"success": True, "data": rows, "count": len(rows),
                             "generated_at": now.isoformat()})
         except Exception as e:
@@ -878,12 +870,15 @@ def create_app(config_class=Config):
             for group in ("vnc", "ssh"):
                 session_data[group] = [_jsonable(s) for s in session_data[group]]
             server = next((s for s in configured_servers() if s["name"] == server_name), {"name": server_name})
+            status = server_status(metrics, now, PERFORMANCE_THRESHOLDS)
+            if status["status"] == "offline":
+                status["last_error"] = _collection_errors(cursor).get(server_name)
             return jsonify({
                 "success": True,
                 "data": {
                     "server_name": server_name,
                     "host": server.get("host"),
-                    **server_status(metrics, now, PERFORMANCE_THRESHOLDS),
+                    **status,
                     "collected_at": metrics["timestamp"].isoformat(),
                     "capacity": build_capacity(metrics),
                     "mounts": mounts,

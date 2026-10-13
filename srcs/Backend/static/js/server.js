@@ -141,6 +141,7 @@
         const parts = [];
         if (d.status === 'offline') {
             parts.push(`<span class="lede-crit">${escapeHtml(d.server_name)} has not reported for ${since(d.collected_at)}</span>; figures below are from its last report.`);
+            if (d.last_error) parts.push(`Reason: ${escapeHtml(d.last_error)}.`);
         }
         parts.push(`<strong>${c.free_cores}</strong> of ${c.virtual_cpus} cores and <strong>${c.ram_free_gb ?? '?'} GB</strong> of memory are free.`);
         if (d.detail_collected) {

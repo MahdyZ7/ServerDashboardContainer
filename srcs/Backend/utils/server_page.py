@@ -151,10 +151,13 @@ def top_accounts(users: List[Dict[str, Any]], limit: int = TOP_USERS_LIMIT) -> L
 
 def build_fleet(servers: List[Dict[str, Any]], sessions_by_server: Dict[str, List[Dict[str, Any]]],
                 mounts_by_server: Dict[str, List[Dict[str, Any]]], now: datetime,
-                thresholds: Dict[str, float], configured: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+                thresholds: Dict[str, float], configured: Optional[List[str]] = None,
+                collection_errors: Optional[Dict[str, str]] = None) -> List[Dict[str, Any]]:
     """One overview row per server, most free capacity first (the placement ranking),
     with load, session counts and required-mount state from its latest run.
-    Configured servers that have never reported are listed last."""
+    Configured servers that have never reported are listed last. Rows that are not
+    reporting carry `last_error`, the reason the latest collection attempt failed."""
+    errors = collection_errors or {}
     by_name = {m["server_name"]: m for m in servers}
     rows = []
     for rank in rank_placement(servers, now):
@@ -179,4 +182,7 @@ def build_fleet(servers: List[Dict[str, Any]], sessions_by_server: Dict[str, Lis
         if name not in by_name:
             rows.append({"server_name": name, "status": "offline", "minutes_since_update": None,
                          "available": False, "detail_collected": False, "mounts": []})
+    for row in rows:
+        if row["status"] == "offline":
+            row["last_error"] = errors.get(row["server_name"])
     return rows

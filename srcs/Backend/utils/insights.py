@@ -76,6 +76,7 @@ def build_attention_items(
     disk_io_by_server: Optional[Dict[str, List[Dict[str, Any]]]] = None,
     network_by_server: Optional[Dict[str, List[Dict[str, Any]]]] = None,
     services_by_server: Optional[Dict[str, List[Dict[str, Any]]]] = None,
+    collection_errors: Optional[Dict[str, str]] = None,
 ) -> List[Dict[str, Any]]:
     """
     Produce a ranked list of issues, each with a concrete next step.
@@ -109,9 +110,11 @@ def build_attention_items(
 
         # Offline / stale data takes precedence: the other numbers are not current.
         if age is not None and age > STALE_AFTER_MINUTES:
+            error = (collection_errors or {}).get(name)
             add("critical", "offline", name,
                 f"{name} has stopped reporting",
-                f"Last data received {age / 60:.1f} h ago; figures shown for it are out of date.",
+                f"Last data received {age / 60:.1f} h ago; figures shown for it are out of date."
+                + (f" Reason: {error}." if error else ""),
                 "Check SSH reachability from the DataCollection container "
                 "(make logs-DataCollection) and whether the host is up.",
                 minutes_since_report=round(age))

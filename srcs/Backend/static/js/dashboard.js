@@ -226,10 +226,10 @@
             renderOverviewLede(rows);
             window.ServersMenu?.mark(rows.map(r => ({ server_name: r.server_name, online: r.status !== 'offline' })));
             body.innerHTML = rows.length ? rows.map(renderFleetRow).join('') : `
-                <tr><td colspan="9" class="table-empty">No server data yet.</td></tr>`;
+                <tr><td colspan="${FLEET_COLUMNS}" class="table-empty">No server data yet.</td></tr>`;
         } catch (error) {
             console.error('Error loading fleet:', error);
-            body.innerHTML = `<tr><td colspan="9" class="table-empty">
+            body.innerHTML = `<tr><td colspan="${FLEET_COLUMNS}" class="table-empty">
                 Failed to load server data.
                 <button class="btn btn-secondary" onclick="loadServerGrid()"><i class="fas fa-sync-alt" aria-hidden="true"></i> Retry</button>
             </td></tr>`;
@@ -237,12 +237,19 @@
         }
     }
 
-    function fleetBar(pct) {
-        if (pct == null) return '<span class="cell-muted">—</span>';
-        const p = Math.min(100, Math.max(0, parseFloat(pct)));
-        return `<div class="fleet-bar">
-            <div class="fleet-bar-track"><i style="width:${p}%;background:${getPercentageColor(p)}"></i></div>
-            <span>${p.toFixed(0)}%</span>
+    const FLEET_COLUMNS = 6;
+
+    /**
+     * Capacity cell: a bar filled to the share in use, then free / total.
+     * Bars are all the same length; the label carries the server's size.
+     */
+    function capacityCell(free, total, unit) {
+        if (free == null || !total) return '<span class="cell-muted">—</span>';
+        const used = Math.min(100, Math.max(0, (total - free) / total * 100));
+        const fmt = v => unit ? Math.round(v) : Math.round(v * 10) / 10;
+        return `<div class="fleet-cap" title="${used.toFixed(0)}% in use">
+            <span class="fleet-cap-track"><i style="width:${used}%;background:${getPercentageColor(used)}"></i></span>
+            <span class="fleet-cap-label"><strong>${fmt(free)}</strong><small> / ${Math.round(total)}${unit ? ` ${unit}` : ''} free</small></span>
         </div>`;
     }
 
@@ -265,7 +272,7 @@
         if (r.status === 'offline') {
             return `<tr class="fleet-row is-offline">
                 <td class="fleet-server"><span class="status-dot status-offline" aria-hidden="true"></span>${link}</td>
-                <td colspan="8" class="cell-muted">Not reporting — last data ${ageText(r.minutes_since_update)}</td>
+                <td colspan="${FLEET_COLUMNS - 1}" class="cell-muted">Not reporting${r.last_error ? ` — ${escapeHtml(r.last_error)}` : ''} · ${r.minutes_since_update == null ? 'never reported' : `last data ${ageText(r.minutes_since_update)}`}</td>
             </tr>`;
         }
         const dot = r.status === 'warning' ? 'status-warning' : '';
@@ -275,17 +282,18 @@
                 const [icon, tone, label] = MOUNT_MARK[m.state] || ['fa-question', 'is-warn', m.state];
                 return `<i class="fas ${icon} mount-mark ${tone}" title="${escapeHtml(m.name)}: ${escapeHtml(label)}"></i><span class="visually-hidden">${escapeHtml(m.name)} ${escapeHtml(label)}</span>`;
             }).join(' ') : '<span class="cell-muted">—</span>';
-        const count = (n, inUse, word) => !r.detail_collected ? '<span class="cell-muted">—</span>'
-            : `${n}${n ? `<small title="${inUse} ${word}"> (${inUse})</small>` : ''}`;
+        const disk = r.disk_percentage != null ? Math.round(parseFloat(r.disk_percentage)) : null;
+        const diskTone = disk > 90 ? 'is-crit' : disk > 70 ? 'is-warn' : '';
+        const count = (n, inUse, kind, word) =>
+            `<span title="${inUse} ${word}"><strong>${n}</strong> ${kind}</span>`;
+        const sessions = !r.detail_collected ? '<span class="cell-muted">—</span>'
+            : count(r.vnc, r.vnc_in_use, 'VNC', 'with a viewer connected') + count(r.ssh, r.ssh_in_use, 'SSH', 'active in the last 30 min');
         return `<tr class="fleet-row">
             <td class="fleet-server"><span class="status-dot ${dot}" aria-hidden="true"></span>${link}${star}</td>
-            <td>${fleetBar(r.cpu_usage_percent)}</td>
-            <td>${fleetBar(r.ram_percentage)}</td>
-            <td>${fleetBar(r.disk_percentage)}</td>
-            <td class="cell-numeric"><strong>${r.free_cores}</strong><small> / ${r.virtual_cpus}</small></td>
-            <td class="cell-numeric">${r.free_ram_gb != null ? `<strong>${Math.round(r.free_ram_gb)}</strong><small> / ${Math.round(r.ram_total_gb)} GB</small>` : '—'}</td>
-            <td class="cell-numeric">${count(r.vnc, r.vnc_in_use, 'viewed')}</td>
-            <td class="cell-numeric">${count(r.ssh, r.ssh_in_use, 'active')}</td>
+            <td>${capacityCell(r.free_cores, r.virtual_cpus, '')}</td>
+            <td>${capacityCell(r.free_ram_gb, r.ram_total_gb, 'GB')}</td>
+            <td class="cell-numeric">${disk != null ? `<span class="fleet-disk ${diskTone}">${disk}%</span>` : '—'}</td>
+            <td class="fleet-sessions">${sessions}</td>
             <td class="col-center">${lab}</td>
         </tr>`;
     }
@@ -670,7 +678,8 @@
         // Use actual CPU utilization if available, otherwise fall back to load heuristic
         const cpuHigh = cpuUsage !== null ? cpuUsage > 85 : cpuLoad > 5;
 
-        if (minutesSinceUpdate > 15) {
+        // Same window as STALE_AFTER_MINUTES in utils/insights.py: two collection runs
+        if (minutesSinceUpdate > 30) {
             return { label: 'Offline', class: 'status-offline', icon: 'fa-times-circle' };
         } else if (ram > 90 || disk > 90 || cpuHigh || swapPerc > 90) {
             return { label: 'Warning', class: 'status-warning', icon: 'fa-exclamation-triangle' };
@@ -683,7 +692,8 @@
      * Get performance rating
      */
     function getPerformanceRating(cpu, ram, disk) {
-        const score = (cpu * 10) + (ram * 0.4) + (disk * 0.2);
+        // All inputs are percentages; weights sum to 1 so the score stays 0–100
+        const score = (cpu * 0.4) + (ram * 0.4) + (disk * 0.2);
 
         if (score < 40) {
             return { rating: 'Excellent', class: 'perf-excellent', icon: 'fa-check-circle' };
