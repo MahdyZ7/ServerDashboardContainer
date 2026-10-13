@@ -130,6 +130,16 @@ class FleetTests(unittest.TestCase):
         self.assertEqual((rows[2]["status"], rows[2]["available"], rows[2]["detail_collected"]),
                          ("offline", False, False))
 
+    def test_offline_rows_carry_the_last_collection_error(self):
+        servers = [self.metrics("up", 8, 1), self.metrics("gone", 8, 0, 90)]
+        errors = {"gone": "SSH connection failed", "never": "authentication failed", "up": "stale"}
+        rows = {r["server_name"]: r for r in build_fleet(servers, {}, {}, NOW, THRESHOLDS,
+                                                         configured=["up", "gone", "never"],
+                                                         collection_errors=errors)}
+        self.assertEqual(rows["gone"]["last_error"], "SSH connection failed")
+        self.assertEqual(rows["never"]["last_error"], "authentication failed")
+        self.assertNotIn("last_error", rows["up"])
+
 
 if __name__ == "__main__":
     unittest.main()

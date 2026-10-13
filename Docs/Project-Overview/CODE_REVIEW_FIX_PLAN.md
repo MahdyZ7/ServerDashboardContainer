@@ -20,15 +20,17 @@ within each section.
 
 ## 2. Correctness bugs found in review
 
+All fixed 2026-10-13.
+
 | Item | Status |
 | --- | --- |
-| Server Details "Performance rating" uses `cpu * 10` with CPU in percent: any server above ~8 % CPU is rated Poor (`getPerformanceRating`, `dashboard.js`) | **Open.** |
-| Offline threshold differs: Server Details cards use 15 min (one collection interval, so servers flicker "Offline" before each run); overview, server pages and API insights use 30 min | **Open.** Use 30 min everywhere. |
-| `/api/servers/<name>/status` checks warning thresholds before staleness, so a stale server can show "warning" | **Open.** |
-| `/api/servers/metrics/latest` joins on `MAX(timestamp)` (duplicates on ties); use `DISTINCT ON` like the newer endpoints | **Open.** |
-| Cap `hours` on `/api/servers/<name>/metrics/historical/<hours>` | **Open.** (User history is already capped at 90 days.) |
-| Physical CPU count is 0 where `/proc/cpuinfo` has no `physical id` (some VMs) | **Open.** |
-| Show "collection failed: <reason>" instead of only "not reporting" (store the last error per server) | **Open.** |
+| Server Details "Performance rating" used `cpu * 10` with CPU in percent, so any server above ~8 % CPU was Poor (`getPerformanceRating`, `dashboard.js`) | **Done.** Weights 0.4 CPU / 0.4 RAM / 0.2 disk; score stays 0–100. |
+| Offline threshold differed: Server Details cards and `/api/system/overview` used 15 min (one collection interval) | **Done.** 30 min everywhere (`STALE_AFTER_MINUTES`). |
+| `/api/servers/<name>/status` checked warning thresholds before staleness | **Done.** Staleness first. |
+| `/api/servers/metrics/latest` (and `/api/system/overview`) joined on `MAX(timestamp)` | **Done.** Shared `LATEST_METRICS_SQL` (`DISTINCT ON`). |
+| Cap `hours` on `/api/servers/<name>/metrics/historical/<hours>` | **Done.** 1 h – 90 days, like user history. |
+| Physical CPU count was 0 where `/proc/cpuinfo` has no `physical id` | **Done.** Falls back to `lscpu` sockets, else NULL (shown as "?"). |
+| Show why a server is not reporting | **Done.** `server_collection_status` (last attempt, last success, last error per server); shown in the overview fleet table, on server pages and in the "stopped reporting" attention item. |
 
 ## 3. Data collection
 

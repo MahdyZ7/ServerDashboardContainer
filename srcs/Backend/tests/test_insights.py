@@ -41,6 +41,13 @@ def test_stale_server_is_critical_and_suppresses_other_checks():
     assert [(i["severity"], i["category"]) for i in items] == [("critical", "offline")]
 
 
+def test_stale_server_reports_the_last_collection_error():
+    stale = server("A", timestamp=NOW - timedelta(hours=2))
+    items = build_attention_items([stale], {}, {}, THRESHOLDS, NOW,
+                                  collection_errors={"A": "Server unreachable on the network"})
+    assert "Reason: Server unreachable on the network." in items[0]["detail"]
+
+
 def test_full_disk_names_largest_users():
     users = {"A": [{"username": "alice", "disk": 200, "mem": 1},
                    {"username": "bob", "disk": 50, "mem": 1},

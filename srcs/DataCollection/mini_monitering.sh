@@ -40,7 +40,12 @@ elif command -v lsb_release >/dev/null 2>&1; then
 	OS="$(lsb_release -si 2>/dev/null) $(lsb_release -sr 2>/dev/null)"
 fi
 
+# Sockets. Some VMs omit "physical id"; then ask lscpu, else leave empty (NULL), never 0
 PCPU=$(grep 'physical id' /proc/cpuinfo | sort -u | wc -l)
+if [ "$PCPU" -eq 0 ]; then
+	PCPU=$(LC_ALL=C lscpu 2>/dev/null | awk -F: '/^Socket\(s\)/ { gsub(/ /, "", $2); print $2 }')
+	case "$PCPU" in ''|*[!0-9]*|0) PCPU= ;; esac
+fi
 VCPU=$(getconf _NPROCESSORS_ONLN 2>/dev/null || grep -c '^processor' /proc/cpuinfo)
 
 # Memory from /proc/meminfo; "used" means not available to new work (MemTotal - MemAvailable)
